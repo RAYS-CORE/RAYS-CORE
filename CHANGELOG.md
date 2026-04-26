@@ -2,6 +2,21 @@
 
 All notable changes to RAYS-CORE will be documented in this file.
 
+## [1.5.4] - 2026-04-25
+
+### Changed
+- Bumped package version to `1.5.4` for a fresh TestPyPI/PyPI upload cycle.
+
+## [1.5.3] - 2026-04-25
+
+### Fixed
+- Resolved Windows startup crash caused by missing `readline` module.
+- Added graceful fallbacks for environments without `tty`/`termios`.
+- Guarded `SIGQUIT` registration for platforms that do not expose it.
+
+### Changed
+- Bumped package version to `1.5.3` in `pyproject.toml` and `setup.py`.
+
 ## [1.5.2] - 2026-04-25
 
 ### Changed

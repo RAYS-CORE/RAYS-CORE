@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rays-core"
-version = "1.5.2"
+version = "1.5.4"
 description = "RAYS-CORE: AI-powered codebase analysis and editing assistant"
 readme = "README.md"
 requires-python = ">=3.10"

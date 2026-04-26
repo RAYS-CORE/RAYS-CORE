@@ -23,11 +23,8 @@ import threading
 import re
 import textwrap
 import difflib
-import readline
 import atexit
 import signal
-import tty
-import termios
 import select
 from contextlib import contextmanager
 from typing import List, Optional, Dict, Tuple
@@ -35,6 +32,18 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
 from rich.text import Text
+
+try:
+    import readline
+except ImportError:
+    readline = None
+
+try:
+    import tty
+    import termios
+except ImportError:
+    tty = None
+    termios = None
 
 _console = Console(force_terminal=True)
 
@@ -83,8 +92,10 @@ _SIGINFO = getattr(signal, "SIGINFO", None)
 if _SIGINFO is not None:
     signal.signal(_SIGINFO, toggle_ui_mode)
 
-# SIGQUIT is Ctrl+\ and is very reliable
-signal.signal(signal.SIGQUIT, toggle_ui_mode)
+# SIGQUIT is Ctrl+\ and is very reliable (where available).
+_SIGQUIT = getattr(signal, "SIGQUIT", None)
+if _SIGQUIT is not None:
+    signal.signal(_SIGQUIT, toggle_ui_mode)
 
 def flush_thought_process():
     """Print buffered thought processes with pretty formatting — no raw JSON or prompts."""
@@ -1058,7 +1069,11 @@ def setup_history(path: str):
     """Initialize readline history with a specific file path."""
     global _history_path
     _history_path = os.path.join(path, "history")
-    
+
+    if readline is None:
+        # Windows may not ship GNU readline. History gracefully degrades.
+        return
+
     if os.path.exists(_history_path):
         try:
             readline.read_history_file(_history_path)
@@ -1073,6 +1088,9 @@ def setup_history(path: str):
 
 def save_history():
     """Save the current session history to disk."""
+    if readline is None:
+        return
+
     if _history_path:
         try:
             # Create directory if it doesn't exist
@@ -1183,9 +1201,74 @@ def select_from_menu(title: str, options: List[str], default_idx: int = 0) -> st
                 pass
             print(f"    {C_RED}Invalid choice.{RESET}")
 
-    import tty
-    import termios
-    
+    # Windows path: keep cursor-based selection via msvcrt (no tty/termios needed).
+    if os.name == "nt":
+        try:
+            import msvcrt
+            current_idx = min(max(0, default_idx), len(options) - 1)
+
+            def render_win(idx: int):
+                sys.stdout.write(f"\r\033[{len(options) + 2}A")
+                sys.stdout.write("\033[J")
+                title_tag = f"╭─ {BOLD}{title} "
+                title_vis_len = _vis_len(title_tag)
+                dashes = max(0, inner - title_vis_len + 1)
+                sys.stdout.write(f"\r  {C_VIOLET}{title_tag}{RESET}{C_VIOLET}{'─' * dashes}╮{RESET}\r\n")
+
+                for i, opt in enumerate(options):
+                    if i == idx:
+                        item_vis = f"  ❯ {opt}  "
+                        pad = max(0, inner - _vis_len(item_vis))
+                        sys.stdout.write(f"\r  {C_VIOLET}│{RESET}  {C_PINK}❯ {BOLD}{opt}{RESET}{' ' * pad}  {C_VIOLET}│{RESET}\r\n")
+                    else:
+                        item_vis = f"    {opt}  "
+                        pad = max(0, inner - _vis_len(item_vis))
+                        sys.stdout.write(f"\r  {C_VIOLET}│{RESET}    {C_GRAY}{opt}{RESET}{' ' * pad}  {C_VIOLET}│{RESET}\r\n")
+                sys.stdout.write(f"\r  {C_VIOLET}╰{'─' * inner}╯{RESET}\r\n")
+                sys.stdout.flush()
+
+            sys.stdout.write("\r\n" * (len(options) + 2))
+            render_win(current_idx)
+
+            while True:
+                ch = msvcrt.getwch()
+                if ch in ("\r", "\n"):
+                    return options[current_idx]
+                # Arrow keys on Windows are reported as prefix + code
+                if ch in ("\x00", "\xe0"):
+                    k = msvcrt.getwch()
+                    if k == "H":  # up
+                        current_idx = (current_idx - 1) % len(options)
+                        render_win(current_idx)
+                    elif k == "P":  # down
+                        current_idx = (current_idx + 1) % len(options)
+                        render_win(current_idx)
+                elif ch == "\x03":
+                    raise KeyboardInterrupt
+        except Exception:
+            pass
+
+    # Non-Windows or fallback path: if low-level terminal control isn't available,
+    # use numbered input mode.
+    if tty is None or termios is None:
+        title_len = _vis_len(f"╭─ {BOLD}{title} ")
+        dashes = max(0, inner - title_len - 1)
+        print(f"\n  {C_VIOLET}╭─ {C_WHITE}{BOLD}{title}{RESET} {C_VIOLET}{'─' * dashes}╮{RESET}")
+        for i, opt in enumerate(options):
+            raw_t = f"  [{i+1}] {opt}"
+            pad = max(0, inner - _vis_len(raw_t))
+            print(f"  {C_VIOLET}│{RESET}  {C_LILAC}[{i+1}]{RESET} {opt}{' ' * pad}{C_VIOLET}│{RESET}")
+        print(f"  {C_VIOLET}╰{'─' * inner}╯{RESET}")
+        while True:
+            try:
+                choice = input(f"  {C_PINK}❯ Select (1-{len(options)}): {RESET}").strip()
+                idx = int(choice) - 1
+                if 0 <= idx < len(options):
+                    return options[idx]
+            except Exception:
+                pass
+            print(f"    {C_RED}Invalid choice.{RESET}")
+
     current_idx = min(max(0, default_idx), len(options) - 1)
     
     def render(idx: int):
