@@ -13,12 +13,12 @@ authors = [
   { name = "Samreedh Bhuyan" }
 ]
 dependencies = [
-  "chromadb",
-  "msgpack",
-  "pyyaml",
-  "requests",
-  "rich",
-  "tree-sitter"
+  "chromadb>=0.4,<1",
+  "msgpack>=1.0,<2",
+  "pyyaml>=6.0,<7",
+  "requests>=2.28,<3",
+  "rich>=13,<14",
+  "tree-sitter>=0.21,<1"
 ]
 keywords = ["ai", "codebase", "developer-tools", "cli", "agent"]
 classifiers = [
@@ -34,10 +34,31 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=7,<9",
+  "build>=1",
+  "twine>=6.1,<7",
+]
+
 [project.scripts]
-rays = "rays_main:main"
+rays = "rays_core.rays_main:main"
 
 [project.urls]
 Homepage = "https://github.com/markknoffler/RAYS-CORE-CLI"
 Repository = "https://github.com/markknoffler/RAYS-CORE-CLI"
 Issues = "https://github.com/markknoffler/RAYS-CORE-CLI/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rays_core = ["config.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

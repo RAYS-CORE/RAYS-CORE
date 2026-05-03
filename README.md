@@ -191,7 +191,7 @@ Use:
 8. **Execution** and post-edit terminal actions
 9. **Memory + summary persistence**
 
-Core modules:
+Core modules (`src/rays_core/`):
 
 - `rays_main.py` - orchestrator and CLI loop
 - `task_analyzer.py` - intent and scope analysis
@@ -216,7 +216,11 @@ RAYS intentionally clears persisted API keys in config and uses runtime/session 
 
 ## Contributing
 
-Contributions are welcome. Start with `CONTRIBUTING.md` for setup, branch hygiene, PR expectations, and review checklist.
+Contributions are welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, branch hygiene, and PR expectations.
+
+Pull requests run **automated CI** (install → pytest → package build checks) on **Linux, macOS, and Windows** via GitHub Actions (see [.github/workflows/ci.yml](./.github/workflows/ci.yml)). You only need to push the workflow YAML in this repo — no extra dashboard setup unless Actions are disabled in repository settings.
+
+**More docs:** [`ROADMAP.md`](./ROADMAP.md) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)
 
 ## Security
 
