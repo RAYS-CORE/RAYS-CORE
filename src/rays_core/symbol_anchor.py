@@ -12,7 +12,7 @@ import ast
 import yaml
 from pathlib import Path
 from collections import defaultdict
-import chromadb
+from .chroma_client import persistent_client
 from typing import Dict, List, Optional
 
 from .ai_client import AIClient
@@ -201,7 +201,7 @@ class SymbolAnchor:
                 rays_ui.print_warning(f"Failed to get embedding for query: {query_text[:50]}...")
                 return []
             
-            client = chromadb.PersistentClient(path=self.chroma_path)
+            client = persistent_client(self.chroma_path)
             collection = client.get_collection("code_chunks")
             
             # Query with embedding (NOT query_texts which uses default embedder)

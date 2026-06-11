@@ -1,0 +1,17 @@
+{
+  "mcp_servers": [
+    {
+      "name": "blender",
+      "description": "Blender 3D via blender-mcp (stdio → addon socket on port 9876). In Blender: N panel → BlenderMCP → Connect.",
+      "command": "FULL_PATH_TO_UVX",
+      "args": ["--python", "3.11", "blender-mcp"],
+      "env": {
+        "BLENDER_HOST": "localhost",
+        "BLENDER_PORT": "9876",
+        "DISABLE_TELEMETRY": "true",
+        "UV_PYTHON_PREFERENCE": "only-managed"
+      },
+      "quiet": false
+    }
+  ]
+}

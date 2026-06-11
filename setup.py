@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="rays-core",
-    version="1.5.4",
+    version="1.6.0",
     description="RAYS-CORE — AI-Powered Development Assistant",
     author="Samreedh Bhuyan",
     url="https://github.com/markknoffler/RAYS-CORE-CLI",
@@ -16,6 +16,8 @@ setup(
         "requests>=2.28,<3",
         "rich>=13,<14",
         "tree-sitter>=0.21,<1",
+        "mcp>=1.2,<2",
+        "posthog>=2.4,<6",
     ],
     entry_points={
         "console_scripts": [

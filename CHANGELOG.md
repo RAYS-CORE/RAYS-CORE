@@ -4,18 +4,23 @@ All notable changes to RAYS-CORE will be documented in this file.
 
 ## [Unreleased]
 
-### Changed
-
-- Package layout: application modules and bundled `config.yaml` live under `src/rays_core/` (`src`-layout setuptools package). CLI entrypoint is `rays_core.rays_main:main`.
+## [1.6.0] - 2026-06-03
 
 ### Added
 
-- GitHub Actions CI (`.github/workflows/ci.yml`): runs on pushes and PRs to `main`/`master` on Ubuntu, macOS, and Windows.
-- Minimal `tests/` suite: import smoke checks, bytecode compile of tracked `.py` files, `config_locator` basics.
-- `project.optional-dependencies.dev` (`pytest`, `build`, `twine`) and `[tool.pytest.ini_options]`.
-- `ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/TROUBLESHOOTING.md`.
-- Issue templates (`bug_report`, `feature_request`) and pull request template.
-- Pinned/ranged runtime dependencies in `pyproject.toml` / `setup.py`.
+- **Agent orchestrator** (default CLI): unified skills + MCP planning, dynamic sub-agents, full execution transcripts between steps, Codex-style HUD (Ctrl+T transcript, Ctrl+U detail), boxed session summary with step updates and prose wrap-up.
+- MCP integration: `MCPManager`, `MCPOrchestrator`, `ToolPolicy`, `/mcp` status, lazy server connect, backend failure fail-fast and re-plan limits.
+- Skills sub-agent hardening: reject `completed` without tool calls; programmatic docx/pptx completion checks.
+- Config: `mcp_servers` merge (`config.yaml` → `~/.rays/mcp.json` → `<project>/.rays/mcp.json`), `mcp_tool_policy`, orchestrator prompts, MCP health/retry tunables.
+- `workspace_paths.resolve_workspace_path()` for cross-platform file tools in the skills orchestrator (forward/back slash safe on Windows).
+- Docs: `docs/MCP_SERVERS.md`, `docs/SKILLS.md`, `docs/PUBLISHING.md`, `examples/mcp/`, expanded `TROUBLESHOOTING.md`.
+- Tests: orchestrator, MCP health, execution context, workspace paths, tool policy.
+
+### Changed
+
+- Default prompt path uses `AgentOrchestrator`; **`/code` coding pipeline unchanged**.
+- Package layout: `src/rays_core/` with bundled `config.yaml`; CLI entrypoint `rays_core.rays_main:main`.
+- GitHub Actions CI on Ubuntu, macOS, and Windows (install, pytest, build + `twine check`).
 
 ## [1.5.4] - 2026-04-25
 

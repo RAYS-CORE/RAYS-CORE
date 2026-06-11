@@ -1,7 +1,7 @@
 import os
 import json
-import chromadb
 from pathlib import Path
+from .chroma_client import persistent_client
 from typing import Dict, List, Any, Optional
 from .ai_client import AIClient
 
@@ -17,7 +17,7 @@ class MemoryManager:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize ChromaDB
-        self.chroma_client = chromadb.PersistentClient(path=str(self.base_dir))
+        self.chroma_client = persistent_client(str(self.base_dir))
         self.collection = self.chroma_client.get_or_create_collection(
             name="chat_memories",
             metadata={"hnsw:space": "cosine"}

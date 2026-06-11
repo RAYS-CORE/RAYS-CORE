@@ -15,6 +15,7 @@ Color palette (ANSI 256):
   228 — yellow (warning)
 """
 
+import json
 import sys
 import os
 import time
@@ -27,7 +28,7 @@ import atexit
 import signal
 import select
 from contextlib import contextmanager
-from typing import List, Optional, Dict, Tuple
+from typing import Any, List, Optional, Dict, Tuple
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
@@ -78,14 +79,464 @@ C_DIM_GRAY = C_MID
 
 # UI State Management
 UI_MODE = "cool" # "cool" or "detail"
+_ORCHESTRATION_ACTIVE = False
+_ORCH_SESSION_START: float = 0.0
 THOUGHT_PROCESS_BUFFER = []
 _ACTIVE_SPINNER = None
 PENDING_TOGGLE = False  # Signal-safe toggle flag
+
+
+class OrchestrationHUD:
+    """Single top status line: rotating shapes + phase, tokens pinned to the right edge."""
+
+    def __init__(self) -> None:
+        self.active = False
+        self.phase = "RAYS"
+        self.detail = ""
+        self.tokens = 0
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._shape_idx = 0
+        self._color_idx = 0
+        self._rule_drawn = False
+        self._lock = threading.Lock()
+        self._pause_print = False
+
+    def start(self) -> None:
+        self.active = True
+        self._stop.clear()
+        if not self._rule_drawn:
+            inner = max(20, _term_width() - 4)
+            sys.stdout.write(f"\n  {C_MID}{'─' * inner}{RESET}\n")
+            sys.stdout.flush()
+            self._rule_drawn = True
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(target=self._animate, daemon=True)
+            self._thread.start()
+
+    def stop(self) -> None:
+        self.active = False
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=1.0)
+        sys.stdout.write(f"\r{' ' * _term_width()}\r\n")
+        sys.stdout.flush()
+
+    def set_status(self, phase: str, detail: str = "") -> None:
+        self.phase = phase
+        self.detail = (detail or "").strip()[:56]
+
+    def add_tokens(self, count: int) -> None:
+        if count > 0:
+            self.tokens += int(count)
+
+    def print_below(self, text: str) -> None:
+        """Print a persistent line above the HUD spinner without losing animation."""
+        if not self.active:
+            sys.stdout.write(text if text.endswith("\n") else text + "\n")
+            sys.stdout.flush()
+            return
+        with self._lock:
+            self._pause_print = True
+            time.sleep(0.14)
+            sys.stdout.write(f"\r{' ' * _term_width()}\r")
+            sys.stdout.write(text if text.endswith("\n") else text + "\n")
+            sys.stdout.flush()
+            self._pause_print = False
+
+    def _animate(self) -> None:
+        has_tty = False
+        fd = None
+        old_settings = None
+        try:
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            tty.setcbreak(fd)
+            has_tty = True
+        except Exception:
+            has_tty = False
+
+        try:
+            while not self._stop.is_set():
+                if self._pause_print:
+                    time.sleep(0.04)
+                    continue
+                process_pending_ui_events()
+                s1 = SHAPE_SEQUENCE[self._shape_idx % len(SHAPE_SEQUENCE)]
+                s2 = SHAPE_SEQUENCE[(self._shape_idx + 3) % len(SHAPE_SEQUENCE)]
+                c1 = THEME_COLORS[self._color_idx % len(THEME_COLORS)]
+                c2 = THEME_COLORS[(self._color_idx + 2) % len(THEME_COLORS)]
+                left = f" {c1}{s1}{RESET}{c2}{s2}{RESET} {C_LILAC}{self.phase}{RESET}"
+                if self.detail:
+                    left += f" {C_GRAY}· {self.detail}{RESET}"
+                token_label = f"tokens {self.tokens:,}"
+                token_part = f"{C_DIM_GRAY}{token_label}{RESET}"
+                width = _term_width()
+                left_vis = _vis_len(left)
+                token_vis = _vis_len(token_label)
+                gap = max(2, width - left_vis - token_vis - 1)
+                with self._lock:
+                    if not self._pause_print:
+                        sys.stdout.write(f"\r{left}{' ' * gap}{token_part} ")
+                        sys.stdout.flush()
+                if has_tty:
+                    try:
+                        if select.select([sys.stdin], [], [], 0)[0]:
+                            char = sys.stdin.read(1)
+                            if char == "\x15":  # Ctrl+U — detail toggle
+                                _toggle_ui_mode_now()
+                            elif char == "\x14":  # Ctrl+T — transcript (some terminals)
+                                show_orchestration_transcript()
+                    except Exception:
+                        pass
+                self._shape_idx += 1
+                if self._shape_idx % len(SHAPE_SEQUENCE) == 0:
+                    self._color_idx += 1
+                time.sleep(0.15)
+        finally:
+            if has_tty and old_settings is not None and fd is not None:
+                try:
+                    termios.tcsetattr(
+                        fd,
+                        termios.TCSABRAIN if hasattr(termios, "TCSABRAIN") else termios.TCSADRAIN,
+                        old_settings,
+                    )
+                except Exception:
+                    pass
+
+
+class OrchestrationTranscript:
+    """Buffered full transcript for Ctrl+T detail view."""
+
+    def __init__(self) -> None:
+        self.lines: List[str] = []
+
+    def clear(self) -> None:
+        self.lines.clear()
+
+    def add(self, line: str) -> None:
+        self.lines.append(re.sub(r"\033\[[0-9;]*m", "", line).strip())
+
+    def render(self) -> None:
+        if not self.lines:
+            return
+        inner = max(40, _term_width() - 8)
+        bar = "/" * max(8, (inner - 12) // 2)
+        header = f"  {C_MID}{bar}{RESET} {C_LILAC}{BOLD}TRANSCRIPT{RESET} {C_MID}{bar}{RESET}"
+        _orch_persistent_print(f"\n{header}\n")
+        for line in self.lines:
+            wrapped = textwrap.wrap(line, width=inner) or [line]
+            for w in wrapped:
+                _orch_persistent_print(f"  {C_DIM_GRAY}{w}{RESET}\n")
+        _orch_persistent_print(
+            f"\n  {C_DIM_GRAY}ctrl+t transcript · ctrl+u detail toggle{RESET}\n\n"
+        )
+
+
+_HUD = OrchestrationHUD()
+_ORCH_TRANSCRIPT = OrchestrationTranscript()
+
+
+def _orch_persistent_print(text: str) -> None:
+    if _HUD.active:
+        _HUD.print_below(text)
+    else:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+
+def _orch_transcript_note(text: str) -> None:
+    _ORCH_TRANSCRIPT.add(text)
+
+
+def orch_emit_validation(is_complete: bool, reasoning: str) -> None:
+    if is_complete:
+        orch_emit_action("Validated", "task complete", ok=True)
+    else:
+        orch_emit_section("Needs follow-up")
+    if reasoning:
+        for w in textwrap.wrap(reasoning.strip(), width=max(40, _term_width() - 10)):
+            _orch_persistent_print(f"    {C_DIM_GRAY}{w}{RESET}\n")
+        _orch_transcript_note(f"validation: {reasoning.strip()}")
+
+
+def orch_begin_session(user_prompt: str) -> None:
+    """Codex-style session opener under the HUD rule."""
+    prefix = get_shape_prefix()
+    _orch_persistent_print(f"\n  {prefix} {BOLD}{C_WHITE}Request{RESET}\n")
+    for w in textwrap.wrap(user_prompt.strip(), width=max(40, _term_width() - 8)):
+        _orch_persistent_print(f"    {C_CREAM}{w}{RESET}\n")
+    _orch_transcript_note(f"user: {user_prompt.strip()}")
+
+
+def orch_emit_section(title: str) -> None:
+    prefix = get_shape_prefix()
+    line = f"  {prefix} {BOLD}{C_WHITE}{title}{RESET}\n"
+    _orch_persistent_print(line)
+    _orch_transcript_note(title)
+
+
+def orch_emit_thinking(thought: str) -> None:
+    if not thought or not thought.strip():
+        return
+    wrapped = textwrap.wrap(thought.strip(), width=max(40, _term_width() - 10))
+    _orch_persistent_print(f"    {C_LILAC}{ITALIC}thinking{RESET}\n")
+    for w in wrapped:
+        _orch_persistent_print(f"    {C_DIM_GRAY}{ITALIC}{w}{RESET}\n")
+    _orch_transcript_note(f"thinking: {thought.strip()}")
+
+
+def orch_emit_action(verb: str, detail: str, *, ok: bool = True) -> None:
+    """Codex-style bullet: • Ran git status, • blender/get_scene_info"""
+    mark = f"{C_GREEN}•{RESET}" if ok else f"{C_HOT_PINK}•{RESET}"
+    verb_part = f"{BOLD}{verb}{RESET}" if verb else ""
+    detail_part = f" {C_WHITE}{detail}{RESET}" if detail else ""
+    line = f"  {mark} {verb_part}{detail_part}\n"
+    _orch_persistent_print(line)
+    _orch_transcript_note(f"{verb} {detail}".strip())
+
+
+def orch_emit_plan(summary: str, plan: List[Dict[str, Any]]) -> None:
+    orch_emit_section("Plan")
+    if summary:
+        for w in textwrap.wrap(summary.strip(), width=max(40, _term_width() - 8)):
+            _orch_persistent_print(f"    {C_CREAM}{w}{RESET}\n")
+        _orch_transcript_note(summary.strip())
+    for i, step in enumerate(plan, start=1):
+        stype = step.get("type") or ("skill" if step.get("skill") else "mcp")
+        if stype == "skill":
+            label = step.get("skill", "?")
+            phase = ""
+        else:
+            label = step.get("server", "?")
+            phase = f" [{step.get('phase', 'act')}]"
+        reason = (
+            step.get("spawn_reason")
+            or step.get("reason")
+            or step.get("intent")
+            or ""
+        )
+        _orch_persistent_print(
+            f"    {C_GRAY}{i}.{RESET} {C_LAVENDER}{label}{phase}{RESET}"
+            f"{f' — {C_DIM_GRAY}{truncate_for_display(reason, 72)}{RESET}' if reason else ''}\n"
+        )
+        _orch_transcript_note(f"{i}. {label}{phase} {reason}")
+
+
+def orch_emit_capabilities(skills: List[str], mcp_servers: List[str], reasoning: str = "") -> None:
+    parts = []
+    if skills:
+        parts.append(f"skills: {', '.join(skills)}")
+    if mcp_servers:
+        parts.append(f"MCP: {', '.join(mcp_servers)}")
+    if parts:
+        orch_emit_action("Using", " · ".join(parts))
+    if reasoning:
+        orch_emit_thinking(reasoning)
+
+
+def orch_emit_step_header(label: str, spawn_reason: str = "") -> None:
+    orch_emit_section(label)
+    if spawn_reason:
+        orch_emit_thinking(spawn_reason)
+
+
+def _format_tool_verb(tool: str, arguments: Any) -> Tuple[str, str]:
+    args = arguments if isinstance(arguments, dict) else {}
+    if tool == "list_directory":
+        return "Listed", f"`{args.get('path', '.')}`"
+    if tool == "read_file":
+        return "Read", f"`{args.get('path', '?')}`"
+    if tool == "write_file":
+        return "Wrote", f"`{args.get('path', '?')}`"
+    if tool == "patch_file":
+        return "Edited", f"`{args.get('path', '?')}`"
+    if tool == "run_shell_command":
+        cmd = str(args.get("command", "")).strip()
+        return "Ran", f"`{truncate_for_display(cmd, 64)}`"
+    return "Called", tool or "?"
+
+
+def orch_emit_tool_result(
+    tool: str,
+    arguments: Any,
+    result: str,
+    *,
+    server: str = "",
+) -> None:
+    ok = not str(result).lower().startswith("error")
+    if server:
+        verb, detail = "Called", f"{server}/{tool}"
+    else:
+        verb, detail = _format_tool_verb(tool, arguments)
+    orch_emit_action(verb, detail, ok=ok)
+    preview = truncate_for_display(result, 220 if UI_MODE == "detail" else 72)
+    if preview:
+        indent = "      "
+        if UI_MODE == "detail":
+            for w in textwrap.wrap(preview, width=max(36, _term_width() - 12)):
+                _orch_persistent_print(f"{indent}{C_DIM_GRAY}{w}{RESET}\n")
+        else:
+            _orch_persistent_print(f"{indent}{C_DIM_GRAY}→ {preview}{RESET}\n")
+    _orch_transcript_note(f"{verb} {detail} -> {preview}")
+
+
+def _format_crunched_elapsed(seconds: float) -> str:
+    total = max(0, int(round(seconds)))
+    if total < 60:
+        return f"Crunched for {total}s"
+    minutes, secs = divmod(total, 60)
+    if minutes < 60:
+        return f"Crunched for {minutes}m {secs}s" if secs else f"Crunched for {minutes}m"
+    hours, minutes = divmod(minutes, 60)
+    return f"Crunched for {hours}h {minutes}m"
+
+
+def _box_line(inner: int, content: str, *, color: str = "") -> None:
+    """Write one line inside the Session Summary box."""
+    pad = max(0, inner - _vis_len(content))
+    sys.stdout.write(
+        f"  {C_VIOLET}│{RESET}{color}{content}{' ' * pad}{C_VIOLET}│{RESET}\n"
+    )
+
+
+def orch_render_final_summary(result: Dict[str, Any]) -> None:
+    """Boxed session summary: step updates plus optional prose wrap-up."""
+    history = result.get("history") or []
+    complete = result.get("complete", False)
+    plan_summary = result.get("summary") or ""
+    narrative = (result.get("narrative_summary") or "").strip()
+
+    updates: List[str] = []
+    for entry in history:
+        etype = entry.get("type")
+        actions = entry.get("actions") or []
+        exit_msg = (entry.get("exit_message") or "").strip()
+        if etype == "skill":
+            name = entry.get("skill", "skill")
+            for a in actions:
+                tool = a.get("tool")
+                if not tool:
+                    continue
+                v, d = _format_tool_verb(tool, a.get("arguments"))
+                updates.append(f"{name}: {v} {d}")
+            if exit_msg and entry.get("status") == "completed":
+                updates.append(f"{name}: {truncate_for_display(exit_msg, 120)}")
+        elif etype == "mcp":
+            server = entry.get("server", "mcp")
+            phase = entry.get("phase", "act")
+            for a in actions:
+                tool = a.get("tool")
+                if not tool:
+                    continue
+                res = truncate_for_display(str(a.get("result", "")), 80)
+                ok = not res.lower().startswith("error")
+                mark = "✓" if ok else "✗"
+                updates.append(f"{mark} {server}/{tool} ({phase}) — {res}")
+            if exit_msg and entry.get("status") == "completed":
+                updates.append(f"{server}: {truncate_for_display(exit_msg, 120)}")
+
+    if not updates and plan_summary:
+        updates.append(truncate_for_display(plan_summary, 200))
+
+    inner = max(20, _safe_inner_width(margin=8, minimum=20))
+    status = f"{C_GREEN}complete{RESET}" if complete else f"{C_YELLOW}may need follow-up{RESET}"
+    title = f" {BOLD}Session Summary {RESET}{C_VIOLET}"
+    dashes = max(0, inner - _vis_len(title) - 1)
+    sys.stdout.write(f"\n  {C_VIOLET}╭─{RESET}{C_VIOLET}{title}{'─' * dashes}╮{RESET}\n")
+    _box_line(inner, f"  {C_LAVENDER}Status:{RESET} {status}")
+
+    if updates:
+        _box_line(inner, "")
+        _box_line(inner, f"  {C_LILAC}{BOLD}> Updates{RESET}")
+        for item in updates[:12]:
+            for w in textwrap.wrap(item, width=inner - 6):
+                _box_line(inner, f"  • {w}", color=C_CREAM)
+        if len(updates) > 12:
+            _box_line(inner, f"  … +{len(updates) - 12} more", color=C_DIM_GRAY)
+
+    if narrative:
+        _box_line(inner, "")
+        _box_line(inner, f"  {C_LILAC}{BOLD}> Summary{RESET}")
+        for para in re.split(r"\n\s*\n", narrative):
+            para = para.strip()
+            if not para:
+                continue
+            for w in textwrap.wrap(para, width=inner - 6):
+                _box_line(inner, f"  {w}", color=C_CREAM)
+
+    validation = (result.get("validation_reasoning") or "").strip()
+    if validation and not complete:
+        _box_line(inner, "")
+        _box_line(inner, f"  {C_YELLOW}{BOLD}Note{RESET}")
+        for w in textwrap.wrap(validation, width=inner - 6):
+            _box_line(inner, f"  {w}", color=C_DIM_GRAY)
+
+    sys.stdout.write(f"  {C_VIOLET}╰{'─' * inner}╯{RESET}\n")
+
+    elapsed = time.time() - _ORCH_SESSION_START if _ORCH_SESSION_START else 0.0
+    if elapsed > 0:
+        sys.stdout.write(f"  {C_DIM_GRAY}{_format_crunched_elapsed(elapsed)}{RESET}\n")
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+def show_orchestration_transcript() -> None:
+    if _ORCHESTRATION_ACTIVE:
+        _HUD.print_below("")
+    _ORCH_TRANSCRIPT.render()
+
+
+def hud_set_status(phase: str, detail: str = "") -> None:
+    if _HUD.active:
+        _HUD.set_status(phase, detail)
+
+
+def hud_add_tokens(count: int) -> None:
+    if _HUD.active and count > 0:
+        _HUD.add_tokens(count)
+
+
+def orchestration_hud_active() -> bool:
+    return _ORCHESTRATION_ACTIVE
+
+
+def hud_note_ok(message: str) -> None:
+    """One-line outcome after HUD stops (no walls of text)."""
+    prefix = get_shape_prefix()
+    sys.stdout.write(f"  {prefix} {C_GREEN}{message}{RESET}\n")
+    sys.stdout.flush()
+
+
+def hud_note_warn(message: str) -> None:
+    prefix = get_shape_prefix()
+    sys.stdout.write(f"  {prefix} {C_YELLOW}{message}{RESET}\n")
+    sys.stdout.flush()
 
 def toggle_ui_mode(signum=None, frame=None):
     """Toggle between cool and detail UI modes — signal-safe version."""
     global PENDING_TOGGLE
     PENDING_TOGGLE = True
+
+
+def _toggle_ui_mode_now() -> None:
+    global UI_MODE
+    UI_MODE = "detail" if UI_MODE == "cool" else "cool"
+    hint = "detail" if UI_MODE == "detail" else "compact"
+    _orch_persistent_print(f"    {C_DIM_GRAY}view: {hint}{RESET}\n")
+
+
+def process_pending_ui_events() -> None:
+    """Handle Ctrl+T (SIGINFO) and other deferred UI toggles during orchestration."""
+    global PENDING_TOGGLE
+    if not PENDING_TOGGLE:
+        return
+    PENDING_TOGGLE = False
+    if _ORCHESTRATION_ACTIVE:
+        show_orchestration_transcript()
+    else:
+        _toggle_ui_mode_now()
+        flush_thought_process()
 
 # Catch SIGINFO (Ctrl+T) or SIGQUIT (Ctrl+\) on Mac/Linux
 _SIGINFO = getattr(signal, "SIGINFO", None)
@@ -156,12 +607,44 @@ def flush_thought_process():
     sys.stdout.flush()
     THOUGHT_PROCESS_BUFFER = []
 
+@contextmanager
+def orchestration_hud():
+    """Compact agent/MCP UI: one animated status line, tokens on the right."""
+    global _ORCHESTRATION_ACTIVE, THOUGHT_PROCESS_BUFFER, _ORCH_SESSION_START
+    _ORCHESTRATION_ACTIVE = True
+    _ORCH_SESSION_START = time.time()
+    _ORCH_TRANSCRIPT.clear()
+    _HUD.start()
+    _orch_persistent_print(
+        f"  {C_DIM_GRAY}^T transcript · ^U detail toggle{RESET}\n"
+    )
+    try:
+        yield _HUD
+    finally:
+        _HUD.stop()
+        _ORCHESTRATION_ACTIVE = False
+        THOUGHT_PROCESS_BUFFER.clear()
+
+
+@contextmanager
+def orchestration_live_output():
+    """Deprecated alias — use orchestration_hud()."""
+    with orchestration_hud():
+        yield
+
+
 def log_model_interaction(action: str, details: str):
     """Log model reading/writing actions in a beautiful creamish style."""
+    if _ORCHESTRATION_ACTIVE:
+        label = action.replace("Model ", "").strip()
+        short = re.sub(r"\s+", " ", details).strip()[:48]
+        hud_set_status(label or "Thinking", short)
+        return
+
     icon = "⚙" if "read" in action.lower() else "✦"
     msg = f"  {C_DIM_CREAM}{icon} {action.upper()}:{RESET} {C_CREAM}{details}{RESET}\n"
     
-    if UI_MODE == "cool":
+    if UI_MODE == "cool" and not _ORCHESTRATION_ACTIVE:
         # Buffer and update sub-message, but NEVER print to stdout directly.
         THOUGHT_PROCESS_BUFFER.append(msg)
         if _ACTIVE_SPINNER:
@@ -176,9 +659,16 @@ def log_model_interaction(action: str, details: str):
     sys.stdout.write(msg)
     sys.stdout.flush()
 
-def capture_print(message: str):
-    """Capture or print based on UI_MODE."""
-    if _ACTIVE_SPINNER and UI_MODE == "cool":
+def capture_print(message: str, *, force: bool = False):
+    """Capture or print based on UI_MODE. force=True always prints immediately."""
+    if _ORCHESTRATION_ACTIVE and not force:
+        return
+    if (
+        not force
+        and not _ORCHESTRATION_ACTIVE
+        and _ACTIVE_SPINNER
+        and UI_MODE == "cool"
+    ):
         # Buffer it for later
         THOUGHT_PROCESS_BUFFER.append(message)
         # Update spinner sub-message with a sanitized snippet
@@ -296,21 +786,38 @@ def display_banner():
 class AnimatedShapeSpinner:
     """Threaded spinner that cycles shapes and colors with a 2-second minimum."""
     
-    def __init__(self, message: str = "Working", cool_messages: List[str] = None):
+    def __init__(
+        self,
+        message: str = "Working",
+        cool_messages: List[str] = None,
+        *,
+        use_global: bool = True,
+        dual_shapes: bool = False,
+    ):
         self.original_message = message
         self.message = message
         self.cool_messages = cool_messages or []
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self.start_time: float = 0.0
+        self.use_global = use_global
+        self.dual_shapes = dual_shapes
     
     def _spin(self):
         shape_idx = 0
         color_idx = 0
         while not self._stop_event.is_set():
-            shape = SHAPE_SEQUENCE[shape_idx % len(SHAPE_SEQUENCE)]
-            color = THEME_COLORS[color_idx % len(THEME_COLORS)]
-            sys.stdout.write(f"\r  {color}{shape}{RESET} {C_GRAY}{self.message}{RESET}   ")
+            if self.dual_shapes:
+                s1 = SHAPE_SEQUENCE[shape_idx % len(SHAPE_SEQUENCE)]
+                s2 = SHAPE_SEQUENCE[(shape_idx + 3) % len(SHAPE_SEQUENCE)]
+                c1 = THEME_COLORS[color_idx % len(THEME_COLORS)]
+                c2 = THEME_COLORS[(color_idx + 2) % len(THEME_COLORS)]
+                prefix = f"{c1}{s1}{RESET}{c2}{s2}{RESET}"
+            else:
+                shape = SHAPE_SEQUENCE[shape_idx % len(SHAPE_SEQUENCE)]
+                color = THEME_COLORS[color_idx % len(THEME_COLORS)]
+                prefix = f"{color}{shape}{RESET}"
+            sys.stdout.write(f"\r  {prefix} {C_GRAY}{self.message}{RESET}   ")
             sys.stdout.flush()
             
             shape_idx += 1
@@ -324,7 +831,8 @@ class AnimatedShapeSpinner:
     
     def start(self):
         global _ACTIVE_SPINNER
-        _ACTIVE_SPINNER = self
+        if self.use_global:
+            _ACTIVE_SPINNER = self
         self._stop_event.clear()
         self.start_time = time.time()
         self._thread = threading.Thread(target=self._spin, daemon=True)
@@ -332,7 +840,7 @@ class AnimatedShapeSpinner:
     
     def stop(self, final_message: str = "", success: bool = True):
         global _ACTIVE_SPINNER
-        if _ACTIVE_SPINNER == self:
+        if self.use_global and _ACTIVE_SPINNER == self:
             _ACTIVE_SPINNER = None
             
         # Enforce weight
@@ -357,6 +865,17 @@ class AnimatedShapeSpinner:
 def spinner(message: str = "Working"):
     """Context manager for animated shape spinner."""
     s = AnimatedShapeSpinner(message)
+    s.start()
+    try:
+        yield s
+    finally:
+        s.stop()
+
+
+@contextmanager
+def local_shape_spinner(message: str = "Working"):
+    """Shape/color spinner on one line without buffering other output."""
+    s = AnimatedShapeSpinner(message, use_global=False, dual_shapes=True)
     s.start()
     try:
         yield s
@@ -403,8 +922,10 @@ class CoolAnimation(AnimatedShapeSpinner):
         tick = 0
         
         # Scope terminal settings only for the duration of this animation
-        fd = sys.stdin.fileno()
+        has_tty = False
+        fd = None
         try:
+            fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
             tty.setcbreak(fd)
             has_tty = True
@@ -520,10 +1041,10 @@ def print_phase(title: str):
     capture_print(f"\n  {prefix} {BOLD}{C_WHITE}{title}{RESET}\n")
 
 
-def print_sub_phase(title: str):
+def print_sub_phase(title: str, *, force: bool = True):
     """Print a sub-phase indicator with a shape."""
     prefix = get_shape_prefix()
-    capture_print(f"\n  {prefix} {C_LAVENDER}{title}{RESET}\n")
+    capture_print(f"\n  {prefix} {C_LAVENDER}{title}{RESET}\n", force=force)
 
 
 def print_step(message: str, success: bool = True):
@@ -562,17 +1083,104 @@ def print_exception(e: Exception, devmode: bool = None):
         capture_print(f"\n{C_NEON_BLUE}{trace}{RESET}\n")
 
 
-def print_info(message: str):
+def print_info(message: str, *, force: bool = False):
     """Print an info message."""
     prefix = get_shape_prefix()
-    capture_print(f"    {prefix} {C_LAVENDER}{message}{RESET}\n")
+    capture_print(f"    {prefix} {C_LAVENDER}{message}{RESET}\n", force=force)
+
+
+MCP_MESSAGES = [
+    "Connecting to external application...",
+    "Reading current state...",
+    "Planning next MCP action...",
+    "Applying changes step by step...",
+    "Verifying outcome...",
+]
+
+def truncate_for_display(text: str, max_len: int = 280) -> str:
+    """Single-line preview for MCP tool results."""
+    one_line = re.sub(r"\s+", " ", str(text)).strip()
+    if len(one_line) <= max_len:
+        return one_line
+    return one_line[: max_len - 3] + "..."
+
+
+def print_mcp_step_header(server: str, phase: str, intent: str, task_count: int) -> None:
+    if _ORCHESTRATION_ACTIVE:
+        hud_set_status(f"MCP {server}", f"{phase} · {task_count} task(s)")
+        return
+    prefix = get_shape_prefix()
+    capture_print(
+        f"\n  {prefix} {BOLD}{C_WHITE}MCP {server}{RESET} "
+        f"{C_LAVENDER}[{phase}]{RESET} — {C_CREAM}{intent}{RESET}\n",
+        force=True,
+    )
+
+
+def print_mcp_task_start(index: int, total: int, purpose: str) -> None:
+    if _ORCHESTRATION_ACTIVE:
+        hud_set_status("MCP", f"{index}/{total}")
+        return
+    prefix = get_shape_prefix()
+    capture_print(
+        f"    {prefix} {C_LILAC}Task {index}/{total}{RESET} "
+        f"{C_GRAY}{truncate_for_display(purpose, 120)}{RESET}\n",
+        force=True,
+    )
+
+
+def print_mcp_thought(thought: str) -> None:
+    if _ORCHESTRATION_ACTIVE:
+        orch_emit_thinking(thought)
+        return
+
+
+def print_mcp_tool_invoke(server: str, tool_name: str, arguments: Any = None) -> None:
+    if _ORCHESTRATION_ACTIVE:
+        hud_set_status("Calling", f"{server}/{tool_name}")
+        return
+    prefix = get_shape_prefix()
+    capture_print(
+        f"      {prefix} {C_VIOLET}call{RESET} {BOLD}{server}/{tool_name}{RESET}\n",
+        force=True,
+    )
+
+
+def print_mcp_tool_done(
+    server: str,
+    tool_name: str,
+    result: str,
+    arguments: Any = None,
+) -> None:
+    if _ORCHESTRATION_ACTIVE:
+        orch_emit_tool_result(
+            tool_name, arguments, result, server=server
+        )
+        err = str(result).lower().startswith("error")
+        hud_set_status("Done" if not err else "Failed", f"{server}/{tool_name}")
+        return
+    prefix = get_shape_prefix()
+    preview = truncate_for_display(result, 160)
+    capture_print(
+        f"      {prefix} {C_GREEN}done{RESET} "
+        f"{server}/{tool_name} {C_GRAY}→ {preview}{RESET}\n",
+        force=True,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
 #                          BOXES
 # ═══════════════════════════════════════════════════════════════════════
 
-def print_box(title: str, content: str, color: str = C_VIOLET, max_lines: int = 15, content_color: str = C_CREAM):
+def print_box(
+    title: str,
+    content: str,
+    color: str = C_VIOLET,
+    max_lines: int = 15,
+    content_color: str = C_CREAM,
+    *,
+    force: bool = False,
+):
     """Print a styled box with precision alignment."""
     lines = content.split('\n')
     truncated = len(lines) > max_lines
@@ -585,20 +1193,20 @@ def print_box(title: str, content: str, color: str = C_VIOLET, max_lines: int = 
     title_text = f" {BOLD}{title} {RESET}{color}"
     title_vis = _vis_len(title_text)
     dashes = max(0, inner - title_vis - 1)
-    capture_print(f"\n  {color}╭─{RESET}{color}{title_text}{'─' * dashes}╮{RESET}\n")
+    capture_print(f"\n  {color}╭─{RESET}{color}{title_text}{'─' * dashes}╮{RESET}\n", force=force)
     
     for line in display_lines:
         visible = line[:max(1, inner - 4)] # Leave room for internal padding
         content_line = f"  {visible}"
         pad = max(0, inner - _vis_len(content_line))
-        capture_print(f"  {color}│{RESET}{content_color}{content_line}{' ' * pad}{color}│{RESET}\n")
+        capture_print(f"  {color}│{RESET}{content_color}{content_line}{' ' * pad}{color}│{RESET}\n", force=force)
     
     if truncated:
         msg = f"  … +{len(lines) - max_lines} more lines"
         pad = max(0, inner - _vis_len(msg))
-        capture_print(f"  {color}│{RESET}{C_DIM_GRAY}{msg}{' ' * pad}{color}│{RESET}\n")
+        capture_print(f"  {color}│{RESET}{C_DIM_GRAY}{msg}{' ' * pad}{color}│{RESET}\n", force=force)
     
-    capture_print(f"  {color}╰{'─' * inner}╯{RESET}\n")
+    capture_print(f"  {color}╰{'─' * inner}╯{RESET}\n", force=force)
 
 
 def print_plan_box(plan_text: str):
@@ -1039,6 +1647,7 @@ def print_help():
         ("/help",          "Show this help message"),
         ("/exit",          "Exit RAYS"),
         ("/code <prompt>", "Execute coding pipeline (edit, create, etc.)"),
+        ("/mcp",           "List configured MCP servers and connection status"),
         ("/model <name>",  "Switch to a different model"),
         ("/chat <prompt>", "Read-only contextual Q&A (no edit pipeline)"),
         ("/mode auto",     "Switch to autonomous execution (no confirmations)"),

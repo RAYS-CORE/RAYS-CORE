@@ -52,9 +52,7 @@ class AIClient:
         # Global hard throttle to reduce provider-side rate limiting.
         time.sleep(3.0)
 
-        # Log the request
-        prompt_snippet = (prompt[:100] + "...") if len(prompt) > 100 else prompt
-        rays_ui.log_model_interaction("Model Request", prompt_snippet)
+        rays_ui.log_model_interaction("Thinking", "…")
         
         if self.provider == "ollama":
             response = self._ollama_generate(prompt, system_prompt)
@@ -63,9 +61,7 @@ class AIClient:
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
             
-        # Log the response (truncated)
-        resp_snippet = (response[:100] + "...") if len(response) > 100 else response
-        rays_ui.log_model_interaction("Model Response", resp_snippet)
+        rays_ui.log_model_interaction("Thinking", "…")
 
         # Symmetric post-call delay to space out consecutive prompts.
         time.sleep(3.0)
@@ -210,18 +206,32 @@ class AIClient:
             response.raise_for_status()
             
             full_response = ""
+            prompt_tokens = 0
+            completion_tokens = 0
             for line in response.iter_lines():
                 if line:
                     chunk = json.loads(line)
                     text = chunk.get('response', '')
                     full_response += text
-                    # Minimal feedback to UI during stream
-                    if len(full_response) % 100 == 0:
-                         rays_ui.log_model_interaction("Model Thinking", f"...generated {len(full_response)} chars")
-                    
                     if chunk.get('done'):
+                        prompt_tokens = int(
+                            chunk.get('prompt_eval_count')
+                            or chunk.get('prompt_tokens')
+                            or 0
+                        )
+                        completion_tokens = int(
+                            chunk.get('eval_count')
+                            or chunk.get('completion_tokens')
+                            or 0
+                        )
                         break
-            
+            total = prompt_tokens + completion_tokens
+            if total > 0:
+                rays_ui.hud_add_tokens(total)
+            elif full_response or prompt:
+                rays_ui.hud_add_tokens(
+                    max(1, len(prompt) // 4) + max(1, len(full_response) // 4)
+                )
             return full_response
         except Exception as e:
             rays_ui.print_exception(e)
@@ -296,7 +306,16 @@ class AIClient:
         try:
             response = requests.post(url, json=payload, timeout=3600)
             response.raise_for_status()
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
+            data = response.json()
+            usage = data.get("usageMetadata") or {}
+            total = int(usage.get("promptTokenCount") or 0) + int(
+                usage.get("candidatesTokenCount") or 0
+            )
+            if total > 0:
+                rays_ui.hud_add_tokens(total)
+            elif prompt:
+                rays_ui.hud_add_tokens(max(1, len(prompt) // 4))
+            return data['candidates'][0]['content']['parts'][0]['text']
         except Exception as e:
             rays_ui.print_exception(e)
             return ""

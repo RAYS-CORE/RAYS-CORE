@@ -14,6 +14,7 @@ from datetime import datetime
 import msgpack
 import json
 import chromadb
+from . import chroma_client  # noqa: F401 — posthog capture compat for chromadb
 from .ai_client import AIClient
 from .task_analyzer import TaskAnalyzer
 from . import rays_ui
@@ -33,6 +34,8 @@ from .affected_symbols_skeleton_fill import AffectedSymbolsSkeletonFiller
 from .chat_context_pipeline import ChatContextPipeline
 from .config_locator import resolve_config_path
 from .skills_orchestrator import SkillsOrchestrator
+from .mcp_manager import MCPManager
+from .agent_orchestrator import AgentOrchestrator
 
 class RAYS:
     def __init__(
@@ -114,6 +117,15 @@ class RAYS:
             execution_mode=self.execution_mode
         )
         self.skills_orchestrator = SkillsOrchestrator(self.ai_client, self.config, self.codebase_root)
+        self.mcp_manager = MCPManager(self.config, self.codebase_root)
+        self.agent_orchestrator = AgentOrchestrator(
+            self.ai_client,
+            self.config,
+            self.codebase_root,
+            self.skills_orchestrator,
+            self.mcp_manager,
+            execution_mode=self.execution_mode,
+        )
 
         # Initialize CLI history
         rays_ui.setup_history(str(self.rays_dir))
@@ -126,6 +138,7 @@ class RAYS:
         self.execution_mode = normalized
         self.executor.execution_mode = normalized
         self.terminal_engine.execution_mode = normalized
+        self.agent_orchestrator.set_execution_mode(normalized)
 
     
     def _load_config(self, path: str) -> Dict[str, Any]:
@@ -716,7 +729,8 @@ def main():
     config_path = str(resolve_config_path(args.config))
     
     rays_dir = codebase_path / ".rays"
-    
+    rays = None
+
     try:
         # Show banner
         rays_ui.display_banner()
@@ -952,13 +966,18 @@ def main():
                         summary = summarizer.summarize()
                         rays_ui.print_box("Git Change Summary", summary, rays_ui.C_VIOLET)
                         continue
+
+                    elif cmd == '/mcp':
+                        status = rays.agent_orchestrator.list_mcp_status()
+                        rays_ui.print_box("MCP Status", status, rays_ui.C_VIOLET)
+                        continue
                     
                     else:
                         rays_ui.print_warning(f"Unknown command: {cmd}. Type /help for available commands.")
                         continue
                 
-                # ── Run the pipeline ────────────────────────────
-                rays.skills_orchestrator.run(user_prompt=user_input)
+                # ── Agent orchestrator (skills + MCP); use /code for coding pipeline ──
+                rays.agent_orchestrator.run(user_prompt=user_input)
                 first_run = False
                 
             except KeyboardInterrupt:
@@ -972,13 +991,16 @@ def main():
         
         if not intentional_exit:
             print(f"\n  {rays_ui.C_RED}[CRITICAL] Interactive loop broken unexpectedly. Please report this error.{rays_ui.RESET}")
-            
+
     except KeyboardInterrupt:
         print(f"\n\n  {rays_ui.C_LAVENDER}Goodbye!{rays_ui.RESET}\n")
         sys.exit(130)
     except Exception as e:
         rays_ui.print_exception(e)
         sys.exit(1)
+    finally:
+        if rays is not None:
+            rays.mcp_manager.shutdown()
 
 
 def _print_execution_summary(results):

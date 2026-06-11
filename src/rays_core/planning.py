@@ -1,6 +1,6 @@
 # planning.py
 import msgpack
-import chromadb
+from .chroma_client import persistent_client
 import copy
 from pathlib import Path
 from .ai_client import AIClient
@@ -402,7 +402,7 @@ class Planner:
         # Retrieve code for predicted blockers from vector DB
         
         chroma_path = str(self.rays_dir / "chroma_db")
-        client = chromadb.PersistentClient(path=chroma_path)
+        client = persistent_client(chroma_path)
         collection = client.get_collection("code_chunks")
         
         blocking_symbols_code = ""
@@ -589,7 +589,7 @@ class Planner:
             if chunk_id:
                 try:
                     chroma_path = str(self.rays_dir / "chroma_db")
-                    client = chromadb.PersistentClient(path=chroma_path)
+                    client = persistent_client(chroma_path)
                     collection = client.get_collection("code_chunks")
                     
                     result = collection.get(

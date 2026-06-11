@@ -2,8 +2,8 @@ import os
 import sys
 import msgpack
 import yaml
-import chromadb
 from pathlib import Path
+from .chroma_client import persistent_client
 from typing import List, Dict, Optional
 from .ai_client import AIClient
 
@@ -33,7 +33,7 @@ class VectorDBGenerator:
         
         # Initialize ChromaDB
         chroma_path = str(self.rays_dir / "chroma_db")
-        self.client = chromadb.PersistentClient(path=chroma_path)
+        self.client = persistent_client(chroma_path)
         self.collection = self.client.get_or_create_collection(
             name="code_chunks",
             metadata={"hnsw:space": "cosine"}

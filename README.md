@@ -35,10 +35,11 @@ RAYS-CORE is an AI coding assistant for local repositories. It indexes your code
 
 ## Features
 
+- **Default agent orchestrator**: skills + MCP servers with dynamic sub-agents, live HUD, and session summary (`/mcp` for server status).
 - Codebase indexing (`files`, `symbols`, `relationships`, `boundaries`) via msgpack registries.
 - ChromaDB-backed vector retrieval for relevant chunks.
-- Multi-stage edit pipeline: task analysis -> selection -> planning -> permissions -> apply.
-- Interactive slash commands (`/chat`, `/model`, `/mode`, `/git`, `/help`).
+- Multi-stage **`/code`** edit pipeline: task analysis -> selection -> planning -> permissions -> apply.
+- Interactive slash commands (`/chat`, `/code`, `/model`, `/mode`, `/git`, `/mcp`, `/help`).
 - Session-aware API key handling (reads env vars first; never persists keys in `config.yaml`).
 
 ## Supported Providers
@@ -126,25 +127,36 @@ cd /path/to/your/codebase
 rays
 ```
 
-## The 3 Operating Modes
+## Operating modes
 
-RAYS-CORE supports three workflow modes in practice:
+RAYS-CORE supports these workflow modes:
 
-1. **Editing mode (default pipeline)**
-   - Trigger: normal prompt without `/chat`.
+1. **Agent orchestrator (default prompt)**
+   - Trigger: normal prompt without `/chat` or `/code`.
+   - Behavior: discovers **skills** (`skills/`, `~/.rays/skills/`) and **MCP servers** (`config.yaml` → `~/.rays/mcp.json` → `<project>/.rays/mcp.json`), plans spawn steps, runs dynamic sub-agents. Use for Blender, documents, GitHub MCP, and local file/shell tasks.
+   - Docs: [`docs/SKILLS.md`](./docs/SKILLS.md) · [`docs/MCP_SERVERS.md`](./docs/MCP_SERVERS.md)
+
+2. **Editing mode (`/code`)**
+   - Trigger: `/code` then your prompt (or legacy full coding pipeline where enabled).
    - Behavior: analyzes task, identifies symbols/files, negotiates permissions, plans edits, applies changes.
 
-2. **New codebase generation mode**
+3. **New codebase generation mode**
    - Trigger: prompts that clearly request creating a new project and low structural dependency on existing code.
    - Behavior: sets up project structure, negotiates creation scope, generates files iteratively.
 
-3. **Chat mode (`/chat`)**
+4. **Chat mode (`/chat`)**
    - Trigger: `/chat <question>`.
    - Behavior: read-only contextual Q&A; no edit pipeline.
 
 ## Prompting Guide
 
-### Editing mode prompts (normal chat input)
+### Agent orchestrator prompts (default — no slash command)
+
+- "Add icing and sprinkles to the doughnut in Blender."
+- "List this project's top-level files and summarize the README."
+- "Create a Word doc from `notes.md` in this folder."
+
+### Editing mode prompts (`/code`)
 
 - "Refactor authentication middleware to support JWT refresh tokens."
 - "Fix the bug where user profile update fails on missing avatar."
@@ -171,6 +183,7 @@ Use:
 - `/mode auto` - autonomous command execution
 - `/mode ask` - ask-permission command execution
 - `/git` - summarize current git changes
+- `/mcp` - list MCP servers and connection status (agent orchestrator)
 - `/clear` - clear screen
 - `/exit` - exit RAYS
 
@@ -220,7 +233,7 @@ Contributions are welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) for
 
 Pull requests run **automated CI** (install → pytest → package build checks) on **Linux, macOS, and Windows** via GitHub Actions (see [.github/workflows/ci.yml](./.github/workflows/ci.yml)). You only need to push the workflow YAML in this repo — no extra dashboard setup unless Actions are disabled in repository settings.
 
-**More docs:** [`ROADMAP.md`](./ROADMAP.md) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)
+**More docs:** [`ROADMAP.md`](./ROADMAP.md) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · [`docs/SKILLS.md`](./docs/SKILLS.md) · [`docs/MCP_SERVERS.md`](./docs/MCP_SERVERS.md) · [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)
 
 ## Security
 
@@ -241,6 +254,8 @@ twine check dist/*
 ```
 
 ### Publish to PyPI
+
+See [`docs/PUBLISHING.md`](./docs/PUBLISHING.md) for the full maintainer checklist (version bump, tag, CI, upload).
 
 ```bash
 python -m twine upload dist/*

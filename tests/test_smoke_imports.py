@@ -20,6 +20,13 @@ def test_import_rays_main_orchestrator():
     assert hasattr(rays_main, "main")
 
 
+def test_import_mcp_modules():
+    from rays_core import mcp_manager, agent_orchestrator, mcp_orchestrator, tool_registry  # noqa: F401
+
+    assert hasattr(mcp_manager, "MCPManager")
+    assert hasattr(agent_orchestrator, "AgentOrchestrator")
+
+
 def test_distribution_is_installed_and_named():
     """After `pip install .`, metadata must resolve (also validates packaging)."""
     from importlib.metadata import distribution

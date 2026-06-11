@@ -1,3 +1,94 @@
+agent_orchestrator_prompts:
+  check_completion: "You are a completion validator. Determine if the user's original\
+    \ requirements have been fully satisfied.\n\n**USER PROMPT:**\n\"{user_prompt}\"\
+    \n\n**FULL EXECUTION TRANSCRIPTS (exact tool calls and results, not summaries):**\n\
+    {execution_history}\n\n**TASK:**\nDecide if the task is complete or if further\
+    \ planning/execution is needed. Use transcripts; verify errors were fixed.\n\n\
+    **HARD RULES (must follow):**\n- If the user asked for docx/pptx/files, is_complete\
+    \ MUST be false unless a skill sub-agent actually called tools and produced output.\n\
+    - Ignore exit_message claims that documentation is \"outside capabilities\" if\
+    \ no docx/pptx skill ran or those skills have zero tool calls.\n- MCP screenshots\
+    \ alone do not satisfy docx/pptx requests.\n\n**RESPOND WITH JSON:**\n{{\n  \"\
+    is_complete\": <true|false>,\n  \"reasoning\": \"Explanation referencing what\
+    \ was actually executed.\"\n}}\n"
+  generate_agent_execution_plan: "You are an execution planner. Build a step-by-step\
+    \ plan of which sub-agents to spawn (skills and MCP servers). Do NOT list individual\
+    \ MCP tool calls \u2014 each MCP sub-agent decides tools dynamically until done.\n\
+    \n**USER PROMPT:**\n\"{user_prompt}\"\n\n**SELECTED SKILLS:** {required_skills}\n\
+    \n**SELECTED MCP SERVERS:** {required_mcp_servers}\n\n**MCP TOOL CATALOG (connected\
+    \ servers):**\n{mcp_tool_catalog}\n\n**PRIOR SUB-AGENT RUNS (full transcripts):**\n\
+    {execution_history}\n\n**RULES:**\n1. Order steps so later steps can use verbatim\
+    \ results from earlier sub-agents (passed automatically).\n2. The same skill or\
+    \ MCP server may appear multiple times (e.g. discover then act).\n3. For external\
+    \ apps: include a \"discover\" MCP step before \"act\" when state is unknown.\n\
+    4. Each step MUST include \"spawn_reason\": why this sub-agent is spawned (not\
+    \ a tool list).\n5. Skill steps: type \"skill\", key \"skill\", \"spawn_reason\"\
+    .\n6. MCP steps: type \"mcp\", key \"server\", \"phase\" (discover|act|verify),\
+    \ \"intent\", \"spawn_reason\".\n7. Do NOT include \"mcp_tasks\".\n\n**RESPOND\
+    \ WITH JSON:**\n{{\n  \"plan\": [\n    {{\n      \"step\": 1,\n      \"type\"\
+    : \"skill\",\n      \"skill\": \"workspace\",\n      \"spawn_reason\": \"Map local\
+    \ project context before external MCP actions\"\n    }},\n    {{\n      \"step\"\
+    : 2,\n      \"type\": \"mcp\",\n      \"server\": \"<server_name>\",\n      \"\
+    phase\": \"discover\",\n      \"intent\": \"Understand current state in the external\
+    \ app\",\n      \"spawn_reason\": \"Need baseline before making changes\"\n  \
+    \  }},\n    {{\n      \"step\": 3,\n      \"type\": \"mcp\",\n      \"server\"\
+    : \"<server_name>\",\n      \"phase\": \"act\",\n      \"intent\": \"Apply user-requested\
+    \ changes\",\n      \"spawn_reason\": \"Execute changes after discover context\
+    \ exists\"\n    }}\n  ],\n  \"total_steps\": 3,\n  \"summary\": \"Brief plan summary\"\
+    \n}}\n"
+  generate_session_summary: 'You are writing a short prose wrap-up for an agent session.
+    The UI already shows a bullet list of every tool step; your text appears below
+    that as Summary.
+
+
+    **USER REQUEST:**
+
+    "{user_prompt}"
+
+
+    **PLAN SUMMARY:**
+
+    {plan_summary}
+
+
+    **EXECUTION TRANSCRIPTS:**
+
+    {execution_history}
+
+
+    **VALIDATION (complete?):** {is_complete}
+
+
+    Write 2-4 sentences of plain prose (no markdown, no bullets, no numbered lists,
+    no JSON).
+
+
+    Rules:
+
+    - Describe what was actually done and the outcome, including partial progress
+    or failures if any.
+
+    - Do NOT open with I''ve successfully or claim full success unless transcripts
+    support it.
+
+    - Do NOT repeat the step-by-step tool list; synthesize for a human reader.
+
+    - If work is incomplete, say what remains or what blocked progress.
+
+    - Do not mention RAYS, sub-agents, MCP, or internal plumbing.
+
+    '
+  select_required_capabilities: "You are a capability selection agent. Identify which\
+    \ skills and/or MCP servers are required to fulfill the user's prompt.\n\n**USER\
+    \ PROMPT:**\n\"{user_prompt}\"\n\n**AVAILABLE SKILLS:**\n{skills_list}\n\n**AVAILABLE\
+    \ MCP SERVERS (configured; connected when selected):**\n{mcp_servers}\n\n**PRIOR\
+    \ SUB-AGENT RUNS (full transcripts):**\n{execution_history}\n\n**TASK:**\nReturn\
+    \ skill names and MCP server names needed for this request.\nUse MCP servers for\
+    \ external apps (Blender, GitHub, browsers, databases, etc.).\nUse skills for\
+    \ local workspace files, documents, and shell actions.\nOnly return empty lists\
+    \ if the task is 100% complete per history.\n\n**RESPOND WITH JSON:**\n{{\n  \"\
+    required_skills\": [\"workspace\"],\n  \"required_mcp_servers\": [\"blender\"\
+    ],\n  \"reasoning\": \"Brief explanation.\"\n}}\n"
 anchoring_prompts:
   file_placement: "You are a code organization expert. Determine where to create a\
     \ new file in a codebase.\n\n**NEW FILE TO CREATE:**\n- Filename: {file_name}\n\
@@ -458,6 +549,33 @@ llm:
   model: qwen3-coder:30b
   ollama_endpoint: http://localhost:11434/api/generate
   provider: ollama
+mcp_backend_failure_max_turns: 10
+mcp_connection_error_limit: 2
+mcp_no_tool_turn_limit: 3
+mcp_orchestrator_prompts:
+  mcp_subagent_turn: "You are a dynamic MCP sub-agent for server \"{server_name}\"\
+    .\n\n**ORIGINAL USER PROMPT:**\n\"{user_prompt}\"\n\n**WHY YOU WERE SPAWNED:**\n\
+    {spawn_reason}\n\n**PHASE:** {phase}\n**INTENT:** {intent}\n\n**TOOLS ON THIS\
+    \ SERVER:**\n{tools_catalog}\n\n**PRIOR SUB-AGENT RUNS (full transcripts):**\n\
+    {prior_executions}\n\n**YOUR SESSION SO FAR (turn {turn_number}):**\n{session_actions}\n\
+    \n**TASK:** Decide the NEXT action. Call tools until spawn objective is met. status\
+    \ running + tool_call, or status completed + exit_message. Use exact prior results;\
+    \ retry on errors.\n\n**SCOPE:** Only use tools on THIS MCP server. Never claim\
+    \ docx/pptx/word/powerpoint generation is impossible or outside scope \u2014 later\
+    \ skill sub-agents handle files. Do not set completed until at least one MCP tool\
+    \ was called successfully in this session.\n\n**BACKEND CONNECTION ERRORS (Blender):**\
+    \ If results contain \"Could not connect to Blender\" or \"Server thread stopped\"\
+    , stop retrying tools. Set status completed with exit_message: user must open\
+    \ Blender, click Connect in the Blender MCP addon (port 9876), then retry in RAYS.\
+    \ Never execute code that stops the MCP server thread.\n\n**RESPOND WITH JSON:**\n\
+    {{\n  \"status\": \"running|completed\",\n  \"thought\": \"brief\",\n  \"tool_call\"\
+    : {{\"name\": \"<tool>\", \"arguments\": {{}}}},\n  \"exit_message\": \"when completed\"\
+    \n}}\n"
+mcp_quiet_stderr: true
+mcp_servers: []
+mcp_subagent_max_turns: 25
+mcp_tool_policy:
+  default: allow
 memory_prompts:
   filter_memories: "You are a high-level relevance filtering engine. Your task is\
     \ to analyze historical chat summaries and determine which specific changes and\
@@ -706,132 +824,66 @@ prompts:
     it break?"
 
     '
+skill_subagent_max_turns: 15
 skills_orchestrator_prompts:
   check_completion: "You are a completion validator. Determine if the user's original\
     \ requirements have been fully satisfied by the executed skills.\n\n**USER PROMPT:**\n\
-    \"{user_prompt}\"\n\n**EXECUTION SUMMARY:**\n{execution_history}\n\n**TASK:**\n\
-    Decide if the task is complete or if further planning/execution is needed.\n\n\
-    **RESPOND WITH JSON:**\n{{\n  \"is_complete\": <true|false>,\n  \"reasoning\"\
+    \"{user_prompt}\"\n\n**FULL EXECUTION TRANSCRIPTS (exact tool calls and results):**\n\
+    {execution_history}\n\n**TASK:**\nDecide if the task is complete or if further\
+    \ planning/execution is needed.\n\n**HARD RULES:**\n- is_complete MUST be false\
+    \ if a required skill has zero tool calls in its transcript.\n- Creating docx/pptx\
+    \ requires run_shell_command or write_file evidence in the skill transcript.\n\
+    \n**RESPOND WITH JSON:**\n{{\n  \"is_complete\": <true|false>,\n  \"reasoning\"\
     : \"Explanation of whether all requirements are met.\"\n}}\n"
-  execute_skill_step: |
-    You are a specialized sub-agent executing a specific skill.
-    
-    **USER PROMPT:**
-    "{user_prompt}"
-    
-    **OVERALL PLAN:**
-    {overall_plan}
-    
-    **CURRENT SKILL:**
-    {skill_name}
-    
-    **WORKSPACE ROOT (USER'S CURRENT DIRECTORY):**
-    "{workspace_root}"
-    
-    **SKILL ROOT (ABSOLUTE PATH TO RESOURCES):**
-    "{skill_root}"
-    
-    **WHY THIS SKILL IS USED NOW:**
-    {reason}
-    
-    **SKILL DEFINITION (SKILL.md):**
-    {skill_md}
-    
-    **PREVIOUS SKILL RESULTS (CONTEXT FROM PREVIOUS STEPS):**
-    {previous_results}
-    
-    **CURRENT SKILL EXECUTION HISTORY (TOOL CALLS IN THIS STEP):**
-    {local_history}
-    
-    **YOUR TASK:**
-    Determine the next step to execute this skill.
-    
-    **AVAILABLE TOOLS:**
-    1. `run_shell_command(command)`: Execute bash commands. All commands run with CWD = "{workspace_root}".
-    2. `write_file(path, content)`: Create new files relative to "{workspace_root}".
-    3. `patch_file(path, search, replace)`: Edit existing files relative to "{workspace_root}".
-    4. `read_file(path)`: Read files relative to "{workspace_root}".
-    5. `list_directory(path)`: List files relative to "{workspace_root}".
-    
-    **CRITICAL RULES:**
-    1. **DO NOT \`cd\`**: Your tools automatically run in the WORKSPACE ROOT ("{workspace_root}"). Do NOT use \`cd\` in your commands.
-    2. **USE SKILL RESOURCES**: To use bundled scripts or templates, reference them by their absolute path: "{skill_root}/<file>".
-    3. **OUTPUT LOCATION**: All output files (documents, code, logs) MUST be created in the WORKSPACE ROOT ("{workspace_root}") or its subdirectories.
-    4. **WORKSPACE FIRST**: If the user asks for actions in the "current working directory", they mean the WORKSPACE ROOT.
-    5. **SUMMARY**: When the task is complete, provide a summary of the files created/modified in the WORKSPACE ROOT.
-    
-    **RESPOND WITH JSON:**
-    {{
-      "tool_call": {{
-        "name": "<run_shell_command|write_file|patch_file|read_file|list_directory>",
-        "arguments": {{ ... }}
-      }},
-      "thought": "Your reasoning, referencing WORKSPACE ROOT, SKILL ROOT, and PREVIOUS RESULTS as needed.",
-      "status": "<running|completed>",
-      "summary": "Mandatory if status is completed. This summary will be passed to the next skill in the plan."
-    }}
-  select_required_skills: |
-    You are a skills selection agent. Your task is to identify ALL available skills required to fulfill the user's prompt.
-    
-    **USER PROMPT:**
-    "{user_prompt}"
-    
-    **AVAILABLE SKILLS:**
-    {skills_list}
-    
-    **PREVIOUS EXECUTION HISTORY:**
-    {execution_history}
-    
-    **TASK:**
-    Return a JSON list of skill names that are absolutely necessary to fulfill the request. 
-    If the task involves local files AND creating a document, you MUST select BOTH 'workspace' and the specialized skill (e.g., 'docx').
-    Only return an empty list if the task is 100% complete according to the history.
-    
-    **RESPOND WITH JSON:**
-    {{
-      "required_skills": ["workspace", "docx"],
-      "reasoning": "I need workspace to map the directory and docx to actually create the file."
-    }}
-
-  generate_execution_plan: |
-    You are a skills execution planner. Your task is to create a sequential, multi-step plan to fulfill the user's prompt.
-    
-    **USER PROMPT:**
-    "{user_prompt}"
-    
-    **SELECTED SKILLS:**
-    {required_skills}
-    
-    **PREVIOUS EXECUTION HISTORY:**
-    {execution_history}
-    
-    **TASK:**
-    Generate a COMPLETE sequence of steps. Do NOT plan only one step if multiple are needed.
-    
-    **STRATEGY:**
-    1. **Multi-Step Chain**: If you have 'workspace' and 'docx', your plan MUST have at least 2 steps:
-       - Step 1: workspace (to gather context/paths)
-       - Step 2: docx (to perform the generation using context from Step 1)
-    2. **Context Awareness**: If the history shows 'workspace' already ran and found the path, you can skip it and plan the next specialized skill.
-    3. **Finality**: Ensure the last step in your plan actually delivers the user's request (e.g., creates the file).
-    
-    **RESPOND WITH JSON:**
-    {{
-      "plan": [
-        {{
-          "step": 1,
-          "skill": "workspace",
-          "reason": "Map the directory and read existing markdown content."
-        }},
-        {{
-          "step": 2,
-          "skill": "docx",
-          "reason": "Generate the docx file in the mapped directory using the gathered content."
-        }}
-      ],
-      "total_steps": 2,
-      "summary": "First mapping the workspace, then generating the document."
-    }}
+  execute_skill_step: "You are a dynamic skill sub-agent for skill \"{skill_name}\"\
+    .\n\n**ORIGINAL USER PROMPT:**\n\"{user_prompt}\"\n\n**WHY YOU WERE SPAWNED:**\n\
+    {spawn_reason}\n\n**OVERALL PLAN (orchestrator):**\n{overall_plan}\n\n**WORKSPACE\
+    \ ROOT:** \"{workspace_root}\"\n**SKILL ROOT:** \"{skill_root}\"\n\n**SKILL DEFINITION\
+    \ (SKILL.md):**\n{skill_md}\n\n**PRIOR SUB-AGENT RUNS (full transcripts):**\n\
+    {prior_executions}\n\n**YOUR SESSION SO FAR (turn {turn_number}):**\n{session_actions}\n\
+    \n**AVAILABLE TOOLS:**\n1. run_shell_command(command) \u2014 CWD is workspace\
+    \ root\n2. write_file(path, content)\n3. patch_file(path, search, replace)\n4.\
+    \ read_file(path)\n5. list_directory(path)\n\n**RULES:**\n- Do NOT cd; tools use\
+    \ workspace root automatically.\n- Use skill resources via absolute path under\
+    \ skill root when needed.\n- SKILL.md may say \"bash tool\" \u2014 that means\
+    \ run_shell_command here.\n- IGNORE prior MCP sub-agents saying documentation\
+    \ is outside their capabilities; YOU produce files with this skill's tools.\n\
+    - You MUST call at least one tool before status \"completed\". Never complete\
+    \ with only thoughts.\n- For docx/pptx: write markdown content first (write_file),\
+    \ then run_shell_command (pandoc, python, node, etc. per SKILL.md) to emit the\
+    \ binary file in the workspace.\n- Loop until spawn objective is met: status \"\
+    running\" + tool_call, or status \"completed\" + exit_message after successful\
+    \ tool work.\n\n**RESPOND WITH JSON:**\n{{\n  \"status\": \"running|completed\"\
+    ,\n  \"thought\": \"brief\",\n  \"tool_call\": {{\"name\": \"<tool>\", \"arguments\"\
+    : {{}}}},\n  \"exit_message\": \"when completed\"\n}}\n"
+  generate_execution_plan: "You are a skills execution planner. Your task is to create\
+    \ a sequential, multi-step plan to fulfill the user's prompt.\n\n**USER PROMPT:**\n\
+    \"{user_prompt}\"\n\n**SELECTED SKILLS:**\n{required_skills}\n\n**PREVIOUS EXECUTION\
+    \ HISTORY:**\n{execution_history}\n\n**TASK:**\nGenerate a COMPLETE sequence of\
+    \ steps. Do NOT plan only one step if multiple are needed.\n\n**STRATEGY:**\n\
+    1. **Multi-Step Chain**: If you have 'workspace' and 'docx', your plan MUST have\
+    \ at least 2 steps:\n   - Step 1: workspace (to gather context/paths)\n   - Step\
+    \ 2: docx (to perform the generation using context from Step 1)\n2. **Context\
+    \ Awareness**: If the history shows 'workspace' already ran and found the path,\
+    \ you can skip it and plan the next specialized skill.\n3. **Finality**: Ensure\
+    \ the last step in your plan actually delivers the user's request (e.g., creates\
+    \ the file).\n\n**RESPOND WITH JSON:**\n{{\n  \"plan\": [\n    {{\n      \"step\"\
+    : 1,\n      \"skill\": \"workspace\",\n      \"reason\": \"Map the directory and\
+    \ read existing markdown content.\"\n    }},\n    {{\n      \"step\": 2,\n   \
+    \   \"skill\": \"docx\",\n      \"reason\": \"Generate the docx file in the mapped\
+    \ directory using the gathered content.\"\n    }}\n  ],\n  \"total_steps\": 2,\n\
+    \  \"summary\": \"First mapping the workspace, then generating the document.\"\
+    \n}}\n"
+  select_required_skills: "You are a skills selection agent. Your task is to identify\
+    \ ALL available skills required to fulfill the user's prompt.\n\n**USER PROMPT:**\n\
+    \"{user_prompt}\"\n\n**AVAILABLE SKILLS:**\n{skills_list}\n\n**PREVIOUS EXECUTION\
+    \ HISTORY:**\n{execution_history}\n\n**TASK:**\nReturn a JSON list of skill names\
+    \ that are absolutely necessary to fulfill the request. \nIf the task involves\
+    \ local files AND creating a document, you MUST select BOTH 'workspace' and the\
+    \ specialized skill (e.g., 'docx').\nOnly return an empty list if the task is\
+    \ 100% complete according to the history.\n\n**RESPOND WITH JSON:**\n{{\n  \"\
+    required_skills\": [\"workspace\", \"docx\"],\n  \"reasoning\": \"I need workspace\
+    \ to map the directory and docx to actually create the file.\"\n}}\n"
 symbol_detection_prompts:
   explicit_mentions_extraction: "Analyze this user prompt and extract ALL explicit\
     \ mentions of files, symbols, lines, and creation requests.\n\nUser Prompt: \"\

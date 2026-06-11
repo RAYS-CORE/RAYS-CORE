@@ -5,7 +5,13 @@ import subprocess
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .ai_client import AIClient
+from .execution_context import (
+    format_prior_executions,
+    format_session_actions,
+    has_tool_actions,
+)
 from . import rays_ui
+from .workspace_paths import resolve_workspace_path
 
 class SkillsOrchestrator:
     def __init__(self, ai_client: AIClient, config: Dict[str, Any], codebase_root: Path):
@@ -43,15 +49,15 @@ class SkillsOrchestrator:
                                     skills.append({
                                         "name": frontmatter.get("name", skill_name),
                                         "description": frontmatter.get("description", ""),
-                                        "path": str(skill_md),
-                                        "root": str(skill_path)
+                                        "path": skill_md.as_posix(),
+                                        "root": skill_path.as_posix(),
                                     })
                             else:
                                 skills.append({
                                     "name": skill_name,
                                     "description": content.split('\n')[0].strip('# '),
-                                    "path": str(skill_md),
-                                    "root": str(skill_path)
+                                    "path": skill_md.as_posix(),
+                                    "root": skill_path.as_posix(),
                                 })
                             seen_names.add(skill_name)
                         except Exception as e:
@@ -88,8 +94,8 @@ class SkillsOrchestrator:
             plan_data = self._generate_plan(user_prompt, required_skills, cumulative_history)
             summary = plan_data.get('summary', 'No summary provided.')
             
-            if loop_idx == 0 or plan_data.get('plan'):
-                rays_ui.print_box(f"Orchestrator Summary (Loop {loop_idx + 1})", summary, rays_ui.C_LAVENDER)
+            if loop_idx == 0:
+                rays_ui.print_box("Orchestrator Summary", summary, rays_ui.C_LAVENDER)
 
             # Filter plan to only include existing skills
             discovered_map = {s['name']: s for s in skills_list}
@@ -114,16 +120,15 @@ class SkillsOrchestrator:
                 rays_ui.print_sub_phase(f"Step {i+1}/{len(plan)}: {skill_name}")
                 rays_ui.print_info(f"Reason: {reason}")
                 
-                skill_result = self._execute_skill(skill_info, reason, user_prompt, plan, cumulative_history)
-                cumulative_history.append({
-                    "skill": skill_name,
-                    "reason": reason,
-                    "summary": skill_result
-                })
+                spawn_reason = step.get("spawn_reason") or reason or "Run skill"
+                record = self._execute_skill(
+                    skill_info, spawn_reason, user_prompt, plan, cumulative_history
+                )
+                cumulative_history.append(record)
 
             # 4. Final completion check
             completion_data = self._evaluate_completion(user_prompt, cumulative_history)
-            if completion_data.get('is_complete', True):
+            if completion_data.get('is_complete', False):
                 rays_ui.print_info("Task verified as complete.")
                 break
             else:
@@ -137,66 +142,136 @@ class SkillsOrchestrator:
         }
 
     def _identify_required_skills(self, user_prompt: str, skills_list: List[Dict[str, str]], history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        prompt = self.prompts['select_required_skills'].format(
+        prompt = self.prompts["select_required_skills"].format(
             user_prompt=user_prompt,
             skills_list=json.dumps(skills_list, indent=2),
-            execution_history=json.dumps(history, indent=2)
+            execution_history=format_prior_executions(history, user_prompt),
         )
         return self.ai_client.generate_json(prompt)
 
     def _generate_plan(self, user_prompt: str, required_skills: List[str], history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        prompt = self.prompts['generate_execution_plan'].format(
+        prompt = self.prompts["generate_execution_plan"].format(
             user_prompt=user_prompt,
             required_skills=json.dumps(required_skills),
-            execution_history=json.dumps(history, indent=2)
+            execution_history=format_prior_executions(history, user_prompt),
         )
         return self.ai_client.generate_json(prompt)
 
-    def _execute_skill(self, skill_info: Dict[str, Any], reason: str, user_prompt: str, plan: List[Dict[str, Any]], previous_results: List[Dict[str, Any]]) -> str:
-        skill_name = skill_info['name']
-        skill_root = skill_info['root']
-        skill_md_path = Path(skill_info['path'])
-        
-        if not skill_md_path.exists():
-            return f"Error: Skill definition for '{skill_name}' not found."
-            
-        skill_md_content = skill_md_path.read_text()
+    def _execute_skill(
+        self,
+        skill_info: Dict[str, Any],
+        reason: str,
+        user_prompt: str,
+        plan: List[Dict[str, Any]],
+        previous_results: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        skill_name = skill_info["name"]
+        skill_root = skill_info["root"]
+        skill_md_path = Path(skill_info["path"])
 
-        local_history = []
-        max_steps = 15
-        
-        for _ in range(max_steps):
-            prompt = self.prompts['execute_skill_step'].format(
+        if not skill_md_path.exists():
+            return {
+                "type": "skill",
+                "skill": skill_name,
+                "spawn_reason": reason,
+                "status": "error",
+                "exit_message": f"Skill definition for '{skill_name}' not found.",
+                "actions": [],
+            }
+
+        skill_md_content = skill_md_path.read_text()
+        prior_transcript = format_prior_executions(previous_results, user_prompt)
+        session_actions: List[Dict[str, Any]] = []
+        max_steps = int(self.config.get("skill_subagent_max_turns", 15))
+
+        for turn in range(1, max_steps + 1):
+            rays_ui.hud_set_status("Thinking", f"skill/{skill_name} · turn {turn}")
+
+            prompt = self.prompts["execute_skill_step"].format(
                 user_prompt=user_prompt,
                 overall_plan=json.dumps(plan, indent=2),
                 skill_name=skill_name,
                 skill_root=skill_root,
-                workspace_root=str(self.codebase_root),
-                reason=reason,
+                workspace_root=self.codebase_root.as_posix(),
+                spawn_reason=reason,
                 skill_md=skill_md_content,
-                previous_results=json.dumps(previous_results, indent=2),
-                local_history=json.dumps(local_history, indent=2)
+                prior_executions=prior_transcript,
+                session_actions=format_session_actions(session_actions),
+                turn_number=turn,
             )
-            
+
             response = self.ai_client.generate_json(prompt)
-            thought = response.get('thought', '')
-            status = response.get('status', 'running')
-            tool_call = response.get('tool_call')
+            thought = response.get("thought", "")
+            status = (response.get("status") or "running").lower()
+            tool_call = response.get("tool_call")
 
             if thought:
-                rays_ui.print_step(f"Sub-agent thought: {thought}")
+                rays_ui.print_mcp_thought(thought)
 
             if tool_call:
                 result = self._dispatch_tool(tool_call)
-                local_history.append({
-                    "tool_call": tool_call,
-                    "result": result
-                })
-            
-            if status == 'completed':
-                return response.get('summary', 'Skill execution completed.')
+                session_actions.append(
+                    {
+                        "turn": turn,
+                        "thought": thought,
+                        "tool": tool_call.get("name"),
+                        "arguments": tool_call.get("arguments"),
+                        "result": result,
+                    }
+                )
+                if rays_ui.orchestration_hud_active():
+                    rays_ui.orch_emit_tool_result(
+                        tool_call.get("name", "?"),
+                        tool_call.get("arguments"),
+                        result,
+                    )
 
-        return "Skill execution timed out."
+            if status == "completed":
+                if not has_tool_actions(session_actions):
+                    session_actions.append(
+                        {
+                            "turn": turn,
+                            "thought": thought,
+                            "tool": None,
+                            "arguments": None,
+                            "result": (
+                                "REJECTED completion: you must call at least one tool "
+                                "(run_shell_command, write_file, etc.) before status "
+                                "completed. Prior MCP runs cannot do docx/pptx — use "
+                                "this skill's tools per SKILL.md. 'bash tool' means "
+                                "run_shell_command."
+                            ),
+                        }
+                    )
+                    continue
+                return {
+                    "type": "skill",
+                    "skill": skill_name,
+                    "spawn_reason": reason,
+                    "status": "completed",
+                    "exit_message": response.get("exit_message", ""),
+                    "actions": session_actions,
+                }
+
+            if not tool_call:
+                session_actions.append(
+                    {
+                        "turn": turn,
+                        "thought": thought,
+                        "tool": None,
+                        "arguments": None,
+                        "result": "No tool_call provided; call a tool or set status completed.",
+                    }
+                )
+
+        return {
+            "type": "skill",
+            "skill": skill_name,
+            "spawn_reason": reason,
+            "status": "max_turns",
+            "exit_message": f"Stopped after {max_steps} turns without completion.",
+            "actions": session_actions,
+        }
 
     def _dispatch_tool(self, tool_call: Dict[str, Any]) -> str:
         name = tool_call.get('name')
@@ -230,10 +305,16 @@ class SkillsOrchestrator:
         except Exception as e:
             return f"Error executing command: {e}"
 
+    def _resolve_path(self, path: str) -> Path:
+        return resolve_workspace_path(self.codebase_root, path)
+
     def _write_file(self, path: str, content: str) -> str:
         if not path:
             return "Error: 'path' argument is required for write_file"
-        full_path = self.codebase_root / path
+        try:
+            full_path = self._resolve_path(path)
+        except ValueError as e:
+            return f"Error: {e}"
         rays_ui.print_step(f"Writing file: {path}")
         try:
             full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -245,7 +326,10 @@ class SkillsOrchestrator:
     def _patch_file(self, path: str, search: str, replace: str) -> str:
         if not path:
             return "Error: 'path' argument is required for patch_file"
-        full_path = self.codebase_root / path
+        try:
+            full_path = self._resolve_path(path)
+        except ValueError as e:
+            return f"Error: {e}"
         rays_ui.print_step(f"Patching file: {path}")
         try:
             if not full_path.exists():
@@ -265,7 +349,10 @@ class SkillsOrchestrator:
     def _read_file(self, path: str) -> str:
         if not path:
             return "Error: 'path' argument is required for read_file"
-        full_path = self.codebase_root / path
+        try:
+            full_path = self._resolve_path(path)
+        except ValueError as e:
+            return f"Error: {e}"
         try:
             if not full_path.exists():
                 return f"Error: File does not exist: {path}"
@@ -275,7 +362,10 @@ class SkillsOrchestrator:
 
     def _list_directory(self, path: str) -> str:
         path = path or "."
-        full_path = self.codebase_root / path
+        try:
+            full_path = self._resolve_path(path)
+        except ValueError as e:
+            return f"Error: {e}"
         try:
             if not full_path.exists():
                 return f"Error: Directory does not exist: {path}"
@@ -285,8 +375,17 @@ class SkillsOrchestrator:
             return f"Error listing directory: {e}"
 
     def _evaluate_completion(self, user_prompt: str, execution_history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        prompt = self.prompts['check_completion'].format(
+        from .execution_context import programmatic_completion_failures
+
+        hard_failures = programmatic_completion_failures(user_prompt, execution_history)
+        if hard_failures:
+            return {
+                "is_complete": False,
+                "reasoning": "Programmatic validation failed:\n- "
+                + "\n- ".join(hard_failures),
+            }
+        prompt = self.prompts["check_completion"].format(
             user_prompt=user_prompt,
-            execution_history=json.dumps(execution_history, indent=2)
+            execution_history=format_prior_executions(execution_history, user_prompt),
         )
         return self.ai_client.generate_json(prompt)

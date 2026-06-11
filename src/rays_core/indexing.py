@@ -73,8 +73,8 @@ class Indexer:
         chroma_is_populated = False
         if chroma_db_path.exists():
             try:
-                import chromadb
-                client = chromadb.PersistentClient(path=str(chroma_db_path))
+                from .chroma_client import persistent_client
+                client = persistent_client(str(chroma_db_path))
                 col = client.get_collection("code_chunks")
                 if col.count() > 0:
                     chroma_is_populated = True

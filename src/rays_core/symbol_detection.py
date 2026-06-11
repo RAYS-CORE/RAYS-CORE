@@ -1,5 +1,5 @@
 import msgpack
-import chromadb
+from .chroma_client import persistent_client
 import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Set, Any
@@ -127,7 +127,7 @@ class SymbolDetector:
         """
         
         chroma_path = str(self.rays_dir / "chroma_db")
-        client = chromadb.PersistentClient(path=chroma_path)
+        client = persistent_client(chroma_path)
         collection = client.get_collection("code_chunks")
         
         # Create search query from keywords and symbol names
@@ -321,7 +321,7 @@ class SymbolDetector:
         """
         
         chroma_path = str(self.rays_dir / "chroma_db")
-        client = chromadb.PersistentClient(path=chroma_path)
+        client = persistent_client(chroma_path)
         collection = client.get_collection("code_chunks")
         
         symbols_with_code = []
