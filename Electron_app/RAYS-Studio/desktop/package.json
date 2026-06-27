@@ -3,6 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "description": "RAYS Studio — Electron shell for the RAYS desktop GUI",
+  "homepage": "https://github.com/RAYS-CORE/RAYS-CORE",
+  "author": {
+    "name": "Samreedh Bhuyan",
+    "email": "samreedh.bhuyan@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RAYS-CORE/RAYS-CORE.git"
+  },
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"npm run dev --prefix ../ui\" \"wait-on http://127.0.0.1:8080 && electron .\"",
@@ -53,7 +63,10 @@
     },
     "linux": {
       "icon": "build/icon.png",
-      "target": ["AppImage", "deb"]
+      "target": ["AppImage", "deb"],
+      "maintainer": "Samreedh Bhuyan <samreedh.bhuyan@users.noreply.github.com>",
+      "vendor": "RAYS-CORE",
+      "category": "Development"
     }
   }
 }
