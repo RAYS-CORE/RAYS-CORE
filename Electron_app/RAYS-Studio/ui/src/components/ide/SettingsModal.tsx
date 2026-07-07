@@ -13,6 +13,8 @@ const providers: { id: StoredProviderSettings["provider"]; label: string }[] = [
   { id: "ollama", label: "Ollama (Local)" },
   { id: "gemini", label: "Google Gemini" },
   { id: "openai", label: "OpenAI" },
+  { id: "groq", label: "Groq" },
+  { id: "claude", label: "Anthropic Claude" },
 ];
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -109,7 +111,11 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                           ? "qwen2.5-coder:latest"
                           : provider === "gemini"
                             ? "gemini-1.5-flash"
-                            : "gpt-4o"
+                            : provider === "groq"
+                              ? "llama-3.3-70b-versatile"
+                              : provider === "claude"
+                                ? "claude-3-5-sonnet-20241022"
+                                : "gpt-4o"
                       }
                       className="w-full bg-secondary rounded-md px-3 py-2 text-ui text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
                     />

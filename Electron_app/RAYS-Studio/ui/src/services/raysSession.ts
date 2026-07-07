@@ -35,7 +35,7 @@ export type ChatMessage = {
 };
 export type TerminalLine = { id: string; kind: "output" | "command"; content: string };
 export type ProviderConfig = {
-  provider: "ollama" | "gemini" | "openai";
+  provider: "ollama" | "gemini" | "openai" | "groq" | "claude";
   model: string;
   apiKey?: string;
 };

@@ -31,7 +31,7 @@ export default function IDELayout() {
   const [explorerWidth, setExplorerWidth] = useState(260);
   const [agentWidth, setAgentWidth] = useState(340);
   const [terminalHeight, setTerminalHeight] = useState(200);
-  const { state, startSession, stopSession, submitPrompt, sendTerminalInput, selectFolder, readFile, completeThinkingReveal, reloadMcp } =
+  const { state, startSession, stopSession, submitPrompt, sendTerminalInput, selectFolder, readFile, completeThinkingReveal, reloadMcp, cancelCurrentTask } =
     useRaysSession();
 
   const showLauncher = !state.sessionId;
@@ -263,6 +263,7 @@ export default function IDELayout() {
                 thinkingPhase={state.thinkingPhase}
                 thinkingText={state.thinkingText}
                 onSend={(prompt) => submitPrompt(prompt, "code")}
+                onStop={cancelCurrentTask}
                 onThinkingRevealComplete={completeThinkingReveal}
               />
             </div>

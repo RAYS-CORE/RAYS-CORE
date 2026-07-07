@@ -169,18 +169,61 @@ async function listSkillsForWorkspace(workspaceRoot) {
     ["project", workspaceRoot ? path.join(workspaceRoot, "skills") : null],
     ["global", path.join(os.homedir(), ".rays", "skills")],
   ];
-  for (const [scope, root] of scopes) {
-    if (!root || !fs.existsSync(root)) continue;
-    const names = await fsp.readdir(root);
-    for (const name of names) {
-      const skillDir = path.join(root, name);
-      const stat = await fsp.stat(skillDir);
-      if (!stat.isDirectory()) continue;
-      const skillMd = path.join(skillDir, "SKILL.md");
-      if (!fs.existsSync(skillMd)) continue;
-      results.push({ name, scope, path: skillDir });
+
+  /** Parse YAML frontmatter description from SKILL.md */
+  function parseSkillDescription(skillMdPath) {
+    try {
+      const content = fs.readFileSync(skillMdPath, "utf8");
+      const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+      if (!fmMatch) return "";
+      const fm = fmMatch[1];
+      const descMatch = fm.match(/^description:\s*["']?(.+?)["']?\s*$/m);
+      return descMatch ? descMatch[1].trim() : "";
+    } catch {
+      return "";
     }
   }
+
+  /** Recursively find all skill dirs (containing SKILL.md) under root */
+  async function walkSkillDir(dir, scope, rootSkillsDir) {
+    let entries;
+    try {
+      entries = await fsp.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const subDir = path.join(dir, entry.name);
+      const skillMd = path.join(subDir, "SKILL.md");
+      if (fs.existsSync(skillMd)) {
+        // This is a skill folder — compute the relative name including category
+        const relPath = path.relative(rootSkillsDir, subDir).replace(/\\/g, "/");
+        const description = parseSkillDescription(skillMd);
+        results.push({
+          name: relPath,          // e.g. "creative/architecture-diagram"
+          scope,
+          path: subDir,
+          description,
+        });
+      } else {
+        // It's a category folder — recurse deeper
+        await walkSkillDir(subDir, scope, rootSkillsDir);
+      }
+    }
+  }
+
+  for (const [scope, root] of scopes) {
+    if (!root || !fs.existsSync(root)) continue;
+    await walkSkillDir(root, scope, root);
+  }
+
+  // Sort: project first, then alphabetically by name
+  results.sort((a, b) => {
+    if (a.scope !== b.scope) return a.scope === "project" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
   return results;
 }
 
@@ -323,7 +366,13 @@ function bridgeLaunchConfig() {
       command: binary,
       argsPrefix: [],
       cwd: process.env.HOME || process.cwd(),
-      env: { ...process.env, PATH: shellPathEnv(), PYTHONUNBUFFERED: "1" },
+      env: {
+        ...process.env,
+        PATH: shellPathEnv(),
+        PYTHONUNBUFFERED: "1",
+        PYTHONIOENCODING: "utf-8",
+        PYTHONUTF8: "1",
+      },
     };
   }
 
@@ -336,8 +385,13 @@ function bridgeLaunchConfig() {
     env: {
       ...process.env,
       PATH: shellPathEnv(),
+      PYTHONUNBUFFERED: "1",
+      PYTHONIOENCODING: "utf-8",
+      PYTHONUTF8: "1",
       PYTHONPATH: [
         path.join(root, "src"),
+        path.resolve(root, "../../src"),
+        path.resolve(root, "../.."),
         path.join(root, "bridge/src"),
         process.env.PYTHONPATH || "",
       ]

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, Square } from "lucide-react";
 import { AgentTurnFeed } from "@/components/agent/hermes/AgentTurnFeed";
 import { ApprovalPanel } from "@/components/agent/hermes/ApprovalPanel";
 import type { AgentTurn } from "@/services/agentActivity";
@@ -17,6 +17,7 @@ type AgentChatProps = {
   defaultMode?: PromptMode;
   onSend: (prompt: string, mode?: PromptMode) => void;
   onApprove?: (approved: boolean) => void;
+  onStop?: () => void;
 };
 
 export function AgentChat({
@@ -31,6 +32,7 @@ export function AgentChat({
   defaultMode = "agent",
   onSend,
   onApprove,
+  onStop,
 }: AgentChatProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -123,14 +125,25 @@ export function AgentChat({
             className="flex-1 bg-transparent resize-none text-sm outline-none placeholder:text-muted-foreground max-h-40"
             disabled={!connected || loading}
           />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!canSend}
-            className="p-2 rounded-full bg-rays-violet text-accent-foreground disabled:opacity-40 transition-opacity shrink-0"
-          >
-            <Send size={16} />
-          </button>
+          {running ? (
+            <button
+              type="button"
+              onClick={onStop}
+              className="p-2 rounded-full bg-red-500/80 hover:bg-red-500 text-white transition-colors shrink-0 animate-pulse"
+              title="Stop agent"
+            >
+              <Square size={16} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!canSend}
+              className="p-2 rounded-full bg-rays-violet text-accent-foreground disabled:opacity-40 transition-opacity shrink-0"
+            >
+              <Send size={16} />
+            </button>
+          )}
         </div>
       </div>
     </div>

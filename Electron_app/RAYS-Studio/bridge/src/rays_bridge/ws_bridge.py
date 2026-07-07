@@ -137,6 +137,8 @@ class GUIBridgeRuntime:
         self.runtime_overrides = runtime_overrides or {}
         self.rays: Optional[Any] = None
         self._busy = False
+        self._cancel_event = threading.Event()
+        self._worker_thread: Optional[threading.Thread] = None
         self._patch_applied = False
         self.approval_manager = ApprovalManager(bus=self.bus)
         self.shell = PersistentShell(workspace_root=self.workspace_root, bus=self.bus)
@@ -223,15 +225,25 @@ class GUIBridgeRuntime:
 
         from rays_core import rays_ui
 
-        original_print_diff = rays_ui.print_diff
-        original_print_command_box = rays_ui.print_command_box
-        original_print_file_tree = rays_ui.print_file_tree
-        original_print_full_width_box = rays_ui.print_full_width_box
-        original_capture_print = rays_ui.capture_print
-        original_print_warning = rays_ui.print_warning
-        original_print_error = rays_ui.print_error
-        original_print_file_created = rays_ui.print_file_created
-        original_print_final_run_summary = rays_ui.print_final_run_summary
+        def safe_wrap(func):
+            if func is None:
+                return None
+            def wrapper(*args, **kwargs):
+                try:
+                    return func(*args, **kwargs)
+                except Exception:
+                    pass
+            return wrapper
+
+        original_print_diff = safe_wrap(rays_ui.print_diff)
+        original_print_command_box = safe_wrap(rays_ui.print_command_box)
+        original_print_file_tree = safe_wrap(rays_ui.print_file_tree)
+        original_print_full_width_box = safe_wrap(rays_ui.print_full_width_box)
+        original_capture_print = safe_wrap(rays_ui.capture_print)
+        original_print_warning = safe_wrap(rays_ui.print_warning)
+        original_print_error = safe_wrap(rays_ui.print_error)
+        original_print_file_created = safe_wrap(rays_ui.print_file_created)
+        original_print_final_run_summary = safe_wrap(rays_ui.print_final_run_summary)
 
         def wrapped_print_diff(file_path: str, search_block: str, replace_block: str, reason: str = ""):
             lines = []
@@ -337,21 +349,21 @@ class GUIBridgeRuntime:
         rays_ui.print_file_created = wrapped_print_file_created
         rays_ui.print_final_run_summary = wrapped_print_final_run_summary
 
-        original_ask_approval = rays_ui.ask_approval
-        original_orch_begin_session = rays_ui.orch_begin_session
-        original_orch_emit_section = rays_ui.orch_emit_section
-        original_orch_emit_thinking = rays_ui.orch_emit_thinking
-        original_orch_emit_action = rays_ui.orch_emit_action
-        original_orch_emit_plan = rays_ui.orch_emit_plan
-        original_orch_emit_capabilities = rays_ui.orch_emit_capabilities
-        original_orch_emit_step_header = rays_ui.orch_emit_step_header
-        original_orch_emit_tool_result = rays_ui.orch_emit_tool_result
-        original_orch_emit_validation = rays_ui.orch_emit_validation
-        original_orch_render_final_summary = rays_ui.orch_render_final_summary
-        original_hud_set_status = rays_ui.hud_set_status
-        original_hud_add_tokens = rays_ui.hud_add_tokens
-        original_hud_note_ok = rays_ui.hud_note_ok
-        original_hud_note_warn = rays_ui.hud_note_warn
+        original_ask_approval = safe_wrap(rays_ui.ask_approval)
+        original_orch_begin_session = safe_wrap(rays_ui.orch_begin_session)
+        original_orch_emit_section = safe_wrap(rays_ui.orch_emit_section)
+        original_orch_emit_thinking = safe_wrap(rays_ui.orch_emit_thinking)
+        original_orch_emit_action = safe_wrap(rays_ui.orch_emit_action)
+        original_orch_emit_plan = safe_wrap(rays_ui.orch_emit_plan)
+        original_orch_emit_capabilities = safe_wrap(rays_ui.orch_emit_capabilities)
+        original_orch_emit_step_header = safe_wrap(rays_ui.orch_emit_step_header)
+        original_orch_emit_tool_result = safe_wrap(rays_ui.orch_emit_tool_result)
+        original_orch_emit_validation = safe_wrap(rays_ui.orch_emit_validation)
+        original_orch_render_final_summary = safe_wrap(rays_ui.orch_render_final_summary)
+        original_hud_set_status = safe_wrap(rays_ui.hud_set_status)
+        original_hud_add_tokens = safe_wrap(rays_ui.hud_add_tokens)
+        original_hud_note_ok = safe_wrap(rays_ui.hud_note_ok)
+        original_hud_note_warn = safe_wrap(rays_ui.hud_note_warn)
 
         def wrapped_ask_approval(message: str) -> bool:
             if self.rays and getattr(self.rays, "execution_mode", "autonomous") == "autonomous":
@@ -522,6 +534,7 @@ class GUIBridgeRuntime:
 
         def worker() -> None:
             self._busy = True
+            self._cancel_event.clear()
             try:
                 self.bus.emit("session_status", {"status": "running"})
                 self.bus.emit("chat_message", {"role": "user", "content": resolved_prompt})
@@ -539,20 +552,30 @@ class GUIBridgeRuntime:
                         "nodes": self.bus.snapshot_tree(self.workspace_root),
                     },
                 )
-            except Exception as exc:
-                self.bus.emit(
-                    "error",
-                    {
-                        "level": "error",
-                        "message": str(exc),
-                        "traceback": traceback.format_exc(),
-                    },
-                )
-                self.bus.emit("session_status", {"status": "idle"})
+            except BaseException as exc:
+                if self._cancel_event.is_set() or isinstance(exc, KeyboardInterrupt):
+                    self._cancel_event.set()
+                    self.bus.emit(
+                        "chat_message",
+                        {"role": "system", "title": "Cancelled", "content": "Task cancelled by user."},
+                    )
+                    self.bus.emit("session_status", {"status": "idle"})
+                else:
+                    self.bus.emit(
+                        "error",
+                        {
+                            "level": "error",
+                            "message": str(exc),
+                            "traceback": traceback.format_exc(),
+                        },
+                    )
+                    self.bus.emit("session_status", {"status": "idle"})
             finally:
                 self._busy = False
+                self._cancel_event.clear()
 
-        threading.Thread(target=worker, daemon=True).start()
+        self._worker_thread = threading.Thread(target=worker, daemon=True)
+        self._worker_thread.start()
 
     def set_execution_mode(self, mode: str) -> None:
         if self.rays is None:
@@ -582,7 +605,12 @@ class GUIBridgeRuntime:
 
         def worker() -> None:
             try:
-                status = self.rays.agent_orchestrator.reload_mcp_servers()
+                # Reconnect all MCP servers then report status
+                try:
+                    self.rays.mcp_manager.connect_all()
+                except Exception:
+                    pass
+                status = self.rays.agent_orchestrator.list_mcp_status()
                 self.bus.emit(
                     "mcp_status",
                     {"content": strip_ansi(status), "reloaded": True},
@@ -592,8 +620,78 @@ class GUIBridgeRuntime:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def cancel_current_task(self) -> None:
+        """Cancel the currently running worker thread by setting the cancel flag
+        and raising KeyboardInterrupt in the worker thread."""
+        if not self._busy or self._worker_thread is None:
+            self.bus.emit(
+                "hud_note",
+                {"level": "warn", "message": "No task is currently running."},
+            )
+            return
+        self._cancel_event.set()
+        # Raise KeyboardInterrupt in the worker thread so it aborts promptly.
+        import ctypes
+        thread_id = self._worker_thread.ident
+        if thread_id is not None:
+            try:
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    ctypes.c_ulong(thread_id),
+                    ctypes.py_object(KeyboardInterrupt),
+                )
+            except Exception:
+                pass
+        self.bus.emit(
+            "hud_note",
+            {"level": "warn", "message": "Cancellation requested — stopping..."},
+        )
+
     def execute_terminal_input(self, command: str) -> None:
         self.shell.execute(command)
+
+    def list_skills(self) -> None:
+        """Scan workspace/skills and ~/.rays/skills recursively for SKILL.md folders."""
+        import re as _re
+
+        def _parse_description(skill_md_path: Path) -> str:
+            try:
+                text = skill_md_path.read_text(encoding="utf-8", errors="replace")
+                fm = _re.search(r"^---\s*\n([\s\S]*?)\n---", text)
+                if not fm:
+                    return ""
+                desc = _re.search(r"^description:\s*[\"']?(.+?)[\"']?\s*$", fm.group(1), _re.MULTILINE)
+                return desc.group(1).strip() if desc else ""
+            except Exception:
+                return ""
+
+        def _walk(root: Path, scope: str, skills: list) -> None:
+            try:
+                entries = list(root.iterdir())
+            except Exception:
+                return
+            for entry in sorted(entries, key=lambda e: e.name):
+                if not entry.is_dir():
+                    continue
+                skill_md = entry / "SKILL.md"
+                if skill_md.exists():
+                    rel = str(entry.relative_to(root)).replace("\\", "/")
+                    skills.append({
+                        "name": rel,
+                        "scope": scope,
+                        "path": str(entry),
+                        "description": _parse_description(skill_md),
+                    })
+                else:
+                    _walk(entry, scope, skills)
+
+        skills: list = []
+        project_skills = self.workspace_root / "skills"
+        global_skills = Path.home() / ".rays" / "skills"
+        if project_skills.exists():
+            _walk(project_skills, "project", skills)
+        if global_skills.exists():
+            _walk(global_skills, "global", skills)
+        self.bus.emit("skills_list", {"skills": skills})
 
     def shutdown(self) -> None:
         if self.rays is not None:
@@ -640,6 +738,8 @@ class PersistentShell:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
         )
         self._running = True
@@ -787,14 +887,10 @@ async def run_server(
                     )
                 elif command == "terminal_input":
                     runtime.execute_terminal_input(payload.get("input", ""))
+                elif command == "list_skills":
+                    runtime.list_skills()
                 elif command == "cancel_current_task":
-                    bus.emit(
-                        "error",
-                        {
-                            "level": "warning",
-                            "message": "Cancel is not yet supported by CLI runtime.",
-                        },
-                    )
+                    runtime.cancel_current_task()
         finally:
             bus.clients.discard(websocket)
 
@@ -837,6 +933,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # Force stdout/stderr to UTF-8 to prevent charmap encoding errors on Windows
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8")
+            except Exception:
+                pass
+
     try:
         # Load RAYS on the main thread before worker threads import rays_ui (signal handlers).
         os.environ.setdefault("RAYS_GUI_BRIDGE", "1")
