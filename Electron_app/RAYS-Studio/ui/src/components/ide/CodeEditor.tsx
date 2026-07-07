@@ -244,7 +244,7 @@ export function CodeEditor({
             <span>Word Document Preview</span>
             <span className="normal-case font-normal text-muted-foreground/60">{fileName}</span>
           </div>
-          <div className="whitespace-pre-wrap">{fileContent || "Empty Document"}</div>
+          <div className="docx-preview-content space-y-4 font-sans prose dark:prose-invert" dangerouslySetInnerHTML={{ __html: fileContent || "Empty Document" }} />
         </div>
       </div>
     );

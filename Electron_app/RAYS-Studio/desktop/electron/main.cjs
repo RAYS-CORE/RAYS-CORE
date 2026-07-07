@@ -529,8 +529,89 @@ ipcMain.handle("rays:read-file", async (_event, { workspaceRoot, relativePath })
   const extension = relativePath.split(".").pop().toLowerCase();
   if (extension === "docx") {
     try {
-      const pythonCmd = `import zipfile, xml.etree.ElementTree as ET; z = zipfile.ZipFile(r"${resolvedPath}"); xml = z.read("word/document.xml"); root = ET.fromstring(xml); texts = []; [texts.append(el.text or "") if el.tag.endswith("t") else texts.append("\\n") if el.tag.endswith("p") else None for el in root.iter()]; print("".join(texts).strip())`;
-      const output = execSync(`python -c "${pythonCmd.replace(/"/g, '\\"')}"`, { encoding: "utf8" });
+      const pythonScript = `
+import sys, zipfile, base64
+import xml.etree.ElementTree as ET
+
+docx_path = sys.argv[1]
+namespaces = {
+    'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+    'pic': 'http://schemas.openxmlformats.org/drawingml/2006/picture'
+}
+
+try:
+    with zipfile.ZipFile(docx_path) as docx:
+        rels = {}
+        try:
+            rels_data = docx.read('word/_rels/document.xml.rels')
+            rels_root = ET.fromstring(rels_data)
+            for child in rels_root:
+                rId = child.attrib.get('Id')
+                target = child.attrib.get('Target')
+                if rId and target:
+                    rels[rId] = target
+        except:
+            pass
+
+        doc_xml = docx.read('word/document.xml')
+        root = ET.fromstring(doc_xml)
+        html_parts = []
+        body = root.find('w:body', namespaces)
+        if body is not None:
+            for p in body.findall('.//w:p', namespaces):
+                pPr = p.find('w:pPr', namespaces)
+                pStyle = pPr.find('w:pStyle', namespaces) if pPr is not None else None
+                style_val = pStyle.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val', '') if pStyle is not None else ''
+                tag = 'p'
+                if 'Heading' in style_val:
+                    level = style_val.replace('Heading', '')
+                    if level in ['1', '2', '3', '4', '5', '6']:
+                        tag = f'h{level}'
+                
+                p_html = []
+                for child in p:
+                    if child.tag.endswith('r'):
+                        rPr = child.find('w:rPr', namespaces)
+                        is_bold = rPr.find('w:b', namespaces) is not None if rPr is not None else False
+                        is_italic = rPr.find('w:i', namespaces) is not None if rPr is not None else False
+                        text_elem = child.find('w:t', namespaces)
+                        text = text_elem.text if text_elem is not None else ''
+                        if text:
+                            text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                            if is_bold:
+                                text = f'<b>{text}</b>'
+                            if is_italic:
+                                text = f'<i>{text}</i>'
+                            p_html.append(text)
+                        
+                        drawings = child.findall('.//w:drawing', namespaces)
+                        for drawing in drawings:
+                            embeds = drawing.findall('.//*[@{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed]', namespaces)
+                            for embed in embeds:
+                                rId = embed.attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                if rId in rels:
+                                    media_path = f'word/{rels[rId]}'
+                                    try:
+                                        img_data = docx.read(media_path)
+                                        ext = media_path.split('.')[-1].lower()
+                                        mime = f'image/{ext}' if ext in ['png', 'jpeg', 'jpg', 'gif', 'webp'] else 'image/png'
+                                        b64 = base64.b64encode(img_data).decode('utf-8')
+                                        p_html.append(f'<img src="data:{mime};base64,{b64}" class="my-4 max-w-full rounded-md shadow-sm" />')
+                                    except:
+                                        pass
+                p_content = ''.join(p_html).strip()
+                if p_content:
+                    html_parts.append(f'<{tag}>{p_content}</{tag}>')
+                else:
+                    html_parts.append('<br/>')
+            print('\\n'.join(html_parts))
+except Exception as e:
+    print("Error parsing docx: " + str(e))
+`;
+      const proc = require("node:child_process").spawnSync("python", ["-c", pythonScript, resolvedPath], { encoding: "utf8" });
+      const output = proc.stdout || proc.stderr;
       return { content: output };
     } catch (err) {
       return { content: `Error reading docx: ${err.message}` };

@@ -41,6 +41,7 @@ export function AgentChat({
   // Attachment states
   const [showAttachments, setShowAttachments] = useState(false);
   const [attachments, setAttachments] = useState<{ type: string; name: string; path: string }[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -87,12 +88,12 @@ export function AgentChat({
 
   const handleAttachFolder = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const firstFile = e.target.files[0];
-    if (firstFile) {
-      const folderPath = firstFile.path ? firstFile.path.split(/[\\/]/).slice(0, -1).join("/") : "Folder";
-      const folderName = firstFile.path ? firstFile.path.split(/[\\/]/).slice(-2, -1)[0] : "Folder";
-      setAttachments((prev) => [...prev, { type: "directory", name: folderName, path: folderPath }]);
-    }
+    const next = Array.from(e.target.files).map((f) => ({
+      type: f.type.startsWith("image/") ? "image" : "file",
+      name: f.name,
+      path: f.path || f.name,
+    }));
+    setAttachments((prev) => [...prev, ...next]);
   };
 
   const handleAttachUrl = () => {
@@ -100,6 +101,72 @@ export function AgentChat({
     if (url && url.trim()) {
       setAttachments((prev) => [...prev, { type: "url", name: url.trim(), path: url.trim() }]);
     }
+  };
+
+  // Drag and Drop recursive parsing
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (!e.dataTransfer.items) return;
+
+    const fileList: { type: string; name: string; path: string }[] = [];
+
+    const traverseEntry = async (entry: any, currentPath: string = "") => {
+      if (entry.isFile) {
+        const file = await new Promise<File>((resolve, reject) => {
+          entry.file(resolve, reject);
+        });
+        fileList.push({
+          type: file.type.startsWith("image/") ? "image" : "file",
+          name: file.name,
+          path: file.path || (currentPath ? `${currentPath}/${file.name}` : file.name),
+        });
+      } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        const readAllEntries = async (): Promise<any[]> => {
+          let allEntries: any[] = [];
+          const read = async (): Promise<void> => {
+            const results = await new Promise<any[]>((resolve, reject) => {
+              dirReader.readEntries(resolve, reject);
+            });
+            if (results.length > 0) {
+              allEntries = allEntries.concat(results);
+              await read();
+            }
+          };
+          await read();
+          return allEntries;
+        };
+        const entries = await readAllEntries();
+        for (const childEntry of entries) {
+          await traverseEntry(childEntry, currentPath ? `${currentPath}/${entry.name}` : entry.name);
+        }
+      }
+    };
+
+    const promises: Promise<void>[] = [];
+    for (let i = 0; i < e.dataTransfer.items.length; i++) {
+      const item = e.dataTransfer.items[i];
+      if (item.kind === "file") {
+        const entry = item.webkitGetAsEntry();
+        if (entry) {
+          promises.push(traverseEntry(entry));
+        }
+      }
+    }
+
+    await Promise.all(promises);
+    setAttachments((prev) => [...prev, ...fileList]);
   };
 
   useEffect(() => {
@@ -117,7 +184,12 @@ export function AgentChat({
   const showEmpty = turns.length === 0 && !running;
 
   return (
-    <div className="h-full flex flex-col bg-background agent-chat-shell">
+    <div
+      className={`h-full flex flex-col bg-background agent-chat-shell transition-all duration-200 ${isDragging ? "ring-2 ring-rays-pink/50 bg-secondary/15" : ""}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div
         className="px-4 py-2 border-b flex items-center justify-between gap-2 shrink-0"
         style={{ borderColor: "rgba(255,255,255,0.05)" }}
