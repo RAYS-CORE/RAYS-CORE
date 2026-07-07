@@ -610,7 +610,11 @@ try:
 except Exception as e:
     print("Error parsing docx: " + str(e))
 `;
-      const proc = require("node:child_process").spawnSync("python", ["-c", pythonScript, resolvedPath], { encoding: "utf8" });
+      const isWin = process.platform === "win32";
+      const pythonPath = app.isPackaged 
+        ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
+        : (isWin ? "python" : "python3");
+      const proc = require("node:child_process").spawnSync(pythonPath, ["-c", pythonScript, resolvedPath], { encoding: "utf8" });
       const output = proc.stdout || proc.stderr;
       return { content: output };
     } catch (err) {

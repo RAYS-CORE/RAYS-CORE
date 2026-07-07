@@ -1,6 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+
+DOMPurify.addHook('afterSanitizeAttributes', function(node) {
+  if ('target' in node) {
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer');
+  }
+  if (node.nodeName && node.nodeName.toLowerCase() === 'img') {
+    const src = node.getAttribute('src') || '';
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//')) {
+      node.removeAttribute('src');
+      node.setAttribute('alt', 'Remote image blocked for privacy');
+      node.setAttribute('class', 'border border-dashed border-red-500/50 p-4 text-xs text-red-500/80 rounded block max-w-sm');
+    } else if (src.startsWith('data:')) {
+      if (!/^data:image\/(png|jpeg|jpg|gif|webp);base64,/.test(src)) {
+        node.removeAttribute('src');
+        node.setAttribute('alt', 'Invalid data URI MIME type blocked');
+      }
+    }
+  }
+});
+
+const purifyConfig = {
+  ADD_DATA_URI_TAGS: ['img'],
+  ADD_ATTR: ['target'],
+  FORBID_ATTR: ['style']
+};
 
 function detectLanguage(fileName: string): string {
   const extension = fileName.split(".").pop()?.toLowerCase() || "";
@@ -222,7 +250,7 @@ export function CodeEditor({
   }
 
   if (["md", "markdown"].includes(extension) && fileContent !== undefined && !loading && !loadError) {
-    const mdNodes = parseMarkdownToReact(fileContent);
+    const htmlContent = DOMPurify.sanitize(marked.parse(fileContent, { async: false }) as string, purifyConfig);
     return (
       <div className="w-full h-full bg-background overflow-y-auto p-8 select-text">
         <div className="max-w-3xl mx-auto prose dark:prose-invert">
@@ -230,13 +258,14 @@ export function CodeEditor({
             <span>Markdown Preview</span>
             <span className="normal-case font-normal text-muted-foreground/60">{fileName}</span>
           </div>
-          {mdNodes}
+          <div className="markdown-preview-content space-y-4" dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </div>
       </div>
     );
   }
 
   if (extension === "docx" && fileContent !== undefined && !loading && !loadError) {
+    const safeHtml = DOMPurify.sanitize(fileContent || "Empty Document", purifyConfig);
     return (
       <div className="w-full h-full bg-background overflow-y-auto p-8 select-text">
         <div className="max-w-2xl mx-auto bg-card/60 p-8 rounded-lg shadow-panel border border-border/40 min-h-[90%] font-sans text-sm text-foreground/80 leading-relaxed">
@@ -244,7 +273,7 @@ export function CodeEditor({
             <span>Word Document Preview</span>
             <span className="normal-case font-normal text-muted-foreground/60">{fileName}</span>
           </div>
-          <div className="docx-preview-content space-y-4 font-sans prose dark:prose-invert" dangerouslySetInnerHTML={{ __html: fileContent || "Empty Document" }} />
+          <div className="docx-preview-content space-y-4 font-sans prose dark:prose-invert" dangerouslySetInnerHTML={{ __html: safeHtml }} />
         </div>
       </div>
     );
