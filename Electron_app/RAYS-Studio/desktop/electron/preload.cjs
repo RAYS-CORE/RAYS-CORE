@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("raysDesktop", {
   startSession: (workspacePath, runtimeOverrides, conversationId) =>
     ipcRenderer.invoke("rays:session-start", { workspacePath, runtimeOverrides, conversationId }),
   stopSession: (sessionId) => ipcRenderer.invoke("rays:session-stop", { sessionId }),
+  startDaemon: () => ipcRenderer.invoke("rays:daemon-start"),
+  stopDaemon: () => ipcRenderer.invoke("rays:daemon-stop"),
   readMcpConfig: (scope, workspaceRoot) =>
     ipcRenderer.invoke("rays:read-mcp-config", { scope, workspaceRoot }),
   writeMcpConfig: (scope, workspaceRoot, server) =>

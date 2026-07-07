@@ -47,6 +47,12 @@ studio = [
   "websockets>=12,<14",
   "onnxruntime>=1.16,<2",
   "tokenizers>=0.15,<1",
+  "torch>=2.0.0",
+  "fastapi>=0.100",
+  "uvicorn>=0.20",
+  "huggingface_hub>=0.19",
+  "pydantic>=2.0",
+  "textual>=0.40"
 ]
 
 [project.scripts]

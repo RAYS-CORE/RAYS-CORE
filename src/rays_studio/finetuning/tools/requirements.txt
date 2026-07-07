@@ -1,0 +1,5 @@
+torch
+fastapi
+uvicorn
+textual
+llama-cpp-python

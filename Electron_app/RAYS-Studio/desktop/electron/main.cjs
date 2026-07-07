@@ -46,6 +46,9 @@ const bridgeSessions = new Map();
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
 
+/** @type {import('node:child_process').ChildProcessWithoutNullStreams | null} */
+let daemonProcess = null;
+
 function sendToRenderer(channel, payload) {
   const win = BrowserWindow.getFocusedWindow() || mainWindow;
   if (win && !win.isDestroyed()) {
@@ -453,6 +456,10 @@ app.on("window-all-closed", () => {
     child.kill("SIGTERM");
   }
   bridgeSessions.clear();
+  if (daemonProcess) {
+    daemonProcess.kill("SIGTERM");
+    daemonProcess = null;
+  }
   if (process.platform !== "darwin") app.quit();
 });
 
@@ -569,6 +576,31 @@ ipcMain.handle("rays:session-stop", async (_event, { sessionId }) => {
   if (!child) return { stopped: false };
   child.kill("SIGTERM");
   bridgeSessions.delete(sessionId);
+  return { stopped: true };
+});
+
+ipcMain.handle("rays:daemon-start", async () => {
+  if (daemonProcess) return { started: true };
+  const cmd = resolveExecutable("rays");
+  try {
+    daemonProcess = spawn(cmd, ["--studio", "--start"], {
+      cwd: os.homedir(),
+      env: { ...process.env, PATH: shellPathEnv() }
+    });
+    daemonProcess.on("exit", () => {
+      daemonProcess = null;
+    });
+    return { started: true };
+  } catch (err) {
+    return { started: false, error: err.message };
+  }
+});
+
+ipcMain.handle("rays:daemon-stop", async () => {
+  if (daemonProcess) {
+    daemonProcess.kill("SIGTERM");
+    daemonProcess = null;
+  }
   return { stopped: true };
 });
 
