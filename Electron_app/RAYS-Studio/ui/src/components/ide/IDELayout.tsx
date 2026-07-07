@@ -221,6 +221,7 @@ export default function IDELayout() {
                 fileName={activeTab}
                 fileContent={state.fileContents[activeTab]}
                 onLoadFile={readFile}
+                workspaceRoot={state.workspaceRoot}
               />
             ) : (
               <DiffStream connected={state.connected} chunks={state.diffChunks} />

@@ -526,6 +526,16 @@ ipcMain.handle("rays:read-file", async (_event, { workspaceRoot, relativePath })
   if (!resolvedPath.startsWith(normalizedRoot)) {
     throw new Error("Invalid file path");
   }
+  const extension = relativePath.split(".").pop().toLowerCase();
+  if (extension === "docx") {
+    try {
+      const pythonCmd = `import zipfile, xml.etree.ElementTree as ET; z = zipfile.ZipFile(r"${resolvedPath}"); xml = z.read("word/document.xml"); root = ET.fromstring(xml); texts = []; [texts.append(el.text or "") if el.tag.endswith("t") else texts.append("\\n") if el.tag.endswith("p") else None for el in root.iter()]; print("".join(texts).strip())`;
+      const output = execSync(`python -c "${pythonCmd.replace(/"/g, '\\"')}"`, { encoding: "utf8" });
+      return { content: output };
+    } catch (err) {
+      return { content: `Error reading docx: ${err.message}` };
+    }
+  }
   const content = await fsp.readFile(resolvedPath, "utf8");
   return { content };
 });

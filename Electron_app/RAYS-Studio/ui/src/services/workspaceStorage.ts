@@ -111,3 +111,55 @@ export function conversationIdForWorkspace(workspacePath: string): string {
   }
   return `ws_${hash.toString(16)}`;
 }
+
+export type AppearanceSettings = {
+  language: string;
+  colorMode: "light" | "dark" | "system";
+  theme: "nous" | "midnight" | "ember" | "mono" | "cyberpunk" | "slate";
+  toolCallDisplay: "product" | "technical";
+};
+
+export function loadAppearanceSettings(): AppearanceSettings {
+  try {
+    const raw = localStorage.getItem("rays-appearance-settings");
+    if (!raw) return { language: "english", colorMode: "dark", theme: "midnight", toolCallDisplay: "technical" };
+    const parsed = JSON.parse(raw);
+    return {
+      language: parsed.language ?? "english",
+      colorMode: parsed.colorMode ?? "dark",
+      theme: parsed.theme ?? "midnight",
+      toolCallDisplay: parsed.toolCallDisplay ?? "technical",
+    };
+  } catch {
+    return { language: "english", colorMode: "dark", theme: "midnight", toolCallDisplay: "technical" };
+  }
+}
+
+export function saveAppearanceSettings(settings: AppearanceSettings): void {
+  localStorage.setItem("rays-appearance-settings", JSON.stringify(settings));
+}
+
+export function applyAppearanceSettings(settings: AppearanceSettings) {
+  const root = document.documentElement;
+  
+  // Remove all old theme classes
+  const themeClasses = ["theme-nous", "theme-midnight", "theme-ember", "theme-mono", "theme-cyberpunk", "theme-slate"];
+  themeClasses.forEach((cls) => root.classList.remove(cls));
+  
+  // Add current theme class
+  root.classList.add(`theme-${settings.theme}`);
+  
+  // Handle dark/light mode
+  if (settings.colorMode === "dark") {
+    root.classList.add("dark");
+  } else if (settings.colorMode === "light") {
+    root.classList.remove("dark");
+  } else {
+    const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (systemIsDark) {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }
+}
