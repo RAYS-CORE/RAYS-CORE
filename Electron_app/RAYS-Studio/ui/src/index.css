@@ -87,6 +87,109 @@
     --shadow-panel: 0 0 0 1px rgba(177, 156, 217, 0.1), 0 4px 12px rgba(0,0,0,0.3);
     --shadow-modal: 0 0 0 1px rgba(201, 0, 150, 0.2), 0 20px 40px rgba(0,0,0,0.5);
   }
+
+  .theme-nous {
+    --background: 220 15% 95%;
+    --foreground: 220 40% 15%;
+    --card: 220 20% 98%;
+    --card-foreground: 220 40% 15%;
+    --popover: 220 20% 98%;
+    --popover-foreground: 220 40% 15%;
+    --secondary: 220 20% 90%;
+    --secondary-foreground: 220 30% 20%;
+    --muted: 220 10% 92%;
+    --muted-foreground: 220 10% 45%;
+    --border: 220 20% 88%;
+    --primary: 210 100% 45%;
+    --accent: 210 100% 45%;
+    --ring: 210 100% 45%;
+  }
+
+  .theme-midnight {
+    --background: 265 30% 6%;
+    --foreground: 270 70% 92%;
+    --card: 265 25% 10%;
+    --card-foreground: 270 70% 92%;
+    --popover: 265 25% 10%;
+    --popover-foreground: 270 70% 92%;
+    --secondary: 265 25% 14%;
+    --secondary-foreground: 270 60% 85%;
+    --muted: 265 20% 14%;
+    --muted-foreground: 260 30% 55%;
+    --accent: 265 60% 45%;
+    --accent-foreground: 0 0% 100%;
+    --border: 260 20% 15%;
+    --primary: 330 100% 70%;
+    --ring: 330 100% 70%;
+  }
+
+  .theme-ember {
+    --background: 12 25% 6%;
+    --foreground: 30 70% 90%;
+    --card: 12 20% 10%;
+    --card-foreground: 30 70% 90%;
+    --popover: 12 20% 10%;
+    --popover-foreground: 30 70% 90%;
+    --secondary: 15 20% 15%;
+    --secondary-foreground: 30 50% 80%;
+    --muted: 15 15% 13%;
+    --muted-foreground: 20 40% 50%;
+    --border: 15 20% 16%;
+    --primary: 15 80% 55%;
+    --accent: 15 80% 55%;
+    --ring: 15 80% 55%;
+  }
+
+  .theme-mono {
+    --background: 0 0% 5%;
+    --foreground: 0 0% 90%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 90%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 90%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 80%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 50%;
+    --border: 0 0% 14%;
+    --primary: 0 0% 70%;
+    --accent: 0 0% 70%;
+    --ring: 0 0% 70%;
+  }
+
+  .theme-cyberpunk {
+    --background: 120 100% 1%;
+    --foreground: 120 100% 65%;
+    --card: 120 40% 3%;
+    --card-foreground: 120 100% 65%;
+    --popover: 120 40% 3%;
+    --popover-foreground: 120 100% 65%;
+    --secondary: 120 40% 8%;
+    --secondary-foreground: 120 100% 55%;
+    --muted: 120 40% 6%;
+    --muted-foreground: 120 70% 40%;
+    --border: 120 40% 12%;
+    --primary: 120 100% 50%;
+    --accent: 120 100% 50%;
+    --ring: 120 100% 50%;
+  }
+
+  .theme-slate {
+    --background: 215 25% 8%;
+    --foreground: 210 40% 90%;
+    --card: 215 20% 12%;
+    --card-foreground: 210 40% 90%;
+    --popover: 215 20% 12%;
+    --popover-foreground: 210 40% 90%;
+    --secondary: 215 15% 16%;
+    --secondary-foreground: 210 30% 80%;
+    --muted: 215 10% 14%;
+    --muted-foreground: 210 20% 55%;
+    --border: 215 15% 18%;
+    --primary: 200 65% 55%;
+    --accent: 200 65% 55%;
+    --ring: 200 65% 55%;
+  }
 }
 
 @layer base {

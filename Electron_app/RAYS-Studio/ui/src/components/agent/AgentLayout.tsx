@@ -51,6 +51,7 @@ export default function AgentLayout() {
     refreshTree,
     selectFolder,
     reloadMcp,
+    cancelCurrentTask,
   } = useRaysSession();
 
   const running = state.status === "running";
@@ -244,6 +245,7 @@ export default function AgentLayout() {
               defaultMode="agent"
               onSend={(prompt, mode) => submitPrompt(prompt, mode || "agent")}
               onApprove={respondApproval}
+              onStop={cancelCurrentTask}
             />
           )}
         </div>
