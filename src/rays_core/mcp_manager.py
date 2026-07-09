@@ -234,12 +234,15 @@ class MCPManager:
         if not command:
             raise ValueError("stdio MCP server requires 'command'")
 
+        import shutil
+        resolved_command = shutil.which(str(command)) or str(command)
+
         args = _expand_env_value(entry.get("args") or [])
         env = _expand_env_value(entry.get("env") or {})
         merged_env = {**os.environ, **{k: str(v) for k, v in env.items()}}
 
         params = StdioServerParameters(
-            command=str(command),
+            command=resolved_command,
             args=[str(a) for a in args],
             env=merged_env,
         )
@@ -309,6 +312,74 @@ class MCPManager:
                 }
             )
         return caps
+
+    def probe_server(self, server_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Probes a server by connecting, fetching tools, and immediately disconnecting."""
+        try:
+            return self._run_async(self._probe_server_async(server_config))
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "tools": []}
+
+    async def _probe_server_async(self, entry: Dict[str, Any]) -> Dict[str, Any]:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+        import shutil
+
+        transport = (entry.get("transport") or "stdio").lower()
+        if transport != "stdio":
+            return {"ok": False, "error": f"Unsupported transport '{transport}'", "tools": []}
+        
+        command = entry.get("command")
+        if not command:
+            return {"ok": False, "error": "stdio MCP server requires 'command'", "tools": []}
+
+        resolved_command = shutil.which(str(command)) or str(command)
+        args = _expand_env_value(entry.get("args") or [])
+        env = _expand_env_value(entry.get("env") or {})
+        merged_env = {**os.environ, **{k: str(v) for k, v in env.items()}}
+
+        params = StdioServerParameters(
+            command=resolved_command,
+            args=[str(a) for a in args],
+            env=merged_env,
+        )
+
+        quiet = entry.get("quiet", self.config.get("mcp_quiet_stderr", True))
+        errlog = open(os.devnull, "w") if quiet else sys.stderr
+
+        stack = AsyncExitStack()
+        try:
+            stdio_transport = await stack.enter_async_context(
+                stdio_client(params, errlog=errlog)
+            )
+            read_stream, write_stream = stdio_transport
+            session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
+            await session.initialize()
+
+            list_result = await session.list_tools()
+            tools = []
+            for tool in list_result.tools:
+                schema = {}
+                if tool.inputSchema is not None:
+                    if hasattr(tool.inputSchema, "model_dump"):
+                        schema = tool.inputSchema.model_dump()
+                    elif isinstance(tool.inputSchema, dict):
+                        schema = tool.inputSchema
+                    else:
+                        schema = dict(tool.inputSchema)
+                tools.append({
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "input_schema": schema
+                })
+            return {"ok": True, "tools": tools}
+        except Exception as e:
+            return {"ok": False, "error": str(e), "tools": []}
+        finally:
+            try:
+                await stack.aclose()
+            except Exception:
+                pass
 
     def get_session(self, server: str) -> Optional[MCPServerSession]:
         return self._sessions.get(server)

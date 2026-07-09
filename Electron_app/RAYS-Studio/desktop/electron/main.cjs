@@ -46,9 +46,6 @@ const bridgeSessions = new Map();
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
 
-/** @type {import('node:child_process').ChildProcessWithoutNullStreams | null} */
-let daemonProcess = null;
-
 function sendToRenderer(channel, payload) {
   const win = BrowserWindow.getFocusedWindow() || mainWindow;
   if (win && !win.isDestroyed()) {
@@ -252,6 +249,13 @@ async function listSkillsForWorkspace(workspaceRoot) {
     if (!root || !fs.existsSync(root)) continue;
     await walkSkillDir(root, scope, root);
   }
+
+  // Sort: project first, then alphabetically by name
+  results.sort((a, b) => {
+    if (a.scope !== b.scope) return a.scope === "project" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
   return results;
 }
 
@@ -394,7 +398,13 @@ function bridgeLaunchConfig() {
       command: binary,
       argsPrefix: [],
       cwd: process.env.HOME || process.cwd(),
-      env: { ...process.env, PATH: shellPathEnv(), PYTHONUNBUFFERED: "1" },
+      env: {
+        ...process.env,
+        PATH: shellPathEnv(),
+        PYTHONUNBUFFERED: "1",
+        PYTHONIOENCODING: "utf-8",
+        PYTHONUTF8: "1",
+      },
     };
   }
 
@@ -407,8 +417,13 @@ function bridgeLaunchConfig() {
     env: {
       ...process.env,
       PATH: shellPathEnv(),
+      PYTHONUNBUFFERED: "1",
+      PYTHONIOENCODING: "utf-8",
+      PYTHONUTF8: "1",
       PYTHONPATH: [
         path.join(root, "src"),
+        path.resolve(root, "../../src"),
+        path.resolve(root, "../.."),
         path.join(root, "bridge/src"),
         process.env.PYTHONPATH || "",
       ]
@@ -524,10 +539,6 @@ app.on("window-all-closed", () => {
     child.kill("SIGTERM");
   }
   bridgeSessions.clear();
-  if (daemonProcess) {
-    daemonProcess.kill("SIGTERM");
-    daemonProcess = null;
-  }
   if (process.platform !== "darwin") app.quit();
 });
 
@@ -546,6 +557,101 @@ ipcMain.handle("rays:read-file", async (_event, { workspaceRoot, relativePath })
   const resolvedPath = path.resolve(normalizedRoot, relativePath);
   if (!resolvedPath.startsWith(normalizedRoot)) {
     throw new Error("Invalid file path");
+  }
+  const extension = relativePath.split(".").pop().toLowerCase();
+  if (extension === "docx") {
+    try {
+      const pythonScript = `
+import sys, zipfile, base64
+import xml.etree.ElementTree as ET
+
+docx_path = sys.argv[1]
+namespaces = {
+    'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+    'pic': 'http://schemas.openxmlformats.org/drawingml/2006/picture'
+}
+
+try:
+    with zipfile.ZipFile(docx_path) as docx:
+        rels = {}
+        try:
+            rels_data = docx.read('word/_rels/document.xml.rels')
+            rels_root = ET.fromstring(rels_data)
+            for child in rels_root:
+                rId = child.attrib.get('Id')
+                target = child.attrib.get('Target')
+                if rId and target:
+                    rels[rId] = target
+        except:
+            pass
+
+        doc_xml = docx.read('word/document.xml')
+        root = ET.fromstring(doc_xml)
+        html_parts = []
+        body = root.find('w:body', namespaces)
+        if body is not None:
+            for p in body.findall('.//w:p', namespaces):
+                pPr = p.find('w:pPr', namespaces)
+                pStyle = pPr.find('w:pStyle', namespaces) if pPr is not None else None
+                style_val = pStyle.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val', '') if pStyle is not None else ''
+                tag = 'p'
+                if 'Heading' in style_val:
+                    level = style_val.replace('Heading', '')
+                    if level in ['1', '2', '3', '4', '5', '6']:
+                        tag = f'h{level}'
+                
+                p_html = []
+                for child in p:
+                    if child.tag.endswith('r'):
+                        rPr = child.find('w:rPr', namespaces)
+                        is_bold = rPr.find('w:b', namespaces) is not None if rPr is not None else False
+                        is_italic = rPr.find('w:i', namespaces) is not None if rPr is not None else False
+                        text_elem = child.find('w:t', namespaces)
+                        text = text_elem.text if text_elem is not None else ''
+                        if text:
+                            text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                            if is_bold:
+                                text = f'<b>{text}</b>'
+                            if is_italic:
+                                text = f'<i>{text}</i>'
+                            p_html.append(text)
+                        
+                        drawings = child.findall('.//w:drawing', namespaces)
+                        for drawing in drawings:
+                            embeds = drawing.findall('.//*[@{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed]', namespaces)
+                            for embed in embeds:
+                                rId = embed.attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                if rId in rels:
+                                    media_path = f'word/{rels[rId]}'
+                                    try:
+                                        img_data = docx.read(media_path)
+                                        ext = media_path.split('.')[-1].lower()
+                                        mime = f'image/{ext}' if ext in ['png', 'jpeg', 'jpg', 'gif', 'webp'] else 'image/png'
+                                        b64 = base64.b64encode(img_data).decode('utf-8')
+                                        p_html.append(f'<img src="data:{mime};base64,{b64}" class="my-4 max-w-full rounded-md shadow-sm" />')
+                                    except:
+                                        pass
+                p_content = ''.join(p_html).strip()
+                if p_content:
+                    html_parts.append(f'<{tag}>{p_content}</{tag}>')
+                else:
+                    html_parts.append('<br/>')
+            print('\\n'.join(html_parts))
+except Exception as e:
+    print("Error parsing docx: " + str(e))
+`;
+      const isWin = process.platform === "win32";
+      const pythonPath = app.isPackaged 
+        ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
+        : (isWin ? "python" : "python3");
+      const proc = require("node:child_process").spawnSync(pythonPath, ["-c", pythonScript, resolvedPath], { encoding: "utf8" });
+      const output = proc.stdout || proc.stderr;
+      return { content: output };
+    } catch (err) {
+      return { content: `Error reading docx: ${err.message}` };
+    }
   }
   const content = await fsp.readFile(resolvedPath, "utf8");
   return { content };
@@ -647,31 +753,6 @@ ipcMain.handle("rays:session-stop", async (_event, { sessionId }) => {
   return { stopped: true };
 });
 
-ipcMain.handle("rays:daemon-start", async () => {
-  if (daemonProcess) return { started: true };
-  const cmd = resolveExecutable("rays");
-  try {
-    daemonProcess = spawn(cmd, ["--studio", "--start"], {
-      cwd: os.homedir(),
-      env: { ...process.env, PATH: shellPathEnv() }
-    });
-    daemonProcess.on("exit", () => {
-      daemonProcess = null;
-    });
-    return { started: true };
-  } catch (err) {
-    return { started: false, error: err.message };
-  }
-});
-
-ipcMain.handle("rays:daemon-stop", async () => {
-  if (daemonProcess) {
-    daemonProcess.kill("SIGTERM");
-    daemonProcess = null;
-  }
-  return { stopped: true };
-});
-
 ipcMain.handle("rays:read-mcp-config", async (_event, { scope, workspaceRoot }) => {
   return readMcpJson(scope, workspaceRoot || null);
 });
@@ -683,6 +764,13 @@ ipcMain.handle("rays:write-mcp-config", async (_event, { scope, workspaceRoot, s
   servers.push(normalized);
   await writeMcpJson(scope, workspaceRoot || null, servers);
   return { ok: true, server: normalized };
+});
+
+ipcMain.handle("rays:write-mcp-json", async (_event, { scope, workspaceRoot, data }) => {
+  const filePath = mcpConfigPath(scope, workspaceRoot);
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
+  await fsp.writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
+  return { ok: true };
 });
 
 ipcMain.handle("rays:remove-mcp-server", async (_event, { scope, workspaceRoot, name }) => {
@@ -764,3 +852,86 @@ ipcMain.handle("rays:install-skill", async (_event, { scope, workspaceRoot, sour
 ipcMain.handle("rays:list-skills", async (_event, { workspaceRoot }) => {
   return listSkillsForWorkspace(workspaceRoot || null);
 });
+
+ipcMain.handle("rays:list-agent-profiles", async () => {
+  const agentsDir = path.join(app.getPath("userData"), "agents");
+  if (!fs.existsSync(agentsDir)) return [];
+  const entries = await fsp.readdir(agentsDir, { withFileTypes: true });
+  return entries.filter(e => e.isDirectory()).map(e => e.name);
+});
+
+ipcMain.handle("rays:create-agent-profile", async (_event, { name, cloneFrom, soul }) => {
+  const agentsDir = path.join(app.getPath("userData"), "agents");
+  const targetPath = path.join(agentsDir, name);
+  
+  if (fs.existsSync(targetPath)) {
+    throw new Error(`Profile ${name} already exists.`);
+  }
+  
+  await fsp.mkdir(targetPath, { recursive: true });
+  
+  if (cloneFrom) {
+    const sourcePath = path.join(agentsDir, cloneFrom);
+    if (fs.existsSync(sourcePath)) {
+      await copyDirRecursive(sourcePath, targetPath);
+    }
+  }
+  
+  if (typeof soul === "string") {
+    await fsp.writeFile(path.join(targetPath, "SOUL.md"), soul, "utf8");
+  }
+  
+  return { ok: true, path: targetPath };
+});
+
+ipcMain.handle("rays:transcribe-audio", async (_event, { audioBuffer, format = 'webm' }) => {
+  const tmpPath = path.join(os.tmpdir(), `audio-${Date.now()}.${format}`);
+  fs.writeFileSync(tmpPath, Buffer.from(audioBuffer));
+  
+  const isWin = process.platform === "win32";
+  const pythonPath = app.isPackaged 
+    ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
+    : (isWin ? "python" : "python3");
+  const voiceCliPath = path.join(repoRoot(), "src", "rays_core", "voice_cli.py");
+  
+  const proc = require("node:child_process").spawnSync(pythonPath, [voiceCliPath, "transcribe", tmpPath], { encoding: "utf8" });
+  
+  try { fs.unlinkSync(tmpPath); } catch (e) {}
+  
+  if (proc.error) {
+    throw new Error(`Failed to start STT process: ${proc.error.message}`);
+  }
+  
+  try {
+    const lines = proc.stdout.trim().split("\\n");
+    return JSON.parse(lines[lines.length - 1]);
+  } catch (err) {
+    throw new Error(`Failed to parse STT output: ${proc.stdout || proc.stderr}`);
+  }
+});
+
+ipcMain.handle("rays:speak-text", async (_event, { text }) => {
+  const isWin = process.platform === "win32";
+  const pythonPath = app.isPackaged 
+    ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
+    : (isWin ? "python" : "python3");
+  const voiceCliPath = path.join(repoRoot(), "src", "rays_core", "voice_cli.py");
+  
+  const proc = require("node:child_process").spawnSync(pythonPath, [voiceCliPath, "speak", text], { encoding: "utf8" });
+  if (proc.error) {
+    throw new Error(`Failed to start TTS process: ${proc.error.message}`);
+  }
+  
+  try {
+    const lines = proc.stdout.trim().split("\\n");
+    const parsed = JSON.parse(lines[lines.length - 1]);
+    if (parsed.success && parsed.audio_path) {
+      const audioBuffer = fs.readFileSync(parsed.audio_path);
+      return { success: true, audioBuffer, format: parsed.audio_path.split('.').pop() };
+    }
+    return parsed;
+  } catch (err) {
+    throw new Error(`Failed to parse TTS output: ${proc.stdout || proc.stderr}`);
+  }
+});
+

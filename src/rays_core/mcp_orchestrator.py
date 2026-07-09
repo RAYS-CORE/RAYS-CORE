@@ -118,6 +118,7 @@ class MCPOrchestrator:
         reconnected_this_step = False
         first_backend_failure_turn: int | None = None
         consecutive_no_tool_turns = 0
+        seen_tool_calls: Dict[str, int] = {}
         recovery_hint = blender_recovery_hint() if "blender" in server.lower() else (
             "MCP backend unreachable; fix the external app and retry."
         )
@@ -142,6 +143,17 @@ class MCPOrchestrator:
 
             rays_ui.hud_set_status("Thinking", f"{server} · turn {turn}")
 
+            # Build anti-loop warning if we have duplicate calls
+            loop_warning = ""
+            for key, count in seen_tool_calls.items():
+                if count >= 2:
+                    tool_key, args_key = key.split("::", 1)
+                    loop_warning = (
+                        f"\n\n⚠️ LOOP DETECTED: You ran `{tool_key}({args_key})` {count} times already. "
+                        f"DO NOT run it again. You MUST set status \"completed\" NOW."
+                    )
+                    break
+
             prompt = self.prompts.get("mcp_subagent_turn", "").format(
                 user_prompt=user_prompt,
                 server_name=server,
@@ -150,7 +162,7 @@ class MCPOrchestrator:
                 intent=intent,
                 tools_catalog=tools_json,
                 prior_executions=prior_transcript,
-                session_actions=format_session_actions(session_actions),
+                session_actions=format_session_actions(session_actions) + loop_warning,
                 turn_number=turn,
             )
             response = self.ai_client.generate_json(prompt)
@@ -163,6 +175,12 @@ class MCPOrchestrator:
 
             if tool_call:
                 consecutive_no_tool_turns = 0
+                
+                tool_name = tool_call.get("name", "")
+                args_str = json.dumps(tool_call.get("arguments", {}), sort_keys=True)
+                call_key = f"{tool_name}::{args_str}"
+                seen_tool_calls[call_key] = seen_tool_calls.get(call_key, 0) + 1
+                
                 result = self._dispatch_mcp_tool(server, tool_call)
                 lost = self._apply_backend_error_handling(
                     server,
@@ -207,6 +225,21 @@ class MCPOrchestrator:
                     result,
                     tool_call.get("arguments"),
                 )
+
+                if seen_tool_calls.get(call_key, 0) >= 3:
+                    rays_ui.print_warning(
+                        f"[mcp/{server}] Loop detected: same command ran 3x. Auto-completing."
+                    )
+                    return {
+                        "type": "mcp",
+                        "server": server,
+                        "phase": phase,
+                        "spawn_reason": spawn_reason,
+                        "intent": intent,
+                        "status": "completed",
+                        "exit_message": "Auto-completed due to tool loop.",
+                        "actions": session_actions,
+                    }
 
             if session_actions_have_backend_failure(server, session_actions):
                 if first_backend_failure_turn is None:
@@ -272,18 +305,18 @@ class MCPOrchestrator:
                         session_actions,
                     )
                 if consecutive_no_tool_turns >= self.no_tool_turn_limit:
-                    return self._connection_lost_record(
-                        server,
-                        step,
-                        spawn_reason,
-                        intent,
-                        phase,
-                        (
-                            f"Stopped after {self.no_tool_turn_limit} turns without calling "
-                            f"an MCP tool. {recovery_hint}"
-                        ),
-                        session_actions,
-                    )
+                    exit_msg = f"Stopped after {self.no_tool_turn_limit} turns without calling an MCP tool."
+                    rays_ui.hud_note_warn(exit_msg)
+                    return {
+                        "type": "mcp",
+                        "server": server,
+                        "phase": phase,
+                        "spawn_reason": spawn_reason,
+                        "intent": intent,
+                        "status": "completed",
+                        "exit_message": exit_msg,
+                        "actions": session_actions,
+                    }
 
         return {
             "type": "mcp",
