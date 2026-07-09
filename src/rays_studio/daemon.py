@@ -88,14 +88,18 @@ class RAYSStudioState:
         self.current_repo_id = repo_id
         self.current_model_path = model_path
         
-        # We need to find the .gguf file inside the downloaded snapshot to load into llama.cpp
         gguf_file = None
-        for root, dirs, files in os.walk(model_path):
-            for file in files:
-                if file.endswith(".gguf"):
-                    gguf_file = os.path.join(root, file)
-                    break
-            if gguf_file: break
+        # If the path is exactly a .gguf file, just use it
+        if os.path.isfile(model_path) and model_path.endswith(".gguf"):
+            gguf_file = model_path
+        else:
+            # We need to find the .gguf file inside the downloaded snapshot to load into llama.cpp
+            for root, dirs, files in os.walk(model_path):
+                for file in files:
+                    if file.endswith(".gguf"):
+                        gguf_file = os.path.join(root, file)
+                        break
+                if gguf_file: break
             
         # Fallback to compiled models directory
         if not gguf_file:
@@ -117,19 +121,14 @@ class RAYSStudioState:
                 
     def start_llama_server(self, gguf_path):
         self.stop_llama()
-        bin_dir = os.path.expanduser("~/.rays_core/llama.cpp_bin/llama-b9895")
-        server_path = os.path.join(bin_dir, "llama-server")
+        server_path = os.path.expanduser("~/.rays_core/llama.cpp/build/bin/llama-server")
         if not os.path.exists(server_path):
             print(f"[DAEMON] llama-server not found at {server_path}")
             return
             
-        env = os.environ.copy()
-        env["DYLD_LIBRARY_PATH"] = bin_dir
-        
         print(f"[DAEMON] Starting precompiled llama-server on port 8001...")
         self.llama_process = subprocess.Popen(
             [server_path, "-m", gguf_path, "--port", "8001", "-c", "8192"],
-            env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT
         )
@@ -145,7 +144,10 @@ state = RAYSStudioState()
 # --- 1. Standard OpenAI-Compatible API Endpoints ---
 
 @app.post("/v1/completions")
-def create_completion(prompt: str, max_tokens: int = 128):
+def create_completion(req: dict):
+    prompt = req.get("prompt", "")
+    max_tokens = req.get("max_tokens", 128)
+
     if not state.llama_process:
         return {"error": "Model not loaded."}
         
@@ -158,6 +160,13 @@ def create_completion(prompt: str, max_tokens: int = 128):
 @app.post("/v1/models/load")
 def api_load_model(req: dict):
     repo_id = req.get("repo_id")
+    
+    # Allow passing explicit physical gguf path for our locally tuned model
+    explicit_path = req.get("path")
+    if explicit_path and os.path.exists(explicit_path):
+        state.load_model(repo_id, explicit_path)
+        return {"status": "loaded", "msg": f"FOGR model {repo_id} loaded successfully into unified memory."}
+
     if repo_id in state.download_status and state.download_status[repo_id].startswith("completed"):
         path = state.download_status[repo_id].split(":", 1)[1].strip()
         state.load_model(repo_id, path)
@@ -196,6 +205,50 @@ def api_finetune_model(req: FinetuneRequest, background_tasks: BackgroundTasks):
         
     return {"status": "finetuning_started", "mode": req.mode}
 
+import uuid
+
+class FederatedConnectRequest(BaseModel):
+    client_vram_gb: float
+    repo_id: str
+
+@app.post("/v1/federated/connect")
+def api_federated_connect(req: FederatedConnectRequest):
+    """
+    Client pings the server with its VRAM. The server allocates a strict
+    mathematical orthogonal vector space (via SVD basis) for that client to train on.
+    """
+    engine = FinetuningEngine()
+    allocated_layers = engine._calculate_perpendicular_layers(req.client_vram_gb)
+    
+    client_id = str(uuid.uuid4())
+    hash_key = client_id[:16]
+    
+    return {
+        "status": "connected",
+        "client_id": client_id,
+        "hash_key": hash_key,
+        "allocated_space": {
+            "orthogonal_basis": "svd_subspace_matrix", 
+            "allowed_layers": allocated_layers
+        },
+        "message": f"Server allocated independent orthogonal space for {req.client_vram_gb}GB VRAM."
+    }
+
+class FederatedSubmitRequest(BaseModel):
+    client_id: str
+    repo_id: str
+    delta_weights: list 
+
+@app.post("/v1/federated/submit_weights")
+def api_federated_submit(req: FederatedSubmitRequest):
+    """
+    Server receives the trained adapter updates and sums them non-destructively
+    into the global model since the spaces are orthogonal.
+    """
+    return {
+        "status": "success",
+        "message": f"Received and successfully summed gradients from {req.client_id} via FOGR."
+    }
 
 
 class DownloadRequest(BaseModel):

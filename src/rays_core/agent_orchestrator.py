@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -55,6 +57,26 @@ class AgentOrchestrator:
             user_prompt, result
         )
         rays_ui.orch_render_final_summary(result)
+        
+        # Save Execution-State Graph for FOGR Fine-Tuning
+        try:
+            session_id = str(uuid.uuid4())
+            log_dir = os.path.expanduser(f"~/.rays/conversations/{session_id}")
+            os.makedirs(log_dir, exist_ok=True)
+            log_path = os.path.join(log_dir, "execution_graphs.jsonl")
+            
+            graph_data = {
+                "session_id": session_id,
+                "intent": user_prompt,
+                "execution_topology": cumulative_history,
+                "is_complete": result.get("complete", False)
+            }
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(graph_data) + "\n")
+            logger.info(f"FOGR Execution Graph saved to {log_path}")
+        except Exception as e:
+            logger.error(f"Failed to save FOGR execution graph: {e}")
+
         return result
 
     def _run_loops(

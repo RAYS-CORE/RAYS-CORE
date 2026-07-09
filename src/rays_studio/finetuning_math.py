@@ -1,79 +1,114 @@
 import os
 import time
+import json
+import glob
+import subprocess
+try:
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from peft import get_peft_model, LoraConfig, TaskType
+except ImportError:
+    torch = None
 
 class FinetuningEngine:
-    """
-    FinetuningEngine handles the mathematical operations and PyTorch tensor
-    manipulations required to apply Spectrally Bounded Zero-Gated Adapters (SB-ZGA)
-    or other layer-insertion techniques to Hugging Face safetensors.
-    
-    This class acts as an isolated boundary. The backend daemon provides the
-    safetensors directory and system hardware stats. This class performs the tuning
-    and returns the path to the newly generated/compiled .gguf file for inference.
-    """
-    
     def __init__(self):
         self.output_dir = os.path.expanduser("~/.rays_core/models/")
         os.makedirs(self.output_dir, exist_ok=True)
-        
-    def _calculate_perpendicular_layers(self, vram_gb: float) -> int:
-        """
-        Mathematically detects VRAM and creates a specific number of layers.
-        A "perpendicular space in the math" is created to fit within the hardware constraints.
-        """
-        # Example logic: 1 layer per 2GB of VRAM available, minimum 1 layer.
-        layers = max(1, int(vram_gb // 2))
-        return layers
 
-    def _compile_to_gguf(self, safetensors_path: str, model_name: str, suffix: str) -> str:
-        """
-        Compiles the fine-tuned PyTorch safetensors into a .gguf file.
-        (Stub logic - to be replaced by actual tokenizers/llama.cpp conversion calls)
-        """
+    def _calculate_perpendicular_layers(self, vram_gb: float) -> int:
+        if vram_gb <= 8.0:
+            return min(2, max(1, int(vram_gb // 4)))
+        return max(1, int(vram_gb // 2))
+
+    def _compile_to_gguf(self, hf_dir: str, model_name: str, suffix: str) -> str:
         safe_repo_name = model_name.replace("/", "_")
         out_name = f"compiled_{safe_repo_name}_{suffix}_{int(time.time())}.gguf"
         out_path = os.path.join(self.output_dir, out_name)
         
-        print(f"[MATH ENGINE] Compiling tensors from {safetensors_path} -> {out_path}...")
-        
-        # In a real implementation, you would write the tensors and call llama.cpp conversion.
-        # For now, we simulate success if the actual script isn't called.
+        print(f"[MATH ENGINE] Compiling tensors from {hf_dir} -> {out_path} via llama.cpp...")
+        convert_script = os.path.expanduser("~/.rays_core/llama.cpp/convert_hf_to_gguf.py")
+        if not os.path.exists(convert_script):
+            raise Exception("llama.cpp conversion script not found.")
+            
+        subprocess.run(["python", convert_script, hf_dir, "--outfile", out_path], check=True)
         return out_path
 
-    def finetune_memory(self, model_name: str, safetensors_path: str, vram_gb: float) -> str:
-        """
-        Memory Fine-Tuning: Optimizes layers specifically for in-memory rapid context switching.
-        """
-        print(f"\n--- Starting Memory Fine-Tuning for {model_name} ---")
-        num_layers = self._calculate_perpendicular_layers(vram_gb)
-        print(f"[MATH ENGINE] Detected {vram_gb}GB VRAM. Creating {num_layers} perpendicular memory layers.")
-        
-        # TODO: Implement PyTorch tensor manipulation for memory fine-tuning here
-        
-        return self._compile_to_gguf(safetensors_path, model_name, "mem_tuned")
-
     def finetune_local(self, model_name: str, safetensors_path: str, vram_gb: float) -> str:
-        """
-        Local Fine-Tuning: Standard adapter training optimized for local hardware constraints.
-        """
-        print(f"\n--- Starting Local Agent Fine-Tuning for {model_name} ---")
+        print(f"\n--- Starting Real PyTorch Fine-Tuning for {model_name} ---")
+        if torch is None:
+            raise Exception("PyTorch or transformers not installed.")
+            
         num_layers = self._calculate_perpendicular_layers(vram_gb)
-        print(f"[MATH ENGINE] Detected {vram_gb}GB VRAM. Creating {num_layers} perpendicular local layers.")
         
-        # TODO: Implement PyTorch tensor manipulation for local fine-tuning here
+        # We use the user-selected model path instead of a hardcoded string
+        expanded_path = os.path.expanduser(safetensors_path)
+        print(f"[MATH ENGINE] Loading {model_name} weights from {expanded_path} into memory...")
         
-        return self._compile_to_gguf(safetensors_path, model_name, "local_tuned")
+        tokenizer = AutoTokenizer.from_pretrained(expanded_path)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        
+        model = AutoModelForCausalLM.from_pretrained(expanded_path, torch_dtype=torch.float16, device_map="auto")
+        
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            inference_mode=False,
+            r=8,
+            lora_alpha=32,
+            lora_dropout=0.1
+        )
+        model = get_peft_model(model, peft_config)
+        
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+        
+        # Load Logs
+        convo_dir = os.path.expanduser("~/.rays/conversations/")
+        jsonl_files = glob.glob(os.path.join(convo_dir, "*", "execution_graphs.jsonl"))
+        
+        print(f"[MATH ENGINE] Extracted {len(jsonl_files)} execution graphs. Training...")
+        model.train()
+        
+        for file in jsonl_files:
+            try:
+                with open(file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        data = json.loads(line)
+                        intent = data.get("intent", "")
+                        # Check if response is pre-baked (like our synthetic data) or derive from dag
+                        response = data.get("response", "")
+                        if not response:
+                            nodes = data.get("dag_nodes", [])
+                            for node in nodes:
+                                response += f" [Action: {node['tool']} -> Output: {node['output']}]"
+                                
+                        text = f"<|im_start|>user\n{intent}<|im_end|>\n<|im_start|>assistant\n{response}<|im_end|>"
+                            
+                        inputs = tokenizer(text, return_tensors="pt")
+                        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+                        
+                        print(f"[MATH ENGINE] Overfitting on conversation: {intent}")
+                        for epoch in range(30):
+                            outputs = model(**inputs, labels=inputs["input_ids"])
+                            loss = outputs.loss
+                            loss.backward()
+                            optimizer.step()
+                            optimizer.zero_grad()
+                            if epoch % 5 == 0:
+                                print(f"[MATH ENGINE] Epoch {epoch} Loss: {loss.item():.4f}")
+            except Exception as e:
+                print(f"[MATH ENGINE] Failed to parse/train on {file}: {e}")
+                
+        # Merge and Save
+        print("[MATH ENGINE] Merging adapters into base model...")
+        merged_model = model.merge_and_unload()
+        hf_out_dir = os.path.join(self.output_dir, "qwen_tuned_hf")
+        merged_model.save_pretrained(hf_out_dir)
+        tokenizer.save_pretrained(hf_out_dir)
+        
+        print("[MATH ENGINE] PyTorch fine-tuning complete. Proceeding to GGUF conversion.")
+        return self._compile_to_gguf(hf_out_dir, model_name, "local_tuned")
 
+    def finetune_memory(self, model_name: str, safetensors_path: str, vram_gb: float) -> str:
+        return ""
     def finetune_server(self, model_name: str, safetensors_path: str, vram_gb: float, hardware_info: dict) -> str:
-        """
-        Server-Side Fine-Tuning: Detects user machine info and creates a perpendicular space 
-        so the model is finely tuned specifically for that server hardware architecture.
-        """
-        print(f"\n--- Starting Server-Side Fine-Tuning for {model_name} ---")
-        num_layers = self._calculate_perpendicular_layers(vram_gb)
-        print(f"[MATH ENGINE] Target Server Hardware: {hardware_info}")
-        print(f"[MATH ENGINE] Detected {vram_gb}GB VRAM. Creating {num_layers} perpendicular server layers.")
-        
-        # TODO: Implement PyTorch tensor manipulation for server fine-tuning here
-        
-        return self._compile_to_gguf(safetensors_path, model_name, "server_tuned")
+        return ""
