@@ -1,0 +1,29 @@
+# electron-builder configuration for RAYS-CORE Windows Installer
+# Isolated inside the build/windows directory. Zero modifications to core repository.
+appId: com.rays.studio
+productName: RAYS Studio
+directories:
+  output: release
+files:
+  - electron/**/*
+  - from: ../ui/dist
+    to: ui/dist
+    filter:
+      - '**/*'
+extraResources:
+  - from: resources/backend
+    to: backend
+    filter:
+      - '**/*'
+win:
+  icon: build/icon.png
+  target:
+    - nsis
+    - zip
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  shortcutName: RAYS Studio
+  uninstallDisplayName: RAYS Studio
+  warningsAsErrors: false

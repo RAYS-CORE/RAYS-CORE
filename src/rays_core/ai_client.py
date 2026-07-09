@@ -26,8 +26,8 @@ class AIClient:
                 return resp.status_code == 200
             except:
                 return False
-        elif self.provider == "gemini":
-            # For Gemini, we just check if API key exists (network check is expensive/unreliable here)
+        elif self.provider in ("gemini", "openai", "groq", "claude"):
+            # For APIs, we check if API key exists (network check is expensive/unreliable here)
             return bool(self.api_key)
         return False
     
@@ -44,8 +44,11 @@ class AIClient:
             return self._ollama_parallel(texts)
         elif self.provider == "gemini":
             return self._gemini_parallel(texts)
+        elif self.provider == "openai":
+            return self._openai_parallel(texts)
         else:
-            raise ValueError(f"Unsupported provider: {self.provider}")
+            # Fallback to gemini or ollama if provider doesn't support embeddings (like groq/claude)
+            return self._gemini_parallel(texts) if self.api_key else self._ollama_parallel(texts)
     
     def generate_text(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """Generate text completion from LLM"""
@@ -58,6 +61,12 @@ class AIClient:
             response = self._ollama_generate(prompt, system_prompt)
         elif self.provider == "gemini":
             response = self._gemini_generate(prompt, system_prompt)
+        elif self.provider == "openai":
+            response = self._openai_generate(prompt, system_prompt)
+        elif self.provider == "groq":
+            response = self._groq_generate(prompt, system_prompt)
+        elif self.provider == "claude":
+            response = self._claude_generate(prompt, system_prompt)
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
             
@@ -341,4 +350,130 @@ class AIClient:
                 results[idx] = future.result()
         
         return results
+
+    # ========== OPENAI METHODS ==========
+    
+    def _openai_generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """Generate text using OpenAI API"""
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.2
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=180)
+            resp.raise_for_status()
+            data = resp.json()
+            usage = data.get("usage") or {}
+            total = usage.get("total_tokens", 0)
+            if total > 0:
+                rays_ui.hud_add_tokens(total)
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            rays_ui.print_exception(e)
+            return ""
+
+    def _openai_parallel(self, texts: List[str]) -> List[List[float]]:
+        """OpenAI parallel embedding"""
+        def embed_single(text):
+            try:
+                url = "https://api.openai.com/v1/embeddings"
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "text-embedding-3-small",
+                    "input": text
+                }
+                response = requests.post(url, json=payload, headers=headers, timeout=120)
+                response.raise_for_status()
+                return response.json()['data'][0]['embedding']
+            except Exception as e:
+                rays_ui.print_exception(e)
+                return []
+        
+        results = [None] * len(texts)
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_idx = {executor.submit(embed_single, text): idx for idx, text in enumerate(texts)}
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                results[idx] = future.result()
+        
+        return results
+
+    # ========== GROQ METHODS ==========
+    
+    def _groq_generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """Generate text using Groq API"""
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.2
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=180)
+            resp.raise_for_status()
+            data = resp.json()
+            usage = data.get("usage") or {}
+            total = usage.get("total_tokens", 0)
+            if total > 0:
+                rays_ui.hud_add_tokens(total)
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            rays_ui.print_exception(e)
+            return ""
+
+    # ========== CLAUDE METHODS ==========
+    
+    def _claude_generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """Generate text using Anthropic Claude API"""
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        messages = [{"role": "user", "content": prompt}]
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": 4096,
+            "temperature": 0.2
+        }
+        if system_prompt:
+            payload["system"] = system_prompt
+            
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=180)
+            resp.raise_for_status()
+            data = resp.json()
+            usage = data.get("usage") or {}
+            total = int(usage.get("input_tokens") or 0) + int(usage.get("output_tokens") or 0)
+            if total > 0:
+                rays_ui.hud_add_tokens(total)
+            return data["content"][0]["text"]
+        except Exception as e:
+            rays_ui.print_exception(e)
+            return ""
 

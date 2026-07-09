@@ -1,0 +1,41 @@
+# electron-builder configuration for RAYS-CORE macOS Installer
+# Isolated inside the build/mac directory. Zero modifications to core repository.
+appId: com.rays.studio
+productName: RAYS Studio
+directories:
+  output: release
+files:
+  - electron/**/*
+  - from: ../ui/dist
+    to: ui/dist
+    filter:
+      - '**/*'
+extraResources:
+  - from: resources/backend
+    to: backend
+    filter:
+      - '**/*'
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: ../../../build/mac/entitlements.mac.plist
+  entitlementsInherit: ../../../build/mac/entitlements.mac.inherit.plist
+  target:
+    - dmg
+    - zip
+dmg:
+  title: Install RAYS Studio
+  iconSize: 96
+  window:
+    width: 560
+    height: 360
+  contents:
+    - x: 160
+      y: 170
+      type: file
+    - x: 400
+      y: 170
+      type: link
+      path: /Applications

@@ -10,6 +10,7 @@ import StudioLayout from "@/components/studio/StudioLayout";
 import NotFound from "./pages/NotFound.tsx";
 import { useEffect } from "react";
 import { syncInstallEpoch } from "@/services/appStorage";
+import { loadAppearanceSettings, applyAppearanceSettings } from "@/services/workspaceStorage";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ async function ensureFreshInstallState(): Promise<void> {
 const App = () => {
   useEffect(() => {
     void ensureFreshInstallState();
+    applyAppearanceSettings(loadAppearanceSettings());
   }, []);
 
   return (
