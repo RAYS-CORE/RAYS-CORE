@@ -7,6 +7,7 @@ import { AgentChat } from "@/components/agent/AgentChat";
 import { AgentExplorer } from "@/components/agent/AgentExplorer";
 import { McpManagerPanel } from "@/components/agent/McpManagerPanel";
 import { SkillsManagerPanel } from "@/components/agent/SkillsManagerPanel";
+import { NewAgentModal } from "@/components/agent/NewAgentModal";
 import { useRaysSession } from "@/hooks/useRaysSession";
 import {
   AGENT_EXPLORER_WIDTH_KEY,
@@ -27,6 +28,7 @@ export default function AgentLayout() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const [showSkills, setShowSkills] = useState(false);
+  const [showNewAgent, setShowNewAgent] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(
@@ -51,6 +53,7 @@ export default function AgentLayout() {
     refreshTree,
     selectFolder,
     reloadMcp,
+    cancelCurrentTask,
   } = useRaysSession();
 
   const running = state.status === "running";
@@ -97,11 +100,8 @@ export default function AgentLayout() {
   );
 
   const handleNewAgent = useCallback(async () => {
-    const path = await selectFolder();
-    if (!path) return;
-    const session = createAgentSession(path);
-    await openSession(session);
-  }, [openSession, selectFolder]);
+    setShowNewAgent(true);
+  }, []);
 
   const handleNewChat = useCallback(async () => {
     const workspacePath = state.workspaceRoot || activeSession?.workspacePath;
@@ -244,6 +244,7 @@ export default function AgentLayout() {
               defaultMode="agent"
               onSend={(prompt, mode) => submitPrompt(prompt, mode || "agent")}
               onApprove={respondApproval}
+              onStop={cancelCurrentTask}
             />
           )}
         </div>
@@ -292,6 +293,7 @@ export default function AgentLayout() {
         onReloadMcp={reloadMcp}
       />
       <SkillsManagerPanel open={showSkills} onClose={() => setShowSkills(false)} workspaceRoot={skillsWorkspace} />
+      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} onCreated={(session) => void openSession(session)} />
     </div>
   );
 }

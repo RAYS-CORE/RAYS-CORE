@@ -8,6 +8,7 @@ export const AGENT_SIDEBAR_WIDTH_KEY = "rays-studio:agent-sidebar-width";
 export const AGENT_EXPLORER_WIDTH_KEY = "rays-studio:agent-explorer-width";
 export const LAST_AGENT_SESSION_KEY = "rays-studio:last-agent-session-id";
 export const ONBOARDING_SESSION_KEY = "rays-studio:onboarding-complete";
+export const TOOL_SETTINGS_KEY = "rays-studio:tool-settings";
 
 const LEGACY_KEYS = [
   "rays-user",

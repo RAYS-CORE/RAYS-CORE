@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Bot, User } from "lucide-react";
+import { Send, Bot, User, Square } from "lucide-react";
 import { ThinkingIndicator } from "@/components/agent/ThinkingIndicator";
 import { resolveThinkingDisplayPhase } from "@/components/agent/thinkingDisplay";
 import type { ChatMessage, ThinkingPhase } from "@/services/raysSession";
@@ -11,6 +11,7 @@ type AgentPanelProps = {
   thinkingPhase?: ThinkingPhase;
   thinkingText?: string;
   onSend: (prompt: string) => void;
+  onStop?: () => void;
   onThinkingRevealComplete?: () => void;
 };
 
@@ -21,6 +22,7 @@ export function AgentPanel({
   thinkingPhase = "hidden",
   thinkingText = "",
   onSend,
+  onStop,
   onThinkingRevealComplete,
 }: AgentPanelProps) {
   const [input, setInput] = useState("");
@@ -151,13 +153,23 @@ export function AgentPanel({
             rows={1}
             className="flex-1 resize-none overflow-y-auto bg-secondary rounded-md px-3 py-2 text-ui text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
           />
-          <button
-            onClick={handleSend}
-            disabled={!canSend}
-            className="p-1.5 rounded-md bg-rays-pink/20 hover:bg-rays-pink/30 text-rays-pink transition-colors active:scale-95"
-          >
-            <Send size={14} />
-          </button>
+          {running ? (
+            <button
+              onClick={onStop}
+              className="p-1.5 rounded-md bg-red-500/80 hover:bg-red-500 text-white transition-colors active:scale-95 animate-pulse"
+              title="Stop agent"
+            >
+              <Square size={14} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!canSend}
+              className="p-1.5 rounded-md bg-rays-pink/20 hover:bg-rays-pink/30 text-rays-pink transition-colors active:scale-95"
+            >
+              <Send size={14} />
+            </button>
+          )}
         </div>
       </div>
     </div>

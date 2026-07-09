@@ -1,5 +1,4 @@
-import type { ProviderConfig } from "./raysSession";
-import { PROVIDER_SETTINGS_KEY, RECENT_WORKSPACES_KEY } from "./appStorage";
+import { PROVIDER_SETTINGS_KEY, RECENT_WORKSPACES_KEY, TOOL_SETTINGS_KEY } from "./appStorage";
 
 const MAX_RECENT = 12;
 
@@ -110,4 +109,136 @@ export function conversationIdForWorkspace(workspacePath: string): string {
     hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
   }
   return `ws_${hash.toString(16)}`;
+}
+
+export type AppearanceSettings = {
+  colorMode: "light" | "dark" | "system";
+  theme: "nous" | "midnight" | "ember" | "mono" | "cyberpunk" | "slate";
+};
+
+export function loadAppearanceSettings(): AppearanceSettings {
+  try {
+    const raw = localStorage.getItem("rays-appearance-settings");
+    if (!raw) return { colorMode: "dark", theme: "midnight" };
+    const parsed = JSON.parse(raw);
+    return {
+      colorMode: parsed.colorMode ?? "dark",
+      theme: parsed.theme ?? "midnight",
+    };
+  } catch {
+    return { colorMode: "dark", theme: "midnight" };
+  }
+}
+
+export function saveAppearanceSettings(settings: AppearanceSettings): void {
+  localStorage.setItem("rays-appearance-settings", JSON.stringify(settings));
+}
+
+export function applyAppearanceSettings(settings: AppearanceSettings) {
+  const root = document.documentElement;
+  
+  // Remove all old theme classes
+  const themeClasses = ["theme-nous", "theme-midnight", "theme-ember", "theme-mono", "theme-cyberpunk", "theme-slate"];
+  themeClasses.forEach((cls) => root.classList.remove(cls));
+  
+  // Add current theme class
+  root.classList.add(`theme-${settings.theme}`);
+  
+  // Handle dark/light mode
+  if (settings.colorMode === "dark") {
+    root.classList.add("dark");
+  } else if (settings.colorMode === "light") {
+    root.classList.remove("dark");
+  } else {
+    const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (systemIsDark) {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }
+}
+
+export type ToolSettings = Record<string, string>;
+
+export function loadToolSettings(): ToolSettings {
+  try {
+    const raw = localStorage.getItem(TOOL_SETTINGS_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as ToolSettings;
+  } catch {
+    return {};
+  }
+}
+
+export function saveToolSettings(settings: ToolSettings): void {
+  localStorage.setItem(TOOL_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+export type MemorySettings = {
+  memoryEnabled: boolean;
+  userProfileEnabled: boolean;
+  memoryCharLimit: number;
+  userCharLimit: number;
+  provider: string;
+  compressionEnabled: boolean;
+  compressionThreshold: number;
+  protectLastN: number;
+};
+
+const defaultMemorySettings: MemorySettings = {
+  memoryEnabled: false,
+  userProfileEnabled: false,
+  memoryCharLimit: 2200,
+  userCharLimit: 1375,
+  provider: "builtin",
+  compressionEnabled: true,
+  compressionThreshold: 15250,
+  protectLastN: 4,
+};
+
+export function loadMemorySettings(): MemorySettings {
+  try {
+    const raw = localStorage.getItem("rays-memory-settings");
+    if (!raw) return { ...defaultMemorySettings };
+    const parsed = JSON.parse(raw);
+    return { ...defaultMemorySettings, ...parsed };
+  } catch {
+    return { ...defaultMemorySettings };
+  }
+}
+
+export function saveMemorySettings(settings: MemorySettings): void {
+  localStorage.setItem("rays-memory-settings", JSON.stringify(settings));
+}
+
+export type WorkspaceSettings = {
+  workingDirectory: string;
+  codeExecutionMode: "project" | "strict";
+  persistentShell: boolean;
+  envPassthrough: string;
+  fileReadLimit: number;
+};
+
+const defaultWorkspaceSettings: WorkspaceSettings = {
+  workingDirectory: "~",
+  codeExecutionMode: "project",
+  persistentShell: false,
+  envPassthrough: "",
+  fileReadLimit: 40000,
+};
+
+export function loadWorkspaceSettings(): WorkspaceSettings {
+  try {
+    const raw = localStorage.getItem("rays-workspace-settings");
+    if (!raw) return { ...defaultWorkspaceSettings };
+    const parsed = JSON.parse(raw);
+    return { ...defaultWorkspaceSettings, ...parsed };
+  } catch {
+    return { ...defaultWorkspaceSettings };
+  }
+}
+
+export function saveWorkspaceSettings(settings: WorkspaceSettings): void {
+  localStorage.setItem("rays-workspace-settings", JSON.stringify(settings));
 }

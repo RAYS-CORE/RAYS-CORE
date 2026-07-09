@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("raysDesktop", {
     ipcRenderer.invoke("rays:read-mcp-config", { scope, workspaceRoot }),
   writeMcpConfig: (scope, workspaceRoot, server) =>
     ipcRenderer.invoke("rays:write-mcp-config", { scope, workspaceRoot, server }),
+  writeMcpJson: (scope, workspaceRoot, data) =>
+    ipcRenderer.invoke("rays:write-mcp-json", { scope, workspaceRoot, data }),
   removeMcpServer: (scope, workspaceRoot, name) =>
     ipcRenderer.invoke("rays:remove-mcp-server", { scope, workspaceRoot, name }),
   loadMcpExample: () => ipcRenderer.invoke("rays:load-mcp-example"),
@@ -24,9 +26,19 @@ contextBridge.exposeInMainWorld("raysDesktop", {
   listSkills: (workspaceRoot) => ipcRenderer.invoke("rays:list-skills", { workspaceRoot }),
   openSkillsDirectory: (scope, workspaceRoot) =>
     ipcRenderer.invoke("rays:open-skills-directory", { scope, workspaceRoot }),
+  onSessionOutput: (listener) => {
+    ipcRenderer.on("rays:session-output", listener);
+    return () => ipcRenderer.removeListener("rays:session-output", listener);
+  },
   onMenuAction: (callback) => {
     const listener = (_event, payload) => callback(payload?.action, payload);
     ipcRenderer.on("rays:menu-action", listener);
     return () => ipcRenderer.removeListener("rays:menu-action", listener);
   },
+
+
+  listAgentProfiles: () => ipcRenderer.invoke("rays:list-agent-profiles"),
+  createAgentProfile: (name, cloneFrom, soul) => 
+    ipcRenderer.invoke("rays:create-agent-profile", { name, cloneFrom, soul }),
+
 });

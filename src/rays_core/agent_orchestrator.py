@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import uuid
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +38,27 @@ class AgentOrchestrator:
         )
         self.execution_mode = execution_mode
         self.prompts = config.get("agent_orchestrator_prompts") or {}
+        
+        # Persistent Memory initialization
+        self.memory_enabled = self.config.get("memory", {}).get("memoryEnabled", False)
+        self.frozen_memory_context = ""
+        if self.memory_enabled:
+            import sys
+            # Dynamically register the memory MCP server
+            memory_server_config = {
+                "name": "persistent_memory",
+                "command": sys.executable,
+                "args": ["-m", "rays_core.memory_mcp"]
+            }
+            # Add if not already present
+            if not any(c.get("name") == "persistent_memory" for c in self.mcp_manager._server_configs):
+                self.mcp_manager._server_configs.append(memory_server_config)
+            
+            # Load the frozen context
+            from .persistent_memory import MemoryStore
+            mem_store = MemoryStore(self.codebase_root)
+            mem_store.load_from_disk()
+            self.frozen_memory_context = mem_store.format_for_system_prompt()
 
     def set_execution_mode(self, mode: str) -> None:
         normalized = "autonomous" if mode == "autonomous" else "ask"
@@ -57,26 +77,6 @@ class AgentOrchestrator:
             user_prompt, result
         )
         rays_ui.orch_render_final_summary(result)
-        
-        # Save Execution-State Graph for FOGR Fine-Tuning
-        try:
-            session_id = str(uuid.uuid4())
-            log_dir = os.path.expanduser(f"~/.rays/conversations/{session_id}")
-            os.makedirs(log_dir, exist_ok=True)
-            log_path = os.path.join(log_dir, "execution_graphs.jsonl")
-            
-            graph_data = {
-                "session_id": session_id,
-                "intent": user_prompt,
-                "execution_topology": cumulative_history,
-                "is_complete": result.get("complete", False)
-            }
-            with open(log_path, "w", encoding="utf-8") as f:
-                f.write(json.dumps(graph_data) + "\n")
-            logger.info(f"FOGR Execution Graph saved to {log_path}")
-        except Exception as e:
-            logger.error(f"Failed to save FOGR execution graph: {e}")
-
         return result
 
     def _run_loops(
@@ -95,23 +95,36 @@ class AgentOrchestrator:
                 )
                 rays_ui.orch_emit_section(f"Retry {loop_idx + 1}")
 
-            skills_list = self.skills.discover_skills()
+            raw_skills_list = self.skills.discover_skills()
             mcp_planner_catalog = self.mcp_manager.list_planner_mcp_catalog()
+            mcp_server_names = {c["name"] for c in mcp_planner_catalog}
+
+            skills_list = []
+            for s in raw_skills_list:
+                if s.get("category", "").lower() == "mcp":
+                    base_name = s["name"].replace("-mcp", "")
+                    if s["name"] in mcp_server_names or base_name in mcp_server_names:
+                        skills_list.append(s)
+                else:
+                    skills_list.append(s)
 
             rays_ui.hud_set_status("Thinking", "Choosing capabilities")
             selection = self._select_capabilities(
                 user_prompt, skills_list, mcp_planner_catalog, cumulative_history
             )
-            required_skills = selection.get("required_skills", [])
-            required_mcp_servers = selection.get("required_mcp_servers", [])
+            required_skills = selection.get("required_skills") or selection.get("skills") or []
+            required_mcp_servers = selection.get("required_mcp_servers") or selection.get("mcp_servers") or []
             if required_mcp_servers:
                 self.mcp_manager.connect_servers(required_mcp_servers)
             mcp_capabilities = self.mcp_manager.list_capabilities()
-            rays_ui.orch_emit_capabilities(
-                required_skills,
-                required_mcp_servers,
-                selection.get("reasoning", ""),
-            )
+            
+            # Only print capability selection if there are actually capabilities picked
+            if required_skills or required_mcp_servers:
+                rays_ui.orch_emit_capabilities(
+                    required_skills,
+                    required_mcp_servers,
+                    selection.get("reasoning", ""),
+                )
 
             rays_ui.hud_set_status("Planning", "Building execution plan")
             plan_data = self._generate_plan(
@@ -131,13 +144,23 @@ class AgentOrchestrator:
                 and self.mcp_manager.get_session(c["name"]).is_usable
             }
 
-            plan = self._filter_plan(plan_data.get("plan", []), skills_map, mcp_map)
+            plan_raw = plan_data.get("plan") or plan_data.get("steps") or []
+            plan = self._filter_plan(plan_raw, skills_map, mcp_map)
             plan = self._ensure_workspace_step(plan, required_skills, skills_map)
+            
+            # Print capabilities if we found steps but didn't print capabilities earlier
+            # (In case LLM failed to put it in _select_capabilities but did in plan)
+            if plan and not required_skills and not required_mcp_servers:
+                inferred_skills = [s["skill"] for s in plan if s.get("type") == "skill" and s.get("skill")]
+                inferred_mcps = [s["server"] for s in plan if s.get("type") == "mcp" and s.get("server")]
+                if inferred_skills or inferred_mcps:
+                    rays_ui.orch_emit_capabilities(inferred_skills, inferred_mcps, "Inferred from plan")
+            
             rays_ui.orch_emit_plan(summary, plan)
 
             if not plan:
-                if plan_data.get("plan"):
-                    rays_ui.hud_note_warn("Planned steps are not available.")
+                if plan_raw:
+                    rays_ui.hud_note_warn("Planned steps are not available (all steps were dropped).")
                 if loop_idx == 0:
                     return {
                         "status": "completed",
@@ -246,15 +269,26 @@ class AgentOrchestrator:
         filtered: List[Dict[str, Any]] = []
         for step in raw_plan:
             step_type = (step.get("type") or "").lower()
+            skill_val = step.get("skill") or step.get("name")
+            server_val = step.get("server") or step.get("name")
+            
             if not step_type:
-                if step.get("skill"):
+                if skill_val in skills_map:
                     step_type = "skill"
-                elif step.get("server"):
+                elif server_val in mcp_map:
                     step_type = "mcp"
-            if step_type == "skill" and step.get("skill") in skills_map:
-                filtered.append({**step, "type": "skill"})
-            elif step_type == "mcp" and step.get("server") in mcp_map:
-                filtered.append({**step, "type": "mcp"})
+            if step_type == "skill":
+                if skill_val in skills_map:
+                    filtered.append({**step, "type": "skill", "skill": skill_val})
+                elif skill_val in mcp_map:
+                    # AI confused skill for MCP server
+                    filtered.append({**step, "type": "mcp", "server": skill_val})
+            elif step_type == "mcp":
+                if server_val in mcp_map:
+                    filtered.append({**step, "type": "mcp", "server": server_val})
+                elif server_val in skills_map:
+                    # AI confused MCP server for skill
+                    filtered.append({**step, "type": "skill", "skill": server_val})
         return filtered
 
     def _ensure_workspace_step(
@@ -278,6 +312,49 @@ class AgentOrchestrator:
             *plan,
         ]
 
+    def _slim_skills_list(
+        self, skills_list: List[Dict[str, str]], user_prompt: str = "", max_skills: int = 0
+    ) -> List[Dict[str, str]]:
+        """Trim skills to just name+description, ranked by keyword relevance, capped at max_skills."""
+        # Provider-aware default caps: Groq free tier = 6K TPM, others are much higher
+        provider = getattr(self.ai_client, 'provider', 'ollama')
+        if max_skills == 0:
+            max_skills = 25 if provider == 'groq' else 150
+
+        slim = [{"name": s["name"], "category": s.get("category", ""), "description": s.get("description", "")} for s in skills_list]
+
+        if user_prompt and len(slim) > max_skills:
+            # Simple keyword ranking: count how many words from user_prompt appear in name/description
+            words = set(re.findall(r'\w+', user_prompt.lower()))
+            common_stopwords = {"the", "a", "an", "is", "for", "of", "in", "to", "and", "or", "i", "on", "at", "do", "can", "use", "using", "with"}
+            keywords = words - common_stopwords
+
+            def relevance(s: Dict) -> int:
+                text = (s["name"] + " " + s.get("description", "")).lower()
+                score = sum(1 for kw in keywords if kw in text)
+                if s["name"] == "duckduckgo" and ("search" in keywords or "web" in keywords):
+                    score += 100
+                return score
+
+            slim.sort(key=relevance, reverse=True)
+
+            # CRITICAL FIX: If this is a general web search, hide competing unconfigured community search skills 
+            # so the LLM doesn't get distracted by them, unless the user explicitly requested one by name.
+            if ("search" in keywords or "web" in keywords) and any(s["name"] == "duckduckgo" for s in slim):
+                filtered_slim = []
+                for s in slim:
+                    name_lower = s["name"].lower()
+                    if name_lower == "duckduckgo" or name_lower in user_prompt.lower():
+                        filtered_slim.append(s)
+                    else:
+                        # Hide if it's a generic search script competing with duckduckgo
+                        is_competing_search = "search" in name_lower or "web" in name_lower
+                        if not is_competing_search:
+                            filtered_slim.append(s)
+                slim = filtered_slim
+
+        return slim[:max_skills]
+
     def _select_capabilities(
         self,
         user_prompt: str,
@@ -285,9 +362,10 @@ class AgentOrchestrator:
         mcp_capabilities: List[Dict[str, Any]],
         history: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
+        slim_skills = self._slim_skills_list(skills_list, user_prompt=user_prompt)
         prompt = self.prompts.get("select_required_capabilities", "").format(
             user_prompt=user_prompt,
-            skills_list=json.dumps(skills_list, indent=2),
+            skills_list=json.dumps(slim_skills, indent=2),
             mcp_servers=json.dumps(mcp_capabilities, indent=2),
             execution_history=format_prior_executions(history, user_prompt),
         )

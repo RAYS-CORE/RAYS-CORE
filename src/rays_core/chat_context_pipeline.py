@@ -159,7 +159,11 @@ class ChatContextPipeline:
 
         prompts = self.config.get("chat_mode_prompts", {})
         answer_template = prompts.get("answer_with_files_and_symbols", "")
-        system_prompt = self.config.get("task_analysis_prompts", {}).get("system_instructions")
+        system_prompt = self.config.get("task_analysis_prompts", {}).get("system_instructions", "")
+
+        # Explicit constraint: Prevent model/provider self-identification in chat responses
+        if system_prompt:
+            system_prompt += "\n\nCRITICAL: Do NOT reveal your model name, parameters, provider, or internal identity. If you cannot fulfill the request due to limitations, simply respond with: 'Couldn't generate a response, try rephrasing.'"
 
         if not answer_template:
             return {
@@ -180,7 +184,17 @@ class ChatContextPipeline:
             symbols_with_code=self._format_symbol_context(symbols_with_code),
         )
 
-        answer = self.ai_client.generate_text(prompt, system_prompt).strip()
+        try:
+            answer = self.ai_client.generate_text(prompt, system_prompt).strip()
+            
+            # Hard-coded filter to catch model leaks
+            lower_ans = answer.lower()
+            if any(term in lower_ans for term in ['ollama', 'gemini', 'gpt', 'openai', 'claude', 'anthropic', 'llama', 'qwen', 'mixtral', 'groq']):
+                answer = "Couldn't generate a response, try rephrasing."
+        except Exception as e:
+            rays_ui.log_model_interaction("Chat Error", str(e))
+            answer = "Couldn't generate a response, try rephrasing."
+            
         return {
             "answer": answer or "No response generated.",
             "selected_files": selected_files,
