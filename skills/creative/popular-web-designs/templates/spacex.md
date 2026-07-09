@@ -1,7 +1,7 @@
 # Design System: SpaceX
 
 
-> **Hermes Agent — Implementation Notes**
+> **RAYS-CORE — Implementation Notes**
 >
 > The original site uses proprietary fonts. For self-contained HTML output, use these CDN substitutes:
 > - **Primary:** `Inter` | **Mono:** `system monospace stack`

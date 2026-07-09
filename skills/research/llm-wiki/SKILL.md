@@ -2,11 +2,11 @@
 name: llm-wiki
 description: "Karpathy's LLM Wiki: build/query interlinked markdown KB."
 version: 2.1.0
-author: Hermes Agent
+author: RAYS-CORE
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
+  rays-core:
     tags: [wiki, knowledge-base, research, notes, markdown, rag-alternative]
     category: research
     related_skills: [obsidian, arxiv]
@@ -35,7 +35,7 @@ Use this skill when the user:
 
 ## Wiki Location
 
-**Location:** Set via `WIKI_PATH` environment variable (e.g. in `${HERMES_HOME:-~/.hermes}/.env`).
+**Location:** Set via `WIKI_PATH` environment variable (e.g. in `${RAYS_HOME:-~/.rays-core}/.env`).
 
 If unset, defaults to `~/wiki`.
 

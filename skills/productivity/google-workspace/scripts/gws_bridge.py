@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bridge between Hermes OAuth token and gws CLI.
+"""Bridge between RAYS-CORE OAuth token and gws CLI.
 
 Refreshes the token if expired, then executes gws with the valid access token.
 """
@@ -10,16 +10,16 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Ensure sibling modules (_hermes_home) are importable when run standalone.
+# Ensure sibling modules (_rays_core_home) are importable when run standalone.
 _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from _hermes_home import get_hermes_home
+from _rays_core_home import get_rays_core_home
 
 
 def get_token_path() -> Path:
-    return get_hermes_home() / "google_token.json"
+    return get_rays_core_home() / "google_token.json"
 
 
 def _normalize_authorized_user_payload(payload: dict) -> dict:
