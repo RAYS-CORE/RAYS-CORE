@@ -11,6 +11,8 @@ export type SkillEntry = {
   scope: "global" | "project";
   path: string;
   description?: string;
+  category?: string;
+  platforms?: string[];
 };
 
 declare global {

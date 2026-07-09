@@ -24,14 +24,18 @@ function TreeItem({ node, depth, path, onFileOpen }: { node: FileNode; depth: nu
       <button
         className="flex items-center gap-1 w-full px-2 py-0.5 text-ui font-medium text-foreground/80 hover:text-foreground hover:bg-secondary/60 transition-colors"
         style={{ paddingLeft: `${depth * 14 + 4}px` }}
-        onClick={() => setOpen(!open)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(!open);
+        }}
       >
         {open ? <ChevronDown size={12} className="text-rays-mid shrink-0" /> : <ChevronRight size={12} className="text-rays-mid shrink-0" />}
         {open ? <FolderOpen size={13} className="text-rays-lavender shrink-0" /> : <Folder size={13} className="text-rays-mid shrink-0" />}
         <span className="truncate">{node.name}</span>
       </button>
-      {open && node.children?.map((child, index) => (
-        <TreeItem key={`${fullPath}-${child.name}-${index}`} node={child} depth={depth + 1} path={fullPath} onFileOpen={onFileOpen} />
+      {open && node.children?.map((child) => (
+        <TreeItem key={`${fullPath}/${child.name}`} node={child} depth={depth + 1} path={fullPath} onFileOpen={onFileOpen} />
       ))}
     </div>
   );
@@ -45,8 +49,8 @@ export function FileExplorer({ onFileOpen, nodes }: { onFileOpen: (name: string)
       </div>
       <div className="pb-4">
         {nodes.length === 0 && <div className="px-3 py-1 text-xs text-muted-foreground">No workspace loaded</div>}
-        {nodes.map((node, index) => (
-          <TreeItem key={`${node.name}-${index}`} node={node} depth={0} path="" onFileOpen={onFileOpen} />
+        {nodes.map((node) => (
+          <TreeItem key={node.name} node={node} depth={0} path="" onFileOpen={onFileOpen} />
         ))}
       </div>
     </div>

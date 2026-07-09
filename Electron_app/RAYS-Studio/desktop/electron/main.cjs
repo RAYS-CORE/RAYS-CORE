@@ -172,18 +172,85 @@ async function listSkillsForWorkspace(workspaceRoot) {
   const scopes = [
     ["project", workspaceRoot ? path.join(workspaceRoot, "skills") : null],
     ["global", path.join(os.homedir(), ".rays", "skills")],
+    ["global", path.join(os.homedir(), ".agents", "skills")],
+    ["global", path.join(os.homedir(), ".gemini", "antigravity", "skills")],
+    ["global", path.join(os.homedir(), ".gemini", "antigravity-cli", "skills")],
   ];
+
+  /** Parse YAML frontmatter metadata from SKILL.md */
+  function parseSkillFrontmatter(skillMdPath) {
+    const result = { description: "", category: "", platforms: [] };
+    try {
+      const content = fs.readFileSync(skillMdPath, "utf8");
+      const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+      if (!fmMatch) return result;
+      const fm = fmMatch[1];
+      
+      const descMatch = fm.match(/^description:\s*["']?(.+?)["']?\s*$/m);
+      if (descMatch) result.description = descMatch[1].trim();
+      
+      const catMatch = fm.match(/^category:\s*["']?(.+?)["']?\s*$/m);
+      if (catMatch) result.category = catMatch[1].trim();
+
+      const platMatch = fm.match(/^platforms:\s*\[(.*?)\]\s*$/m);
+      if (platMatch) {
+        result.platforms = platMatch[1].split(',').map(s => s.replace(/["']/g, '').trim()).filter(Boolean);
+      }
+      return result;
+    } catch {
+      return result;
+    }
+  }
+
+  /** Recursively find all skill dirs (containing SKILL.md) under root */
+  async function walkSkillDir(dir, scope, rootSkillsDir) {
+    let entries;
+    try {
+      entries = await fsp.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const subDir = path.join(dir, entry.name);
+      const skillMd = path.join(subDir, "SKILL.md");
+      if (fs.existsSync(skillMd)) {
+        // This is a skill folder — compute the relative name including category
+        const relPath = path.relative(rootSkillsDir, subDir).replace(/\\/g, "/");
+        const fm = parseSkillFrontmatter(skillMd);
+        
+        let inferredCategory = "general";
+        if (relPath.includes("/")) inferredCategory = relPath.split("/")[0];
+        const category = fm.category || inferredCategory;
+        
+        const platforms = fm.platforms;
+        if (platforms && platforms.length > 0) {
+           const sysPlatform = process.platform;
+           let matches = false;
+           if (sysPlatform === 'darwin' && platforms.some(p => p.toLowerCase().includes('mac'))) matches = true;
+           else if (sysPlatform === 'linux' && platforms.some(p => p.toLowerCase() === 'linux')) matches = true;
+           else if (sysPlatform === 'win32' && platforms.some(p => p.toLowerCase().includes('window'))) matches = true;
+           if (!matches) continue; // skip incompatible platform
+        }
+
+        results.push({
+          name: relPath,          // e.g. "creative/architecture-diagram"
+          scope,
+          path: subDir,
+          description: fm.description,
+          category,
+          platforms
+        });
+      } else {
+        // It's a category folder — recurse deeper
+        await walkSkillDir(subDir, scope, rootSkillsDir);
+      }
+    }
+  }
+
   for (const [scope, root] of scopes) {
     if (!root || !fs.existsSync(root)) continue;
-    const names = await fsp.readdir(root);
-    for (const name of names) {
-      const skillDir = path.join(root, name);
-      const stat = await fsp.stat(skillDir);
-      if (!stat.isDirectory()) continue;
-      const skillMd = path.join(skillDir, "SKILL.md");
-      if (!fs.existsSync(skillMd)) continue;
-      results.push({ name, scope, path: skillDir });
-    }
+    await walkSkillDir(root, scope, root);
   }
   return results;
 }

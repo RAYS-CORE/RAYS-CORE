@@ -85,7 +85,11 @@ agent_orchestrator_prompts:
     \ SUB-AGENT RUNS (full transcripts):**\n{execution_history}\n\n**TASK:**\nReturn\
     \ skill names and MCP server names needed for this request.\nUse MCP servers for\
     \ external apps (Blender, GitHub, browsers, databases, etc.).\nUse skills for\
-    \ local workspace files, documents, and shell actions.\nOnly return empty lists\
+    \ local workspace files, documents, and shell actions.\nCRITICAL: For general\
+    \ web searches (like finding sports scores, news, trivia, or general facts), you\
+    \ MUST select ONLY the 'duckduckgo' skill if available. Do NOT select 'tavily-web',\
+    \ 'pi-web-search', or 'search-specialist' unless explicitly asked by name, as\
+    \ they require unconfigured API keys and will crash.\nOnly return empty lists\
     \ if the task is 100% complete per history.\n\n**RESPOND WITH JSON:**\n{{\n  \"\
     required_skills\": [\"workspace\"],\n  \"required_mcp_servers\": [\"blender\"\
     ],\n  \"reasoning\": \"Brief explanation.\"\n}}\n"
@@ -843,17 +847,20 @@ skills_orchestrator_prompts:
     {prior_executions}\n\n**YOUR SESSION SO FAR (turn {turn_number}):**\n{session_actions}\n\
     \n**AVAILABLE TOOLS:**\n1. run_shell_command(command) \u2014 CWD is workspace\
     \ root\n2. write_file(path, content)\n3. patch_file(path, search, replace)\n4.\
-    \ read_file(path)\n5. list_directory(path)\n\n**RULES:**\n- Do NOT cd; tools use\
+    \ read_file(path)\n5. list_directory(path)\n6. skill_view(skill_name) \u2014 reads\
+    \ a skill's full text\n7. skill_manage(action, skill_name, category, content)\
+    \ \u2014 actions: create, update, delete\n\n**RULES:**\n- Do NOT cd; tools use\
     \ workspace root automatically.\n- Use skill resources via absolute path under\
     \ skill root when needed.\n- SKILL.md may say \"bash tool\" \u2014 that means\
     \ run_shell_command here.\n- IGNORE prior MCP sub-agents saying documentation\
-    \ is outside their capabilities; YOU produce files with this skill's tools.\n\
-    - You MUST call at least one tool before status \"completed\". Never complete\
-    \ with only thoughts.\n- For docx/pptx: write markdown content first (write_file),\
+    \ is downloaded unless you see the file yourself via list_directory. If missing,\
     \ then run_shell_command (pandoc, python, node, etc. per SKILL.md) to emit the\
     \ binary file in the workspace.\n- Loop until spawn objective is met: status \"\
     running\" + tool_call, or status \"completed\" + exit_message after successful\
-    \ tool work.\n\n**RESPOND WITH JSON:**\n{{\n  \"status\": \"running|completed\"\
+    \ tool work.\n- CRITICAL SECURITY RULE: If SKILL.md tells you to use a custom\
+    \ tool (e.g., 'web_search') that is NOT in your AVAILABLE TOOLS list, you MUST\
+    \ NOT call it! You must accomplish the goal using ONLY 'run_shell_command' (e.g.\
+    \ curl/python).\n\n**RESPOND WITH JSON:**\n{{\n  \"status\": \"running|completed\"\
     ,\n  \"thought\": \"brief\",\n  \"tool_call\": {{\"name\": \"<tool>\", \"arguments\"\
     : {{}}}},\n  \"exit_message\": \"when completed\"\n}}\n"
   generate_execution_plan: "You are a skills execution planner. Your task is to create\

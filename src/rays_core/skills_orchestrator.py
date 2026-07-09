@@ -20,48 +20,81 @@ class SkillsOrchestrator:
         self.codebase_root = Path(codebase_root).resolve()
         self.local_skills_dir = self.codebase_root / "skills"
         self.global_skills_dir = Path.home() / ".rays" / "skills"
+        
+        # Native RAYS-Core bundled skills
+        self.native_skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
+        
+        # Google Antigravity fallback paths
+        self.fallback_skill_dirs = [
+            Path.home() / ".agents" / "skills",
+            Path.home() / ".gemini" / "antigravity" / "skills",
+            Path.home() / ".gemini" / "antigravity-cli" / "skills"
+        ]
         self.prompts = config.get('skills_orchestrator_prompts', {})
 
     def discover_skills(self) -> List[Dict[str, str]]:
         """Scan both local and global skills directories."""
+        import sys
         skills = []
         seen_names = set()
 
-        for skills_dir in [self.local_skills_dir, self.global_skills_dir]:
+        all_dirs = [self.local_skills_dir, self.global_skills_dir, self.native_skills_dir] + self.fallback_skill_dirs
+        for skills_dir in all_dirs:
             if not skills_dir.exists():
                 continue
 
-            for skill_path in skills_dir.iterdir():
-                if skill_path.is_dir():
-                    skill_name = skill_path.name
-                    if skill_name in seen_names:
-                        continue
-                        
-                    skill_md = skill_path / "SKILL.md"
-                    if skill_md.exists():
-                        try:
-                            content = skill_md.read_text()
-                            # Simple frontmatter extraction
-                            if content.startswith('---'):
-                                parts = content.split('---', 2)
-                                if len(parts) >= 3:
-                                    frontmatter = yaml.safe_load(parts[1])
-                                    skills.append({
-                                        "name": frontmatter.get("name", skill_name),
-                                        "description": frontmatter.get("description", ""),
-                                        "path": skill_md.as_posix(),
-                                        "root": skill_path.as_posix(),
-                                    })
-                            else:
-                                skills.append({
-                                    "name": skill_name,
-                                    "description": content.split('\n')[0].strip('# '),
-                                    "path": skill_md.as_posix(),
-                                    "root": skill_path.as_posix(),
-                                })
-                            seen_names.add(skill_name)
-                        except Exception as e:
-                            rays_ui.print_warning(f"Failed to read skill at {skill_path}: {e}")
+            for skill_md in skills_dir.rglob("SKILL.md"):
+                # Skip hidden directories like .git or .venv
+                if any(part.startswith('.') for part in skill_md.parts):
+                    continue
+
+                skill_path = skill_md.parent
+                skill_name = skill_path.name
+                
+                if skill_name in seen_names:
+                    continue
+                
+                # Infer category from parent directory if it's not the root skills_dir
+                inferred_category = ""
+                if skill_path.parent != skills_dir:
+                    inferred_category = skill_path.parent.name
+                    
+                try:
+                    content = skill_md.read_text()
+                    if content.startswith('---'):
+                        parts = content.split('---', 2)
+                        if len(parts) >= 3:
+                            frontmatter = yaml.safe_load(parts[1])
+                            
+                            # Platform constraint filtering
+                            platforms = frontmatter.get('platforms', [])
+                            if platforms and sys.platform == 'darwin' and 'mac' not in [p.lower() for p in platforms] and 'macos' not in [p.lower() for p in platforms]:
+                                continue
+                            if platforms and sys.platform.startswith('linux') and 'linux' not in [p.lower() for p in platforms]:
+                                continue
+                            if platforms and sys.platform == 'win32' and 'windows' not in [p.lower() for p in platforms]:
+                                continue
+
+                            skills.append({
+                                "name": frontmatter.get("name", skill_name),
+                                "description": frontmatter.get("description", ""),
+                                "category": frontmatter.get("category", inferred_category),
+                                "path": skill_md.as_posix(),
+                                "root": skill_path.as_posix(),
+                                "platforms": platforms
+                            })
+                    else:
+                        skills.append({
+                            "name": skill_name,
+                            "description": content.split('\n')[0].strip('# '),
+                            "category": inferred_category,
+                            "path": skill_md.as_posix(),
+                            "root": skill_path.as_posix(),
+                            "platforms": []
+                        })
+                    seen_names.add(skill_name)
+                except Exception as e:
+                    rays_ui.print_warning(f"Failed to read skill at {skill_path}: {e}")
         return skills
 
     def run(self, user_prompt: str) -> Dict[str, Any]:
