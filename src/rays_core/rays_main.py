@@ -764,16 +764,35 @@ def main():
 
         if args.pull:
             print(f"Pulling model '{args.pull}' from Hugging Face...")
-            # Simulate or invoke Hugging Face model pull
-            print(f"Successfully pulled and registered model '{args.pull}' in GGUF/Safetensors formats.")
+            try:
+                from huggingface_hub import snapshot_download
+                from rays_studio.llama_cpp_manager import manager as llama_manager
+                import os
+                
+                print(f"Downloading both GGUF and Safetensors for {args.pull}...")
+                model_path = snapshot_download(
+                    repo_id=args.pull,
+                    local_files_only=False,
+                    allow_patterns=["*.gguf", "*.safetensors", "*.json"]
+                )
+                print(f"Successfully pulled and registered model '{args.pull}' to {model_path}.")
+                
+                # Auto-host if GGUF is found
+                for root, _, files in os.walk(model_path):
+                    for f in files:
+                        if f.endswith('.gguf'):
+                            gguf_path = os.path.join(root, f)
+                            print(f"Found GGUF at {gguf_path}. Starting local llama.cpp host...")
+                            llama_manager.start_server(gguf_path)
+                            break
+            except Exception as e:
+                print(f"Error pulling model: {e}")
             sys.exit(0)
 
         if args.host:
-            import uuid
-            host_hash = uuid.uuid4().hex[:16]
             print(f"=== Starting RAYS Studio Enterprise Host ===")
-            print(f"Host Hash Key: {host_hash}")
             print("Listening on port 8000 for client updates...")
+            print("Call /v1/federated/generate_hash to generate a hub hash for clients.")
             # Starts daemon server in host mode
             import uvicorn
             uvicorn.run(daemon.app, host="0.0.0.0", port=8000)
@@ -781,7 +800,25 @@ def main():
 
         if args.core:
             print(f"=== Connecting to RAYS Studio Host Core ===")
-            print(f"Authenticating via hash key: {args.core}")
+            print(f"Authenticating via Hub Hash key: {args.core}")
+            import requests
+            try:
+                res = requests.post("http://127.0.0.1:8000/v1/federated/connect", json={
+                    "hub_hash": args.core,
+                    "client_vram_gb": 8.0,
+                    "repo_id": "federated-client-repo"
+                })
+                data = res.json()
+                if res.status_code == 200:
+                    print(f"Connected! ID: {data.get('client_id')}")
+                    print(f"Allocated Orthogonal Subspace: {data.get('allocated_space')}")
+                else:
+                    print(f"Failed to connect: {data}")
+                    sys.exit(1)
+            except Exception as e:
+                print(f"Connection error: {e}")
+                sys.exit(1)
+                
             print("Starting background training client daemon...")
             # Start background client loop pointing to server
             daemon.startup_event()
@@ -811,10 +848,16 @@ def main():
                 vram_gb = 8.0 # Force 8GB for Apple Silicon local tests
                 
             engine = FinetuningEngine()
-            safetensors_path = f"~/.rays_core/models/{args.finetune}" # Mock path if not provided
+            safetensors_path = f"~/.rays/models/{args.finetune}" # Mock path if not provided
             
             out_file = engine.finetune_local(args.finetune, safetensors_path, vram_gb)
             print(f"Finetuning completed successfully. Output adapter: {out_file}")
+            
+            from rays_studio.llama_cpp_manager import manager as llama_manager
+            import os
+            if out_file and os.path.exists(out_file):
+                llama_manager.hot_swap_model(out_file)
+            
             sys.exit(0)
 
         # Launch GUI/TUI Dashboard

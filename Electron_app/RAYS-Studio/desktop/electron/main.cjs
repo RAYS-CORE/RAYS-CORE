@@ -90,6 +90,7 @@ function shellPathEnv() {
   const extra = [
     "/opt/homebrew/bin",
     "/usr/local/bin",
+    "/opt/anaconda3/bin",
     path.join(home, ".local/bin"),
     path.join(home, ".cargo/bin"),
   ];

@@ -18,6 +18,13 @@ setup(
         "tree-sitter>=0.21,<1",
         "mcp>=1.2,<2",
         "posthog>=2.4,<6",
+        "torch>=2.0.0",
+        "transformers>=4.40.0",
+        "huggingface_hub>=0.23.0",
+        "peft>=0.10.0",
+        "fastapi>=0.100.0",
+        "uvicorn>=0.23.0",
+        "accelerate>=0.29.0",
     ],
     entry_points={
         "console_scripts": [
