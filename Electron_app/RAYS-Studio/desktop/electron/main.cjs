@@ -884,54 +884,5 @@ ipcMain.handle("rays:create-agent-profile", async (_event, { name, cloneFrom, so
   return { ok: true, path: targetPath };
 });
 
-ipcMain.handle("rays:transcribe-audio", async (_event, { audioBuffer, format = 'webm' }) => {
-  const tmpPath = path.join(os.tmpdir(), `audio-${Date.now()}.${format}`);
-  fs.writeFileSync(tmpPath, Buffer.from(audioBuffer));
-  
-  const isWin = process.platform === "win32";
-  const pythonPath = app.isPackaged 
-    ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
-    : (isWin ? "python" : "python3");
-  const voiceCliPath = path.join(repoRoot(), "src", "rays_core", "voice_cli.py");
-  
-  const proc = require("node:child_process").spawnSync(pythonPath, [voiceCliPath, "transcribe", tmpPath], { encoding: "utf8" });
-  
-  try { fs.unlinkSync(tmpPath); } catch (e) {}
-  
-  if (proc.error) {
-    throw new Error(`Failed to start STT process: ${proc.error.message}`);
-  }
-  
-  try {
-    const lines = proc.stdout.trim().split("\\n");
-    return JSON.parse(lines[lines.length - 1]);
-  } catch (err) {
-    throw new Error(`Failed to parse STT output: ${proc.stdout || proc.stderr}`);
-  }
-});
 
-ipcMain.handle("rays:speak-text", async (_event, { text }) => {
-  const isWin = process.platform === "win32";
-  const pythonPath = app.isPackaged 
-    ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
-    : (isWin ? "python" : "python3");
-  const voiceCliPath = path.join(repoRoot(), "src", "rays_core", "voice_cli.py");
-  
-  const proc = require("node:child_process").spawnSync(pythonPath, [voiceCliPath, "speak", text], { encoding: "utf8" });
-  if (proc.error) {
-    throw new Error(`Failed to start TTS process: ${proc.error.message}`);
-  }
-  
-  try {
-    const lines = proc.stdout.trim().split("\\n");
-    const parsed = JSON.parse(lines[lines.length - 1]);
-    if (parsed.success && parsed.audio_path) {
-      const audioBuffer = fs.readFileSync(parsed.audio_path);
-      return { success: true, audioBuffer, format: parsed.audio_path.split('.').pop() };
-    }
-    return parsed;
-  } catch (err) {
-    throw new Error(`Failed to parse TTS output: ${proc.stdout || proc.stderr}`);
-  }
-});
 

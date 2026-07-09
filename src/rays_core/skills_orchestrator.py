@@ -24,11 +24,10 @@ class SkillsOrchestrator:
         # Native RAYS-Core bundled skills
         self.native_skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
         
-        # Google Antigravity fallback paths
+        # Fallback system paths
         self.fallback_skill_dirs = [
-            Path.home() / ".agents" / "skills",
-            Path.home() / ".gemini" / "antigravity" / "skills",
-            Path.home() / ".gemini" / "antigravity-cli" / "skills"
+            Path.home() / ".rays-core" / "skills",
+            Path.home() / ".config" / "rays" / "skills"
         ]
         self.prompts = config.get('skills_orchestrator_prompts', {})
 
