@@ -1,4 +1,5 @@
 import type { ProviderConfig } from "./raysSession";
+import { loadToolSettings, loadMemorySettings } from "./workspaceStorage";
 
 export type SessionStartResult = { sessionId: string; wsPort: number };
 
@@ -35,6 +36,11 @@ declare global {
         workspaceRoot: string | undefined,
         server: Record<string, unknown>
       ) => Promise<{ ok: boolean }>;
+      writeMcpJson: (
+        scope: "global" | "project",
+        workspaceRoot: string | undefined,
+        data: unknown
+      ) => Promise<{ ok: boolean }>;
       removeMcpServer: (
         scope: "global" | "project",
         workspaceRoot: string | undefined,
@@ -52,6 +58,10 @@ declare global {
         scope: "global" | "project",
         workspaceRoot?: string
       ) => Promise<{ path: string }>;
+      transcribeAudio: (audioBuffer: ArrayBuffer, format?: string) => Promise<{ success: boolean; transcript?: string; error?: string }>;
+      speakText: (text: string) => Promise<{ success: boolean; audioBuffer?: ArrayBuffer; format?: string; error?: string }>;
+      listAgentProfiles: () => Promise<string[]>;
+      createAgentProfile: (name: string, cloneFrom: string | null, soul: string | null) => Promise<{ ok: boolean; path: string }>;
     };
   }
 }
@@ -65,7 +75,9 @@ function runtimeOverridesFromProvider(providerConfig: ProviderConfig) {
   if (providerConfig.provider === "ollama") {
     llm.ollama_endpoint = "http://localhost:11434/api/generate";
   }
-  return { llm };
+  const env = loadToolSettings();
+  const memory = loadMemorySettings();
+  return { llm, env, memory };
 }
 
 export function isElectronHost(): boolean {
@@ -157,6 +169,15 @@ export async function hostWriteMcpConfig(
   await window.raysDesktop.writeMcpConfig(scope, workspaceRoot, server);
 }
 
+export async function hostWriteMcpJson(
+  scope: "global" | "project",
+  workspaceRoot: string | undefined,
+  data: unknown
+): Promise<void> {
+  if (!window.raysDesktop) throw new Error("MCP management requires the desktop app");
+  await window.raysDesktop.writeMcpJson(scope, workspaceRoot, data);
+}
+
 export async function hostRemoveMcpServer(
   scope: "global" | "project",
   workspaceRoot: string | undefined,
@@ -211,4 +232,51 @@ export async function hostOpenSkillsDirectory(
   if (!window.raysDesktop) throw new Error("Skill folders require the desktop app");
   const result = await window.raysDesktop.openSkillsDirectory(scope, workspaceRoot);
   return result.path;
+}
+
+export async function hostTranscribeAudio(audioBlob: Blob): Promise<string> {
+  if (!window.raysDesktop) throw new Error("Transcription requires the desktop app");
+  
+  const arrayBuffer = await audioBlob.arrayBuffer();
+  // infer format from blob type, e.g. audio/webm -> webm
+  let format = 'webm';
+  if (audioBlob.type) {
+    const extMatch = audioBlob.type.match(/audio\/([^;]+)/);
+    if (extMatch && extMatch[1]) {
+      format = extMatch[1];
+    }
+  }
+
+  const result = await window.raysDesktop.transcribeAudio(arrayBuffer, format);
+  if (!result.success) {
+    throw new Error(result.error || "Transcription failed");
+  }
+  return result.transcript || "";
+}
+
+export async function hostSpeakText(text: string): Promise<Blob> {
+  if (!window.raysDesktop) throw new Error("TTS requires the desktop app");
+  
+  const result = await window.raysDesktop.speakText(text);
+  if (!result.success || !result.audioBuffer) {
+    throw new Error(result.error || "Text-to-speech failed");
+  }
+  
+  const mimeType = result.format === "mp3" ? "audio/mpeg" : (result.format === "wav" ? "audio/wav" : "audio/ogg");
+  return new Blob([result.audioBuffer], { type: mimeType });
+}
+
+export async function hostListAgentProfiles(): Promise<string[]> {
+  if (window.raysDesktop) {
+    return window.raysDesktop.listAgentProfiles();
+  }
+  return [];
+}
+
+export async function hostCreateAgentProfile(name: string, cloneFrom: string | null, soul: string | null): Promise<string> {
+  if (!window.raysDesktop) {
+    throw new Error("Agent profiles require the desktop app");
+  }
+  const res = await window.raysDesktop.createAgentProfile(name, cloneFrom, soul);
+  return res.path;
 }

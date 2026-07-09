@@ -1800,14 +1800,20 @@ def select_from_menu(title: str, options: List[str], default_idx: int = 0) -> st
             pad = max(0, inner - _vis_len(raw_t))
             print(f"  {C_VIOLET}│{RESET}  {C_LILAC}[{i+1}]{RESET} {opt}{' ' * pad}{C_VIOLET}│{RESET}")
         print(f"  {C_VIOLET}╰{'─' * inner}╯{RESET}")
-        
+
         while True:
             try:
                 choice = input(f"  {C_PINK}❯ Select (1-{len(options)}): {RESET}").strip()
+                if not choice:
+                    continue
                 idx = int(choice) - 1
                 if 0 <= idx < len(options):
                     return options[idx]
-            except:
+            except EOFError:
+                # Non-interactive pipe closed; bail out with default.
+                print(f"    {C_GRAY}(no input — using default: {options[default_idx]}){RESET}")
+                return options[default_idx]
+            except (ValueError, KeyboardInterrupt):
                 pass
             print(f"    {C_RED}Invalid choice.{RESET}")
 

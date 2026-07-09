@@ -35,7 +35,7 @@ export type ChatMessage = {
 };
 export type TerminalLine = { id: string; kind: "output" | "command"; content: string };
 export type ProviderConfig = {
-  provider: "ollama" | "gemini" | "openai";
+  provider: "ollama" | "gemini" | "openai" | "groq" | "claude";
   model: string;
   apiKey?: string;
 };
@@ -97,6 +97,7 @@ class RAYSSessionStore {
   private subscribers = new Set<Subscriber>();
   private wsGeneration = 0;
   private switchToken = 0;
+  private pendingMcpTests = new Map<string, { resolve: (val: any) => void; reject: (err: any) => void }>();
 
   subscribe(subscriber: Subscriber): () => void {
     this.subscribers.add(subscriber);
@@ -510,6 +511,20 @@ class RAYSSessionStore {
         return;
       }
 
+      if (eventType === "mcp_server_tested") {
+        const test_id = payload.test_id as string;
+        const pending = this.pendingMcpTests.get(test_id);
+        if (pending) {
+          this.pendingMcpTests.delete(test_id);
+          pending.resolve({
+            ok: Boolean(payload.ok),
+            tools: payload.tools || [],
+            error: payload.error ? String(payload.error) : undefined,
+          });
+        }
+        return;
+      }
+
       if (eventType === "command_finished") {
         const command = String(payload.command || "");
         const output = String(payload.output || "");
@@ -811,6 +826,14 @@ class RAYSSessionStore {
 
   cancelCurrentTask() {
     this.sendCommand("cancel_current_task");
+  }
+
+  async testMcpServer(serverConfig: Record<string, unknown>): Promise<{ ok: boolean; tools: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      const test_id = crypto.randomUUID();
+      this.pendingMcpTests.set(test_id, { resolve, reject: resolve });
+      this.sendCommand("test_mcp_server", { server_config: serverConfig, test_id });
+    });
   }
 
   async selectFolder(): Promise<string> {

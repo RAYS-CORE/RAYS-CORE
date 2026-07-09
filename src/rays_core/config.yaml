@@ -550,9 +550,9 @@ git_status_summarizer_prompts:
     '
 llm:
   api_key: ''
-  model: qwen3-coder:30b
+  model: llama-3.3-70b-versatile
   ollama_endpoint: http://localhost:11434/api/generate
-  provider: ollama
+  provider: groq
 mcp_backend_failure_max_turns: 10
 mcp_connection_error_limit: 2
 mcp_no_tool_turn_limit: 3
@@ -853,7 +853,9 @@ skills_orchestrator_prompts:
     \ workspace root automatically.\n- Use skill resources via absolute path under\
     \ skill root when needed.\n- SKILL.md may say \"bash tool\" \u2014 that means\
     \ run_shell_command here.\n- IGNORE prior MCP sub-agents saying documentation\
-    \ is downloaded unless you see the file yourself via list_directory. If missing,\
+    \ is outside their capabilities; YOU produce files with this skill's tools.\n\
+    - You MUST call at least one tool before status \"completed\". Never complete\
+    \ with only thoughts.\n- For docx/pptx: write markdown content first (write_file),\
     \ then run_shell_command (pandoc, python, node, etc. per SKILL.md) to emit the\
     \ binary file in the workspace.\n- Loop until spawn objective is met: status \"\
     running\" + tool_call, or status \"completed\" + exit_message after successful\

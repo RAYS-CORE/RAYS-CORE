@@ -6,10 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/AppShell";
 import IDELayout from "@/components/ide/IDELayout";
 import AgentLayout from "@/components/agent/AgentLayout";
-import StudioLayout from "@/components/studio/StudioLayout";
 import NotFound from "./pages/NotFound.tsx";
 import { useEffect } from "react";
 import { syncInstallEpoch } from "@/services/appStorage";
+import { loadAppearanceSettings, applyAppearanceSettings } from "@/services/workspaceStorage";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +27,18 @@ async function ensureFreshInstallState(): Promise<void> {
 const App = () => {
   useEffect(() => {
     void ensureFreshInstallState();
+    
+    const applyCurrentSettings = () => {
+      applyAppearanceSettings(loadAppearanceSettings());
+    };
+    
+    applyCurrentSettings();
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyCurrentSettings();
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   return (
@@ -40,7 +52,6 @@ const App = () => {
               <Route path="/" element={<Navigate to="/agent" replace />} />
               <Route path="/agent" element={<AgentLayout />} />
               <Route path="/ide" element={<IDELayout />} />
-              <Route path="/studio" element={<StudioLayout />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

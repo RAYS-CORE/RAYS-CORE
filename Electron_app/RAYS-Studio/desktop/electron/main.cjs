@@ -169,9 +169,7 @@ async function listSkillsForWorkspace(workspaceRoot) {
   const scopes = [
     ["project", workspaceRoot ? path.join(workspaceRoot, "skills") : null],
     ["global", path.join(os.homedir(), ".rays", "skills")],
-    ["global", path.join(os.homedir(), ".agents", "skills")],
-    ["global", path.join(os.homedir(), ".gemini", "antigravity", "skills")],
-    ["global", path.join(os.homedir(), ".gemini", "antigravity-cli", "skills")],
+    ["global", path.join(os.homedir(), ".rays-core", "skills")],
   ];
 
   /** Parse YAML frontmatter metadata from SKILL.md */

@@ -236,10 +236,20 @@ class TerminalEngine:
             # Use a timeout for long-running commands (e.g., dev servers)
             timeout = 20  # seconds
             
+            # Setup environment passthrough
+            env = dict(os.environ)
+            env_passthrough_str = self.config.get('env_passthrough', '')
+            if env_passthrough_str:
+                for key in env_passthrough_str.split(','):
+                    key = key.strip()
+                    if key and key in os.environ:
+                        env[key] = os.environ[key]
+            
             process = subprocess.Popen(
                 command,
                 shell=True,
                 cwd=target_cwd,
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

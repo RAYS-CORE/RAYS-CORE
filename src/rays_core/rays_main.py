@@ -217,7 +217,9 @@ class RAYS:
             memory_summary=memory_summary_text,
             git_status_summary=git_status_summary or "N/A",
         )
-        system_prompt = self.config.get("task_analysis_prompts", {}).get("system_instructions")
+        system_prompt = self.config.get("task_analysis_prompts", {}).get("system_instructions", "")
+        if system_prompt:
+            system_prompt += "\n\nCRITICAL: Do NOT reveal your model name, parameters, provider, or internal identity. If you cannot fulfill the request due to limitations, simply respond with: 'Couldn't generate a response, try rephrasing.'"
 
         try:
             summary = self.ai_client.generate_text(prompt, system_prompt).strip()
@@ -231,7 +233,8 @@ class RAYS:
                 summary = self.ai_client.generate_text(rewrite_prompt, system_prompt).strip()
             return summary or "Final summary generation returned an empty response."
         except Exception as e:
-            return f"Failed to generate final summary: {e}"
+            rays_ui.log_model_interaction("Summary Error", str(e))
+            return "Couldn't generate a response, try rephrasing."
 
     def _build_augmented_prompt_context(self, user_prompt: str, analysis: dict) -> Dict[str, Any]:
         """Build prompt context with memory retrieval and deterministic history."""
@@ -305,14 +308,7 @@ class RAYS:
         summarizer = GitStatusSummarizer(self.codebase_root, self.ai_client, self.config)
         git_status_summary = summarizer.summarize()
 
-        final_run_summary = self._generate_final_pipeline_summary(
-            user_prompt=user_prompt,
-            augmented_prompt=context['augmented_prompt'],
-            execution_data=execution_data,
-            memory_summary=current_summary,
-            git_status_summary=git_status_summary,
-        )
-        rays_ui.print_final_run_summary(final_run_summary)
+        final_run_summary = chat_result.get('answer', '')
 
         return {
             'mode': 'chat',
@@ -712,6 +708,12 @@ def main():
         type=str,
         help="Resume or name a specific conversation session"
     )
+
+    parser.add_argument(
+        "--no-provider-menu",
+        action="store_true",
+        help="Use the provider/model already in config.yaml without prompting"
+    )
     parser.add_argument(
         "--studio",
         action="store_true",
@@ -750,7 +752,7 @@ def main():
         default=None,
         help="Run local Execution-State Graph FOGR fine-tuning on the specified model"
     )
-    
+
     args = parser.parse_args()
 
     # RAYS Studio Execution Path
@@ -869,7 +871,6 @@ def main():
     # Inject Dev Mode state into UI module
     rays_ui.DEVMODE = args.devmode
     
-    # Resolve codebase path
     codebase_path = Path(args.codebase_path).resolve()
     
     if not codebase_path.exists():
@@ -899,10 +900,34 @@ def main():
         # Load current config
         with open(config_path, 'r') as f:
             current_config = yaml.safe_load(f)
-            
-        providers = ["ollama (locally)", "gemini api", "openai api"]
-        chosen_provider_label = rays_ui.select_from_menu("Select AI Provider", providers)
-        
+
+        # Environment / flag overrides win over config
+        env_provider = os.getenv("RAYS_LLM_PROVIDER", "").strip().lower()
+        env_model = os.getenv("RAYS_LLM_MODEL", "").strip()
+        if env_provider:
+            current_config.setdefault('llm', {})['provider'] = env_provider
+        if env_model:
+            current_config.setdefault('llm', {})['model'] = env_model
+
+        interactive_menu = sys.stdin.isatty() and not args.no_provider_menu
+        existing_provider = (current_config.get('llm') or {}).get('provider', '').lower()
+        existing_model = (current_config.get('llm') or {}).get('model', '')
+
+        if interactive_menu or not existing_provider:
+            providers = ["ollama (locally)", "gemini api", "openai api", "groq api", "claude api"]
+            chosen_provider_label = rays_ui.select_from_menu("Select AI Provider", providers)
+        else:
+            # Use the provider already in config; map to display label.
+            label_map = {
+                "ollama": "ollama (locally)",
+                "gemini": "gemini api",
+                "openai": "openai api",
+                "groq":   "groq api",
+                "claude": "claude api",
+            }
+            chosen_provider_label = label_map.get(existing_provider, "ollama (locally)")
+            rays_ui.print_step(f"Using provider from config: {chosen_provider_label}")
+
         # Parse choice into canonical provider slugs used by AIClient
         if chosen_provider_label == "ollama (locally)":
             chosen_provider = "ollama"
@@ -910,11 +935,15 @@ def main():
             chosen_provider = "gemini"
         elif chosen_provider_label == "openai api":
             chosen_provider = "openai"
+        elif chosen_provider_label == "groq api":
+            chosen_provider = "groq"
+        elif chosen_provider_label == "claude api":
+            chosen_provider = "claude"
         else:
             chosen_provider = "ollama"
         current_config['llm']['provider'] = chosen_provider
         session_llm_api_key = ""
-        
+
         if chosen_provider_label == "ollama (locally)":
             current_config['llm']['ollama_endpoint'] = "http://localhost:11434/api/generate"
             rays_ui.print_step("Fetching local models...")
@@ -927,37 +956,72 @@ def main():
             except Exception:
                 rays_ui.print_warning("Could not reach local Ollama. Ensure it's running.")
                 models = ["llama3:latest", "qwen2.5-coder:latest", "mistral:latest"]
-                
+
         elif chosen_provider == "gemini":
             session_llm_api_key = env_key_for_provider("gemini")
             if session_llm_api_key:
                 rays_ui.print_step("Using Gemini API key from environment")
-            else:
+            elif interactive_menu:
                 session_llm_api_key = input(f"  {rays_ui.C_PINK}❯ Enter Gemini API Key: {rays_ui.RESET}").strip()
-            entered_model = input(f"  {rays_ui.C_PINK}❯ Enter Gemini Model Name: {rays_ui.RESET}").strip()
+            entered_model = existing_model if (not interactive_menu and existing_provider == "gemini") else ""
+            if interactive_menu:
+                entered_model = input(f"  {rays_ui.C_PINK}❯ Enter Gemini Model Name: {rays_ui.RESET}").strip()
             models = [entered_model] if entered_model else ["gemini-1.5-flash"]
-            
+
         elif chosen_provider == "openai":
             session_llm_api_key = env_key_for_provider("openai")
             if session_llm_api_key:
                 rays_ui.print_step("Using OpenAI API key from environment")
-            else:
+            elif interactive_menu:
                 session_llm_api_key = input(f"  {rays_ui.C_PINK}❯ Enter OpenAI API Key: {rays_ui.RESET}").strip()
-            entered_model = input(f"  {rays_ui.C_PINK}❯ Enter OpenAI Model Name: {rays_ui.RESET}").strip()
+            entered_model = ""
+            if interactive_menu:
+                entered_model = input(f"  {rays_ui.C_PINK}❯ Enter OpenAI Model Name: {rays_ui.RESET}").strip()
             models = [entered_model] if entered_model else ["gpt-4o"]
-            
+
+        elif chosen_provider == "groq":
+            session_llm_api_key = env_key_for_provider("groq")
+            if session_llm_api_key:
+                rays_ui.print_step("Using Groq API key from environment")
+            elif interactive_menu:
+                session_llm_api_key = input(f"  {rays_ui.C_PINK}❯ Enter Groq API Key: {rays_ui.RESET}").strip()
+            entered_model = ""
+            if interactive_menu:
+                entered_model = input(f"  {rays_ui.C_PINK}❯ Enter Groq Model Name: {rays_ui.RESET}").strip()
+            models = [entered_model] if entered_model else ["llama3-70b-8192"]
+
+        elif chosen_provider == "claude":
+            session_llm_api_key = env_key_for_provider("claude")
+            if session_llm_api_key:
+                rays_ui.print_step("Using Anthropic API key from environment")
+            elif interactive_menu:
+                session_llm_api_key = input(f"  {rays_ui.C_PINK}❯ Enter Anthropic API Key: {rays_ui.RESET}").strip()
+            entered_model = ""
+            if interactive_menu:
+                entered_model = input(f"  {rays_ui.C_PINK}❯ Enter Claude Model Name: {rays_ui.RESET}").strip()
+            models = [entered_model] if entered_model else ["claude-3-5-sonnet-20240620"]
+
         # Select Model
-        if chosen_provider in ("gemini", "openai"):
+        if chosen_provider in ("gemini", "openai", "groq", "claude"):
             chosen_model = models[0]
+        elif not interactive_menu and existing_model and existing_provider == chosen_provider:
+            # Reuse the configured model; don't re-prompt.
+            chosen_model = existing_model
+            rays_ui.print_step(f"Using model from config: {chosen_model}")
         else:
             chosen_model = rays_ui.select_from_menu(f"Select Model ({chosen_provider_label})", models)
         current_config['llm']['model'] = chosen_model
 
         # Embedding setup (session/runtime aware)
-        embedding_choice = rays_ui.select_from_menu(
-            "Embedding Model Setup",
-            ["Use existing embedding model", "Bring your own embedding model"]
-        )
+        existing_embedding_provider = (current_config.get('embedding') or {}).get('provider', '').lower()
+        existing_embedding_model = (current_config.get('embedding') or {}).get('model', '')
+        if interactive_menu:
+            embedding_choice = rays_ui.select_from_menu(
+                "Embedding Model Setup",
+                ["Use existing embedding model", "Bring your own embedding model"]
+            )
+        else:
+            embedding_choice = "Use existing embedding model" if existing_embedding_provider else "Bring your own embedding model"
         session_embedding_api_key = ""
         if embedding_choice == "Use existing embedding model":
             current_config.setdefault('embedding', {})
@@ -965,10 +1029,13 @@ def main():
             current_config['embedding']['provider'] = "ollama"
             current_config['embedding'].setdefault('ollama_endpoint', "http://localhost:11434/api/generate")
         else:
-            provider_choice = rays_ui.select_from_menu(
-                "Select Embedding Provider",
-                ["ollama"]
-            )
+            if interactive_menu:
+                provider_choice = rays_ui.select_from_menu(
+                    "Select Embedding Provider",
+                    ["ollama"]
+                )
+            else:
+                provider_choice = "ollama"
             if provider_choice == "ollama":
                 current_config.setdefault('embedding', {})
                 current_config['embedding']['provider'] = "ollama"
@@ -979,11 +1046,14 @@ def main():
                     resp.raise_for_status()
                     embedding_models = [m['name'] for m in resp.json().get('models', [])]
                     if not embedding_models:
-                        embedding_models = [current_config.get('embedding', {}).get('model', "qwen3-embedding:4b")]
+                        embedding_models = [existing_embedding_model or "qwen3-embedding:4b"]
                 except Exception:
                     rays_ui.print_warning("Could not reach local Ollama. Ensure it's running.")
-                    embedding_models = [current_config.get('embedding', {}).get('model', "qwen3-embedding:4b")]
-                chosen_embedding_model = rays_ui.select_from_menu("Select Embedding Model (ollama)", embedding_models)
+                    embedding_models = [existing_embedding_model or "qwen3-embedding:4b"]
+                if interactive_menu:
+                    chosen_embedding_model = rays_ui.select_from_menu("Select Embedding Model (ollama)", embedding_models)
+                else:
+                    chosen_embedding_model = existing_embedding_model if existing_embedding_model in embedding_models else embedding_models[0]
                 current_config['embedding']['model'] = chosen_embedding_model
         
         # Save config

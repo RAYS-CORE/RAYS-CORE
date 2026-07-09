@@ -328,7 +328,7 @@ class MCPManager:
         transport = (entry.get("transport") or "stdio").lower()
         if transport != "stdio":
             return {"ok": False, "error": f"Unsupported transport '{transport}'", "tools": []}
-        
+
         command = entry.get("command")
         if not command:
             return {"ok": False, "error": "stdio MCP server requires 'command'", "tools": []}

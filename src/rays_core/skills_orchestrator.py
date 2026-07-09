@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import yaml
 import subprocess
 from pathlib import Path
@@ -173,10 +174,36 @@ class SkillsOrchestrator:
             "summary": "Final orchestration cycle finished."
         }
 
+    def _slim_skills_list(
+        self, skills_list: List[Dict[str, str]], user_prompt: str = "", max_skills: int = 0
+    ) -> List[Dict[str, str]]:
+        """Trim skills to just name+description, keyword-ranked, capped at max_skills to prevent TPM overflow."""
+        # Provider-aware default caps: Groq free tier = 6K TPM (~1500 tokens), others are much higher
+        provider = getattr(self.ai_client, 'provider', 'ollama') if self.ai_client else 'ollama'
+        if max_skills == 0:
+            max_skills = 25 if provider == 'groq' else 150
+        
+        slim = [{"name": s["name"], "category": s.get("category", ""), "description": s.get("description", "")} for s in skills_list]
+        if user_prompt and len(slim) > max_skills:
+            words = set(re.findall(r'\w+', user_prompt.lower()))
+            common_stopwords = {"the", "a", "an", "is", "for", "of", "in", "to", "and", "or", "i", "on", "at", "do", "can", "use", "using", "with"}
+            keywords = words - common_stopwords
+            
+            def relevance(s: Dict) -> int:
+                text = (s["name"] + " " + s.get("description", "")).lower()
+                score = sum(1 for kw in keywords if kw in text)
+                if s["name"] == "duckduckgo" and ("search" in keywords or "web" in keywords):
+                    score += 100
+                return score
+                
+            slim.sort(key=relevance, reverse=True)
+        return slim[:max_skills]
+
     def _identify_required_skills(self, user_prompt: str, skills_list: List[Dict[str, str]], history: List[Dict[str, Any]]) -> Dict[str, Any]:
+        slim = self._slim_skills_list(skills_list, user_prompt=user_prompt)
         prompt = self.prompts["select_required_skills"].format(
             user_prompt=user_prompt,
-            skills_list=json.dumps(skills_list, indent=2),
+            skills_list=json.dumps(slim, indent=2),
             execution_history=format_prior_executions(history, user_prompt),
         )
         return self.ai_client.generate_json(prompt)
@@ -215,9 +242,24 @@ class SkillsOrchestrator:
         prior_transcript = format_prior_executions(previous_results, user_prompt)
         session_actions: List[Dict[str, Any]] = []
         max_steps = int(self.config.get("skill_subagent_max_turns", 15))
+        # Track seen tool calls to detect loops
+        seen_tool_calls: Dict[str, int] = {}  # "tool:args_json" -> count
 
         for turn in range(1, max_steps + 1):
             rays_ui.hud_set_status("Thinking", f"skill/{skill_name} · turn {turn}")
+
+            # Build anti-loop warning if we have duplicate calls
+            loop_warning = ""
+            for key, count in seen_tool_calls.items():
+                if count >= 2:
+                    tool_key, args_key = key.split("::", 1)
+                    loop_warning = (
+                        f"\n\n⚠️ LOOP DETECTED: You ran `{tool_key}({args_key})` {count} times already. "
+                        f"The results are in YOUR SESSION SO FAR above. "
+                        f"DO NOT run it again. You MUST set status \"completed\" NOW and put the answer in exit_message. "
+                        f"Even a partial answer is better than looping."
+                    )
+                    break
 
             prompt = self.prompts["execute_skill_step"].format(
                 user_prompt=user_prompt,
@@ -228,11 +270,17 @@ class SkillsOrchestrator:
                 spawn_reason=reason,
                 skill_md=skill_md_content,
                 prior_executions=prior_transcript,
-                session_actions=format_session_actions(session_actions),
+                session_actions=format_session_actions(session_actions) + loop_warning,
                 turn_number=turn,
             )
 
             response = self.ai_client.generate_json(prompt)
+
+            # If the model returned nothing (API failure / token limit), break out cleanly
+            if not response:
+                rays_ui.print_warning(f"[skill/{skill_name}] Empty response from model on turn {turn}. Stopping skill early.")
+                break
+
             thought = response.get("thought", "")
             status = (response.get("status") or "running").lower()
             tool_call = response.get("tool_call")
@@ -242,6 +290,13 @@ class SkillsOrchestrator:
 
             if tool_call:
                 result = self._dispatch_tool(tool_call)
+
+                # Track this call for loop detection
+                tool_name = tool_call.get("name", "")
+                args_str = json.dumps(tool_call.get("arguments", {}), sort_keys=True)
+                call_key = f"{tool_name}::{args_str}"
+                seen_tool_calls[call_key] = seen_tool_calls.get(call_key, 0) + 1
+
                 session_actions.append(
                     {
                         "turn": turn,
@@ -257,6 +312,28 @@ class SkillsOrchestrator:
                         tool_call.get("arguments"),
                         result,
                     )
+
+                # Auto-complete: if the same command was run 3+ times, force completion
+                if seen_tool_calls.get(call_key, 0) >= 3:
+                    # Find the most informative result (longest, likely the actual search output)
+                    all_results = [
+                        a.get("result", "") for a in session_actions
+                        if a.get("result") and len(a.get("result", "")) > 20
+                    ]
+                    best_result = max(all_results, key=len) if all_results else result or "Search was performed."
+                    rays_ui.print_warning(
+                        f"[skill/{skill_name}] Loop detected: same command ran 3x. Auto-completing."
+                    )
+                    return {
+                        "type": "skill",
+                        "skill": skill_name,
+                        "spawn_reason": reason,
+                        "status": "completed",
+                        "exit_message": (
+                            f"Search completed. Results from DuckDuckGo:\n{best_result}"
+                        ),
+                        "actions": session_actions,
+                    }
 
             if status == "completed":
                 if not has_tool_actions(session_actions):
@@ -305,13 +382,51 @@ class SkillsOrchestrator:
             "actions": session_actions,
         }
 
+
     def _dispatch_tool(self, tool_call: Dict[str, Any]) -> str:
         name = tool_call.get('name')
         args = tool_call.get('arguments', {})
-        
+
         if not name:
             return "Error: Tool call missing 'name'."
-            
+
+        # Common misnamings: redirect to the canonical tools the orchestrator exposes.
+        # The skill subagent prompt already maps 'bash' -> run_shell_command; this map
+        # catches a few more LLM habits and SKILL.md phrasings so we don't loop.
+        _ALIASES = {
+            "run_command": "run_shell_command",
+            "bash":        "run_shell_command",
+            "shell":       "run_shell_command",
+            "exec":        "run_shell_command",
+            "terminal":    "run_shell_command",
+            "web_search":  "run_shell_command",
+            "search":      "run_shell_command",
+            "create_file": "write_file",
+            "append_file": "write_file",
+            "edit_file":   "patch_file",
+            "read":        "read_file",
+            "ls":          "list_directory",
+        }
+        if name in _ALIASES:
+            mapped = _ALIASES[name]
+            rays_ui.print_warning(
+                f"[skill] Tool '{name}' is not available; remapping to '{mapped}'."
+            )
+            if mapped == "run_shell_command" and name in ("web_search", "search"):
+                query_str = args.get("query") or args.get("command") or ""
+                args["command"] = (
+                    "python3 -c \"import urllib.request, urllib.parse, re, ssl; "
+                    "ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE; "
+                    f"req = urllib.request.Request('https://html.duckduckgo.com/html/?q=' + urllib.parse.quote('{query_str}'), "
+                    "headers={'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'}); "
+                    "html = urllib.request.urlopen(req, context=ctx).read().decode('utf-8'); "
+                    "snippets = re.findall(r'class=\\\"result__snippet[^>]*>(.*?)</a>', html, re.IGNORECASE | re.DOTALL); "
+                    "print('\\n'.join(re.sub('<[^<]+>', '', s).strip() for s in snippets[:5]))\""
+                )
+            name = mapped
+            tool_call["name"] = mapped
+            tool_call["arguments"] = args
+
         if name == 'run_shell_command':
             return self._run_shell_command(args.get('command'))
         elif name == 'write_file':
@@ -322,8 +437,46 @@ class SkillsOrchestrator:
             return self._read_file(args.get('path'))
         elif name == 'list_directory':
             return self._list_directory(args.get('path', '.'))
+        elif name == 'skill_view':
+            return self._skill_view(args.get('skill_name'))
+        elif name == 'skill_manage':
+            return self._skill_manage(args.get('action'), args.get('skill_name'), args.get('category'), args.get('content'))
         else:
-            return f"Error: Tool '{name}' is not allowed in this mode. Only run_shell_command, write_file, patch_file, read_file, and list_directory are permitted."
+            return (
+                f"Error: Tool '{name}' is not allowed in this mode. "
+                f"Allowed tools: run_shell_command, write_file, patch_file, "
+                f"read_file, list_directory, skill_view, skill_manage. SKILL.md phrases like 'bash tool' "
+                f"or 'run_command' map to run_shell_command automatically."
+            )
+
+    def _skill_view(self, skill_name: str) -> str:
+        if not skill_name: return "Error: skill_name required"
+        for s in self.discover_skills():
+            if s['name'] == skill_name:
+                try:
+                    return Path(s['path']).read_text()
+                except Exception as e:
+                    return f"Error reading skill: {e}"
+        return f"Error: Skill '{skill_name}' not found."
+
+    def _skill_manage(self, action: str, skill_name: str, category: str, content: str) -> str:
+        if not action or not skill_name: return "Error: action and skill_name required"
+        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '', skill_name)
+        cat_path = re.sub(r'[^a-zA-Z0-9_-]', '', category or "custom")
+        target_dir = self.local_skills_dir / cat_path / safe_name
+        
+        if action == "create" or action == "update":
+            if not content: return "Error: content required for create/update"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            (target_dir / "SKILL.md").write_text(content)
+            return f"Skill {safe_name} successfully {action}d in {cat_path}/"
+        elif action == "delete":
+            import shutil
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+                return f"Skill {safe_name} deleted."
+            return f"Skill {safe_name} not found."
+        return "Error: unknown action."
 
     def _run_shell_command(self, command: str) -> str:
         if not command:
