@@ -26,6 +26,13 @@ class AIClient:
                 return resp.status_code == 200
             except:
                 return False
+        elif self.provider == "rays_studio":
+            try:
+                base = self.base_url or "http://localhost:8001/v1"
+                resp = requests.get(f"{base}/models", timeout=2)
+                return resp.status_code == 200
+            except:
+                return False
         elif self.provider in ("gemini", "openai", "groq", "claude"):
             # For APIs, we check if API key exists (network check is expensive/unreliable here)
             return bool(self.api_key)
@@ -46,6 +53,8 @@ class AIClient:
             return self._gemini_parallel(texts)
         elif self.provider == "openai":
             return self._openai_parallel(texts)
+        elif self.provider == "rays_studio":
+            return self._rays_studio_parallel(texts)
         else:
             # Fallback to gemini or ollama if provider doesn't support embeddings (like groq/claude)
             return self._gemini_parallel(texts) if self.api_key else self._ollama_parallel(texts)
@@ -67,6 +76,8 @@ class AIClient:
             response = self._groq_generate(prompt, system_prompt)
         elif self.provider == "claude":
             response = self._claude_generate(prompt, system_prompt)
+        elif self.provider == "rays_studio":
+            response = self._rays_studio_generate(prompt, system_prompt)
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
             
@@ -477,3 +488,66 @@ class AIClient:
             rays_ui.print_exception(e)
             return ""
 
+    # ========== RAYS STUDIO METHODS ==========
+    
+    def _rays_studio_generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """Generate text using local or remote RAYS Studio daemon (llama.cpp)"""
+        base = self.base_url or "http://localhost:8001/v1"
+        url = f"{base}/chat/completions"
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        payload = {
+            "messages": messages,
+            "temperature": 0.2
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=180)
+            resp.raise_for_status()
+            data = resp.json()
+            usage = data.get("usage") or {}
+            total = usage.get("total_tokens", 0)
+            if total > 0:
+                rays_ui.hud_add_tokens(total)
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            rays_ui.print_exception(e)
+            return ""
+
+    def _rays_studio_parallel(self, texts: List[str]) -> List[List[float]]:
+        """RAYS Studio parallel embedding via llama.cpp API"""
+        def embed_single(text):
+            try:
+                base = self.base_url or "http://localhost:8001/v1"
+                url = f"{base}/embeddings"
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                if self.api_key:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
+                payload = {
+                    "input": text
+                }
+                response = requests.post(url, json=payload, headers=headers, timeout=120)
+                response.raise_for_status()
+                return response.json()['data'][0]['embedding']
+            except Exception as e:
+                rays_ui.print_exception(e)
+                return []
+        
+        results = [None] * len(texts)
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_idx = {executor.submit(embed_single, text): idx for idx, text in enumerate(texts)}
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                results[idx] = future.result()
+        
+        return results

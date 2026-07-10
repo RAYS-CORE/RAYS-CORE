@@ -54,6 +54,7 @@ export function loadProviderSettings(): StoredProviderSettings {
       provider: parsed.provider ?? defaultProvider.provider,
       model: parsed.model ?? defaultProvider.model,
       apiKey: parsed.apiKey ?? "",
+      baseUrl: parsed.baseUrl ?? "",
     };
   } catch {
     return { ...defaultProvider };

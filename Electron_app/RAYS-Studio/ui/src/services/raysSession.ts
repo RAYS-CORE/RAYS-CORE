@@ -35,9 +35,10 @@ export type ChatMessage = {
 };
 export type TerminalLine = { id: string; kind: "output" | "command"; content: string };
 export type ProviderConfig = {
-  provider: "ollama" | "gemini" | "openai" | "groq" | "claude";
+  provider: "ollama" | "gemini" | "openai" | "groq" | "claude" | "rays_studio";
   model: string;
   apiKey?: string;
+  baseUrl?: string;
 };
 export type PromptMode = "agent" | "code" | "chat";
 export type ApprovalRequest = { id: string; message: string };

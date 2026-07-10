@@ -6,6 +6,8 @@ import subprocess
 from typing import List, Optional
 import asyncio
 import sys
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 from fastapi import FastAPI, BackgroundTasks, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

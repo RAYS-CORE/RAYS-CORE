@@ -63,6 +63,9 @@ function runtimeOverridesFromProvider(providerConfig: ProviderConfig) {
   if (providerConfig.provider === "ollama") {
     llm.ollama_endpoint = "http://localhost:11434/api/generate";
   }
+  if (providerConfig.provider === "rays_studio" && providerConfig.baseUrl) {
+    llm.base_url = providerConfig.baseUrl;
+  }
   return { llm };
 }
 

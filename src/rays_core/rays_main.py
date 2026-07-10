@@ -900,7 +900,7 @@ def main():
         with open(config_path, 'r') as f:
             current_config = yaml.safe_load(f)
             
-        providers = ["ollama (locally)", "gemini api", "openai api"]
+        providers = ["ollama (locally)", "gemini api", "openai api", "RAYS Studio"]
         chosen_provider_label = rays_ui.select_from_menu("Select AI Provider", providers)
         
         # Parse choice into canonical provider slugs used by AIClient
@@ -910,6 +910,8 @@ def main():
             chosen_provider = "gemini"
         elif chosen_provider_label == "openai api":
             chosen_provider = "openai"
+        elif chosen_provider_label == "RAYS Studio":
+            chosen_provider = "rays_studio"
         else:
             chosen_provider = "ollama"
         current_config['llm']['provider'] = chosen_provider
@@ -946,8 +948,14 @@ def main():
             entered_model = input(f"  {rays_ui.C_PINK}❯ Enter OpenAI Model Name: {rays_ui.RESET}").strip()
             models = [entered_model] if entered_model else ["gpt-4o"]
             
+        elif chosen_provider == "rays_studio":
+            entered_base_url = input(f"  {rays_ui.C_PINK}❯ Enter RAYS Studio Base URL [http://localhost:8001/v1]: {rays_ui.RESET}").strip()
+            current_config['llm']['base_url'] = entered_base_url if entered_base_url else "http://localhost:8001/v1"
+            entered_model = input(f"  {rays_ui.C_PINK}❯ Enter Model Name (Optional, any valid string): {rays_ui.RESET}").strip()
+            models = [entered_model] if entered_model else ["default-model"]
+            
         # Select Model
-        if chosen_provider in ("gemini", "openai"):
+        if chosen_provider in ("gemini", "openai", "rays_studio"):
             chosen_model = models[0]
         else:
             chosen_model = rays_ui.select_from_menu(f"Select Model ({chosen_provider_label})", models)

@@ -19,6 +19,7 @@ const providers: { id: StoredProviderSettings["provider"]; label: string }[] = [
   { id: "openai", label: "OpenAI" },
   { id: "groq", label: "Groq" },
   { id: "claude", label: "Anthropic Claude" },
+  { id: "rays_studio", label: "RAYS Studio" },
 ];
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -26,6 +27,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [provider, setProvider] = useState<StoredProviderSettings["provider"]>("ollama");
   const [model, setModel] = useState("qwen3-coder:30b");
   const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("http://localhost:8001/v1");
   const [savedHint, setSavedHint] = useState<string | null>(null);
   const [mcpConfig, setMcpConfig] = useState(`{
   "servers": [],
@@ -43,13 +45,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setProvider(s.provider);
     setModel(s.model);
     setApiKey(s.apiKey || "");
+    setBaseUrl(s.baseUrl || "http://localhost:8001/v1");
     setAppearance(loadAppearanceSettings());
     setSavedHint(null);
     setExtensionStatus(null);
   }, [open]);
 
   const persistProvider = () => {
-    saveProviderSettings({ provider, model: model.trim(), apiKey: apiKey.trim() });
+    saveProviderSettings({ provider, model: model.trim(), apiKey: apiKey.trim(), baseUrl: baseUrl.trim() });
     setSavedHint("Saved. Applies the next time you open a workspace.");
   };
 
@@ -137,13 +140,25 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                       className="w-full bg-secondary rounded-md px-3 py-2 text-ui text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
                     />
                   </div>
-                  {provider !== "ollama" && (
+                  {provider !== "ollama" && provider !== "rays_studio" && (
                     <div className="space-y-2">
                       <label className="text-ui font-medium text-foreground/80">API Key</label>
                       <input
                         type="password"
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
+                        className="w-full bg-secondary rounded-md px-3 py-2 text-ui text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
+                      />
+                    </div>
+                  )}
+                  {provider === "rays_studio" && (
+                    <div className="space-y-2">
+                      <label className="text-ui font-medium text-foreground/80">Base URL</label>
+                      <input
+                        type="text"
+                        value={baseUrl}
+                        onChange={(e) => setBaseUrl(e.target.value)}
+                        placeholder="http://localhost:8001/v1"
                         className="w-full bg-secondary rounded-md px-3 py-2 text-ui text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
                       />
                     </div>
