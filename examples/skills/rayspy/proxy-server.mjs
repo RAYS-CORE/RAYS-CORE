@@ -19,7 +19,7 @@ if (process.env.OSINT_MOCK === undefined) process.env.OSINT_MOCK = '0';
 
 // Point spiderfoot.mjs at the cloned SpiderFoot checkout.
 // Use 'python' on Windows (python3 is not available).
-const SF_PY = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\spiderfoot\\sf.py';
+const SF_PY = path.join(__dirname, 'spiderfoot', 'sf.py');
 if (!process.env.SPIDERFOOT_SF_PY) {
   process.env.SPIDERFOOT_SF_PY = SF_PY;
 }
@@ -28,19 +28,19 @@ if (!process.env.SPIDERFOOT_PYTHON) {
 }
 
 // Point insightface.mjs at the Python face-detection sidecar.
-const INSIGHTFACE_SCRIPT_PATH = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\scripts\\insightface_sidecar.py';
+const INSIGHTFACE_SCRIPT_PATH = path.join(__dirname, 'scripts', 'insightface_sidecar.py');
 if (!process.env.INSIGHTFACE_SCRIPT) {
   process.env.INSIGHTFACE_SCRIPT = INSIGHTFACE_SCRIPT_PATH;
 }
 
 // Point personMatcher.mjs at the Python person search + face cross-match sidecar.
-const PERSON_MATCHER_SCRIPT_PATH = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\scripts\\person_matcher_sidecar.py';
+const PERSON_MATCHER_SCRIPT_PATH = path.join(__dirname, 'scripts', 'person_matcher_sidecar.py');
 if (!process.env.PERSON_MATCHER_SCRIPT) {
   process.env.PERSON_MATCHER_SCRIPT = PERSON_MATCHER_SCRIPT_PATH;
 }
 
 // Point at the full 14-stage face search pipeline (replaces person_matcher for new flows).
-const FACE_SEARCH_PIPELINE_SCRIPT_PATH = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\scripts\\face_search_pipeline.py';
+const FACE_SEARCH_PIPELINE_SCRIPT_PATH = path.join(__dirname, 'scripts', 'face_search_pipeline.py');
 if (!process.env.FACE_SEARCH_PIPELINE_SCRIPT) {
   process.env.FACE_SEARCH_PIPELINE_SCRIPT = FACE_SEARCH_PIPELINE_SCRIPT_PATH;
 }
@@ -78,17 +78,7 @@ const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 const agent = PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
 
 const server = http.createServer((req, res) => {
-  // CORS Headers for all responses
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-  
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-
+  console.log(`[PROXY] ${req.method} ${req.url}`);
   const url = new URL(req.url, 'http://localhost');
 
   // ── "run" tab bridge: dashboard <-> rays_investigate MCP tool ────────
@@ -96,7 +86,12 @@ const server = http.createServer((req, res) => {
     readJsonBody(req)
       .then(async (body) => {
         const { ok, body: result } = parseMcpResult(
-          await mcpHandle({ action: 'start', query: body.query, maxRounds: body.maxRounds })
+          await mcpHandle({ 
+            action: 'start', 
+            query: body.query, 
+            maxRounds: body.maxRounds,
+            referenceImage: body.referenceImage 
+          })
         );
         sendJson(res, ok ? 200 : 400, result);
       })
@@ -145,10 +140,16 @@ const server = http.createServer((req, res) => {
     }
     const targetName = investigationId.toLowerCase().replace(/\s+/g, '_');
     if (format === 'json') {
-      const jsonPath = path.resolve(__dirname, `${targetName}_investigation_raw.json`);
+      const workspaceDir = path.resolve(__dirname, `workspace_${targetName}`);
+      const jsonPath = path.resolve(workspaceDir, 'report.json');
       if (!fs.existsSync(jsonPath)) { sendJson(res, 404, { error: 'report not found' }); return; }
       res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="${targetName}_investigation_raw.json"` });
       fs.createReadStream(jsonPath).pipe(res);
+    } else if (format === 'html') {
+      const htmlPath = path.resolve(__dirname, `workspace_${targetName}`, 'report.html');
+      if (!fs.existsSync(htmlPath)) { sendJson(res, 404, { error: 'html report not found' }); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Content-Disposition': `attachment; filename="${targetName}_investigation_report.html"` });
+      fs.createReadStream(htmlPath).pipe(res);
     } else {
       const txtPath = path.resolve(__dirname, `${targetName}_investigation_report.txt`);
       if (!fs.existsSync(txtPath)) { sendJson(res, 404, { error: 'report not found' }); return; }
@@ -228,6 +229,46 @@ const server = http.createServer((req, res) => {
     }
     proxyHttps(req, res, target);
   } else {
+    
+  // ── Serve Vite Static Frontend ────────────────────────────────
+  if (req.method === 'GET' && !url.pathname.startsWith('/rayspy-mcp') && !url.pathname.startsWith('/opensky') && !url.pathname.startsWith('/adsb') && !url.pathname.startsWith('/celestrak') && !url.pathname.startsWith('/geocode') && !url.pathname.startsWith('/austin-data') && !url.pathname.startsWith('/cctv') && !url.pathname.startsWith('/openeagle') && !url.pathname.startsWith('/cam-proxy')) {
+    let servePath = url.pathname;
+    if (servePath.startsWith('/rayspy')) {
+      servePath = servePath.replace('/rayspy', '');
+    }
+    if (!servePath || servePath === '/') servePath = 'index.html';
+    
+    let filePath = path.join(__dirname, 'dist', servePath);
+    if (!fs.existsSync(filePath)) {
+      // SPA fallback
+      filePath = path.join(__dirname, 'dist', 'index.html');
+    }
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath);
+      const mimeTypes = {
+        '.html': 'text/html',
+        '.js': 'text/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.wav': 'audio/wav',
+        '.mp4': 'video/mp4',
+        '.woff': 'application/font-woff',
+        '.ttf': 'application/font-ttf',
+        '.eot': 'application/vnd.ms-fontobject',
+        '.otf': 'application/font-otf',
+        '.wasm': 'application/wasm'
+      };
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': contentType });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+  }
+
     res.writeHead(404);
     res.end('Not found');
   }

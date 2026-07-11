@@ -96,7 +96,7 @@ class URLCanonicalizer:
         for _ in range(max_redirects):
             try:
                 req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=10) as resp:
+                with urllib.request.urlopen(req, timeout=1) as resp:
                     if resp.status in (301, 302, 303, 307, 308):
                         redirected = resp.headers.get("Location", "")
                         if redirected:
