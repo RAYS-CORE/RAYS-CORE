@@ -1,0 +1,28 @@
+positive_indicators:
+  - "Profile avatar"
+  - "username visible"
+  - "karma"
+  - "cake day"
+  - "posts"
+  - "reddit-profile"
+negative_indicators:
+  - "Nobody on Reddit goes by that name"
+  - "page not found"
+  - "there is nothing here"
+suspended_indicators:
+  - "account suspended"
+  - "suspended"
+private_indicators:
+  - "private"
+  - "this profile is private"
+login_indicators:
+  - "log in"
+  - "sign in"
+  - "login"
+confidence_weights:
+  avatar: 0.3
+  username: 0.2
+  karma: 0.15
+  cake_day: 0.1
+  posts: 0.15
+  negative_match: -0.5

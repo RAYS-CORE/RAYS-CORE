@@ -1,0 +1,474 @@
+{
+  "pipeline_version": "3.2-registry",
+  "evidence_summary": {
+    "leads": 67,
+    "candidates": 72,
+    "browser_loaded": 67,
+    "validated": 16,
+    "rejected": 51,
+    "high_quality": 4,
+    "harvested_with_names": 4,
+    "harvested_with_emails": 0,
+    "identity_candidates": 0,
+    "verified": 0
+  },
+  "verification_summary": {
+    "face_verification": "SKIPPED",
+    "reference_source": "None",
+    "face_verified": false,
+    "verification_confidence": 0.0,
+    "explanation": "No independent reference image provided. Face verification skipped.",
+    "auto_selected_reference": {
+      "image_url": "https://pbs.twimg.com/profile_images/2051730041827205120/kBsDNHUD_400x400.jpg",
+      "profile_url": "https://x.com/samreedh",
+      "platform": "x",
+      "image_type": "profile_photo",
+      "selection_basis": "best_ranked_profile_photo_among_discovered_candidates",
+      "note": "Auto-selected from discovered candidate photos. This is NOT independent verification \u2014 it only reports whether OTHER, independently-sourced candidate photos corroborate this one."
+    },
+    "auto_reference_matches": []
+  },
+  "query_plan": {
+    "raw_input": "samreedh",
+    "normalized_name": "Samreedh",
+    "structure": "single",
+    "search_queries_generated": 2
+  },
+  "stages": {
+    "1_query_planner": {
+      "normalized_name": "Samreedh",
+      "tokens": [
+        "samreedh"
+      ],
+      "search_queries": [
+        "Samreedh",
+        "\"Samreedh\""
+      ]
+    },
+    "2_collection": {
+      "profiles_found": 5,
+      "platforms": [
+        "x",
+        "instagram",
+        "github",
+        "twitter",
+        "reddit"
+      ]
+    },
+    "3_normalization": {
+      "unique_profiles": 5,
+      "duplicates_removed": 0
+    }
+  },
+  "identity_discovery": {
+    "status": "completed",
+    "search_leads": 67,
+    "candidate_urls": 72,
+    "validated_profiles": 16,
+    "rejected": 51,
+    "high_quality_profiles": 4,
+    "platforms": [
+      "x",
+      "instagram",
+      "github",
+      "twitter",
+      "reddit"
+    ],
+    "cross_verification_cycles": 2,
+    "converged": false,
+    "convergence_message": "Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.",
+    "identity_candidates": [
+      {
+        "linked_profiles": [
+          {
+            "url": "https://www.duolingo.com/profile/samreedh",
+            "platform": "duolingo",
+            "handle": "samreedh",
+            "name": "Samreedh on Duolingo",
+            "exists": true,
+            "validation_status": "LOGIN_REQUIRED",
+            "quality_score": 80,
+            "completeness_score": 0.0,
+            "investigative_value": 0.0,
+            "is_eligible": true,
+            "signals": [],
+            "warnings": [],
+            "low_value_indicators": []
+          },
+          {
+            "url": "https://odysee.com/@samreedh",
+            "platform": "odysee",
+            "handle": "samreedh",
+            "name": "Odysee",
+            "exists": true,
+            "validation_status": "FOUND",
+            "quality_score": 80,
+            "completeness_score": 0.0,
+            "investigative_value": 0.0,
+            "is_eligible": true,
+            "signals": [],
+            "warnings": [],
+            "low_value_indicators": []
+          },
+          {
+            "url": "https://xboxgamertag.com/search/samreedh",
+            "platform": "xboxgamertag",
+            "handle": "samreedh",
+            "name": "samreedh",
+            "exists": true,
+            "validation_status": "LOGIN_REQUIRED",
+            "quality_score": 65,
+            "completeness_score": 0.0,
+            "investigative_value": 0.0,
+            "is_eligible": true,
+            "signals": [],
+            "warnings": [],
+            "low_value_indicators": []
+          },
+          {
+            "url": "https://mastodon.cloud/@samreedh",
+            "platform": "mastodon",
+            "handle": "samreedh",
+            "name": "093",
+            "exists": true,
+            "validation_status": "FOUND",
+            "quality_score": 80,
+            "completeness_score": 0.0,
+            "investigative_value": 0.0,
+            "is_eligible": true,
+            "signals": [],
+            "warnings": [],
+            "low_value_indicators": []
+          }
+        ],
+        "name": "samreedh",
+        "confidence": 0.05,
+        "confidence_label": "LOW",
+        "evidence": [
+          {
+            "evidence_class": "WEAK",
+            "description": "Same username across platforms",
+            "weight": 0.05,
+            "source": "profile_analysis"
+          }
+        ],
+        "face_verification_status": "SKIPPED"
+      }
+    ],
+    "identifiers_extracted": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    },
+    "harvested_evidence": {
+      "display_names": [
+        "093",
+        "Odysee",
+        "Samreedh on Duolingo",
+        "samreedh"
+      ],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "organizations": []
+    }
+  },
+  "identity_verification": {
+    "reference": null,
+    "reference_matches": [],
+    "face_verified": false,
+    "verification_status": "SKIPPED",
+    "reference_source": null,
+    "verification_confidence": 0.0,
+    "verification_explanation": "No independent reference image provided. Face verification skipped.",
+    "face_detected_in_profiles": 1,
+    "image_results": [
+      {
+        "id": "img_aaf6b096",
+        "image_url": "https://pbs.twimg.com/profile_images/2051730041827205120/kBsDNHUD_400x400.jpg",
+        "platform": "x",
+        "profile_url": "https://x.com/samreedh",
+        "accepted": true,
+        "rejection_reason": null,
+        "face_detected": true,
+        "face_count": 1
+      }
+    ],
+    "auto_selected_reference": {
+      "image_url": "https://pbs.twimg.com/profile_images/2051730041827205120/kBsDNHUD_400x400.jpg",
+      "profile_url": "https://x.com/samreedh",
+      "platform": "x",
+      "image_type": "profile_photo",
+      "selection_basis": "best_ranked_profile_photo_among_discovered_candidates",
+      "note": "Auto-selected from discovered candidate photos. This is NOT independent verification \u2014 it only reports whether OTHER, independently-sourced candidate photos corroborate this one."
+    },
+    "auto_reference_matches": []
+  },
+  "reference": null,
+  "reference_matches": [],
+  "candidates": [
+    {
+      "linked_profiles": [
+        {
+          "url": "https://www.duolingo.com/profile/samreedh",
+          "platform": "duolingo",
+          "handle": "samreedh",
+          "name": "Samreedh on Duolingo",
+          "exists": true,
+          "validation_status": "LOGIN_REQUIRED",
+          "quality_score": 80,
+          "completeness_score": 0.0,
+          "investigative_value": 0.0,
+          "is_eligible": true,
+          "signals": [],
+          "warnings": [],
+          "low_value_indicators": []
+        },
+        {
+          "url": "https://odysee.com/@samreedh",
+          "platform": "odysee",
+          "handle": "samreedh",
+          "name": "Odysee",
+          "exists": true,
+          "validation_status": "FOUND",
+          "quality_score": 80,
+          "completeness_score": 0.0,
+          "investigative_value": 0.0,
+          "is_eligible": true,
+          "signals": [],
+          "warnings": [],
+          "low_value_indicators": []
+        },
+        {
+          "url": "https://xboxgamertag.com/search/samreedh",
+          "platform": "xboxgamertag",
+          "handle": "samreedh",
+          "name": "samreedh",
+          "exists": true,
+          "validation_status": "LOGIN_REQUIRED",
+          "quality_score": 65,
+          "completeness_score": 0.0,
+          "investigative_value": 0.0,
+          "is_eligible": true,
+          "signals": [],
+          "warnings": [],
+          "low_value_indicators": []
+        },
+        {
+          "url": "https://mastodon.cloud/@samreedh",
+          "platform": "mastodon",
+          "handle": "samreedh",
+          "name": "093",
+          "exists": true,
+          "validation_status": "FOUND",
+          "quality_score": 80,
+          "completeness_score": 0.0,
+          "investigative_value": 0.0,
+          "is_eligible": true,
+          "signals": [],
+          "warnings": [],
+          "low_value_indicators": []
+        }
+      ],
+      "name": "samreedh",
+      "confidence": 0.05,
+      "confidence_label": "LOW",
+      "evidence": [
+        {
+          "evidence_class": "WEAK",
+          "description": "Same username across platforms",
+          "weight": 0.05,
+          "source": "profile_analysis"
+        }
+      ],
+      "face_verification_status": "SKIPPED"
+    }
+  ],
+  "image_results": [
+    {
+      "id": "img_aaf6b096",
+      "image_url": "https://pbs.twimg.com/profile_images/2051730041827205120/kBsDNHUD_400x400.jpg",
+      "platform": "x",
+      "profile_url": "https://x.com/samreedh",
+      "accepted": true,
+      "rejection_reason": null,
+      "face_detected": true,
+      "face_count": 1
+    }
+  ],
+  "decision": {
+    "verdict": "verification_skipped",
+    "explanation": "No independent reference image provided. Face verification skipped.",
+    "face_verification": "SKIPPED",
+    "verification_confidence": null
+  },
+  "uncertainty_notes": [
+    "Confidence is above minimum but below dominant threshold."
+  ],
+  "enhancements": {
+    "download_manager": {
+      "cache_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_face_cache",
+      "cached_files": 0,
+      "cached_urls": 0,
+      "disk_usage_bytes": 0
+    },
+    "identity_memory_hit": null,
+    "consensus_verification": null,
+    "session_info": {
+      "session_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_sessions",
+      "active_sessions": {
+        "web": {
+          "platform": "web",
+          "saved_at": 1783575993.7261481,
+          "cookie_count": 19,
+          "valid": true
+        }
+      }
+    },
+    "browser_controller_available": true,
+    "url_canonicalization": {
+      "canonicalized_count": 0
+    },
+    "identifier_discovery": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    },
+    "post_metadata": {
+      "count": 0
+    },
+    "organization_graph": {
+      "nodes": [],
+      "edges": [],
+      "stats": {
+        "persons": 0,
+        "organizations": 0,
+        "projects": 0,
+        "edges": 0
+      }
+    },
+    "geolocation": {
+      "locations": [],
+      "confidence": 0.0
+    },
+    "cross_verification": [
+      {
+        "iteration": 0,
+        "queries_run": 5,
+        "new_profiles_found": 5,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "samreedh"
+          ],
+          "usernames": {
+            "github": "samreedh",
+            "reddit": "samreedh",
+            "x": "samreedh",
+            "twitter": "samreedh",
+            "instagram": "samreedh"
+          },
+          "emails": []
+        }
+      },
+      {
+        "iteration": 1,
+        "queries_run": 5,
+        "new_profiles_found": 0,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "samreedh"
+          ],
+          "usernames": {
+            "github": "samreedh",
+            "reddit": "samreedh",
+            "x": "samreedh",
+            "twitter": "samreedh",
+            "instagram": "samreedh"
+          },
+          "emails": []
+        }
+      }
+    ],
+    "cross_verification_profiles": [
+      {
+        "url": "https://github.com/samreedh",
+        "platform": "github",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.85,
+        "query": "direct:github/samreedh"
+      },
+      {
+        "url": "https://reddit.com/user/samreedh",
+        "platform": "reddit",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/samreedh"
+      },
+      {
+        "url": "https://x.com/samreedh",
+        "platform": "x",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:x/samreedh"
+      },
+      {
+        "url": "https://twitter.com/samreedh",
+        "platform": "twitter",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:twitter/samreedh"
+      },
+      {
+        "url": "https://instagram.com/samreedh",
+        "platform": "instagram",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/samreedh"
+      }
+    ],
+    "evidence_iteration": {
+      "iterations": 2,
+      "converged": false,
+      "final_confidence": 0.0
+    },
+    "profile_validation": []
+  },
+  "timing_ms": {
+    "0_authorization": 0.0,
+    "1_query_planning": 0.0,
+    "2_collection": 1107.1908473968506,
+    "a1_candidate_generator": 0.8609294891357422,
+    "a2_browser_controller": 64910.08901596069,
+    "a3_validator": 581.5496444702148,
+    "a3b_evidence_harvester": 50.14538764953613,
+    "a4_quality_scorer": 0.0,
+    "3_normalization": 0.0,
+    "7a_url_canonicalization": 0.0,
+    "7b_identifier_discovery": 0.0,
+    "7c_post_metadata": 0.0,
+    "8_organization_graph": 0.0,
+    "9_geolocation": 0.0,
+    "10_cross_verification": 16941.633224487305,
+    "4_image_collection": 37367.22159385681,
+    "5_quality_validation": 13361.843347549438,
+    "6_dedup": 5295.257568359375,
+    "7_embedding": 2924.2656230926514,
+    "8_clustering": 0.0,
+    "13_evidence_iteration": 0.0,
+    "12_report": 0.0
+  },
+  "total_time_ms": 142540.057182312
+}

@@ -1,0 +1,96 @@
+========================================================================
+  SWAMANTAK — EVIDENCE-DRIVEN OSINT INVESTIGATION
+  Pipeline: 3.2-registry
+  Pipeline run: 103.6s
+========================================================================
+
+STAGE PROGRESSION
+  Leads:              0
+  ↓ Candidates:       9
+  ↓ Browser Loaded:   2
+  ↓ Validated:        0
+  ↓ Rejected:         2
+  ↓ With Names:       0
+  ↓ With Emails:      0
+  ↓ High Quality:     0
+  ↓ Identity Cand:    0
+  ↓ Verified:         0
+
+HARVESTED EVIDENCE (from profile HTML)
+  (none extracted)
+
+FACE VERIFICATION
+  Status: SKIPPED
+  Reference source: None
+  Face verified: False
+  Confidence: 0.0
+  No independent reference image provided. Face verification skipped.
+
+  Auto-selected reference (NOT independent verification):
+    Image: https://scontent.cdninstagram.com/v/t51.2885-19/19121211_251212088616270_3985661382182830080_a.jpg?stp=dst-jpg_s100x100_tt6&_nc_cat=102&ccb=7-5&_nc_sid=bf7eb4&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4zMzguQzMifQ%3D%3D&_nc_ohc=vDirrXro1o4Q7kNvwFUv8M9&_nc_oc=AdoX7Q0MF_XQ2FOGMTMt0ygL5EqDXfjtxCrM5ifoUI0CgojMd4QjVl-M006RXKzR40du5UJ8-CgWTBAw2jutZ_u3&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_ss=78689&oh=00_AQDYKlPCdD07rISBO6zEp9oKpJWIFFj7otQh6xFo64vcWw&oe=6A56AA9E
+    Source profile: https://instagram.com/swamantak (instagram)
+    No cross-platform corroboration found.
+
+IDENTITY DISCOVERY
+  Status: completed
+  Platforms: x, youtube, twitter, instagram, linkedin, medium, github, reddit
+  Cross-verification cycles: 2
+  Converged: False
+  Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.
+
+DECISION
+  Verdict: verification_skipped
+  Explanation: No independent reference image provided. Face verification skipped.
+  Face verification: SKIPPED
+  Verification confidence: None
+
+IDENTIFIERS EXTRACTED
+  No emails, phones, or names publicly exposed
+
+RELATIONSHIP / ORGANIZATION GRAPH
+  Nodes: 0
+  Edges: 0
+
+GEOLOCATION
+  Locations: []
+  Confidence: 0.0
+
+TIMING
+  4_image_collection: 66581.0ms
+  10_cross_verification: 17932.0ms
+  5_quality_validation: 10076.0ms
+  6_dedup: 3240.0ms
+  7_embedding: 2334.0ms
+  2_collection: 2092.0ms
+  7a_url_canonicalization: 1050.0ms
+  a3_validator: 167.0ms
+  1_query_planning: 3.0ms
+  9_geolocation: 3.0ms
+  13_evidence_iteration: 2.0ms
+  TOTAL: 103481.0ms
+
+========================================================================
+  APPENDIX A: SHERLOCK — 0 CANDIDATE USERNAMES
+  (Sherlock matches URL patterns only — does not verify accounts)
+========================================================================
+
+
+========================================================================
+  APPENDIX B: CROSS-REFERENCE — VALIDATED vs SHERLOCK
+========================================================================
+  Validated platforms: github, instagram, linkedin, medium, reddit, twitter, x, youtube
+
+  Sherlock candidate usernames: 0
+  Total unique candidate URLs: 8
+
+========================================================================
+  LIMITATIONS & NOTES
+========================================================================
+  - DuckDuckGo blocked by corporate proxy — name search unavailable
+  - Sherlock generated 0 URL pattern matches;
+    these are candidate usernames, not verified accounts.
+  - No emails or phone numbers found in public sources
+
+========================================================================
+  END OF REPORT
+========================================================================

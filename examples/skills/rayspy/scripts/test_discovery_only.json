@@ -1,0 +1,436 @@
+{
+  "pipeline_version": "3.1-23-improvements",
+  "query_plan": {
+    "raw_input": "samreedh",
+    "normalized_name": "Samreedh",
+    "structure": "single",
+    "search_queries_generated": 2
+  },
+  "stages": {
+    "1_query_planner": {
+      "normalized_name": "Samreedh",
+      "tokens": [
+        "samreedh"
+      ],
+      "search_queries": [
+        "Samreedh",
+        "\"Samreedh\""
+      ]
+    },
+    "2_collection": {
+      "profiles_found": 6,
+      "platforms": [
+        "instagram",
+        "twitter",
+        "reddit",
+        "x",
+        "github",
+        "medium"
+      ]
+    },
+    "3_normalization": {
+      "unique_profiles": 6,
+      "duplicates_removed": 0
+    }
+  },
+  "identity_discovery": {
+    "status": "completed",
+    "profiles_found": 6,
+    "platforms": [
+      "instagram",
+      "twitter",
+      "reddit",
+      "x",
+      "github",
+      "medium"
+    ],
+    "cross_verification_cycles": 3,
+    "converged": false,
+    "convergence_message": "Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.",
+    "identity_candidates": [
+      {
+        "candidate_id": "candidate_1",
+        "name_hypothesis": "samreedh",
+        "platforms": [
+          "instagram",
+          "twitter",
+          "reddit",
+          "x",
+          "github",
+          "medium"
+        ],
+        "profile_urls": [
+          "https://twitter.com/samreedh",
+          "https://x.com/samreedh",
+          "https://reddit.com/user/samreedh",
+          "https://github.com/samreedh",
+          "https://medium.com/@samreedh",
+          "https://instagram.com/samreedh"
+        ],
+        "handles": [
+          "samreedh"
+        ],
+        "platform_status": {
+          "reddit": {
+            "url": "https://reddit.com/user/samreedh",
+            "handle": "samreedh",
+            "accessibility": "accessible",
+            "evidence": "profile_accessible",
+            "verification": "pending"
+          },
+          "x": {
+            "url": "https://x.com/samreedh",
+            "handle": "samreedh",
+            "accessibility": "accessible",
+            "evidence": "profile_accessible",
+            "verification": "pending"
+          },
+          "twitter": {
+            "url": "https://twitter.com/samreedh",
+            "handle": "samreedh",
+            "accessibility": "accessible",
+            "evidence": "profile_accessible",
+            "verification": "pending"
+          },
+          "github": {
+            "url": "https://github.com/samreedh",
+            "handle": "samreedh",
+            "accessibility": "accessible",
+            "evidence": "profile_accessible",
+            "verification": "pending"
+          },
+          "instagram": {
+            "url": "https://instagram.com/samreedh",
+            "handle": "samreedh",
+            "accessibility": "accessible",
+            "evidence": "profile_accessible",
+            "verification": "pending"
+          },
+          "medium": {
+            "url": "https://medium.com/@samreedh",
+            "handle": "samreedh",
+            "accessibility": "login_gated",
+            "evidence": "username_only",
+            "verification": "not_performed"
+          }
+        },
+        "accessible_count": 5,
+        "login_gated_count": 1,
+        "evidence_signals": [
+          {
+            "signal": "username_consistency",
+            "strength": "high",
+            "detail": "Same handle 'samreedh' used across 6 platforms"
+          },
+          {
+            "signal": "cross_platform_presence",
+            "strength": "medium",
+            "detail": "Present on 6 platforms: instagram, twitter, reddit, x, github"
+          },
+          {
+            "signal": "name_handle_match",
+            "strength": "high",
+            "detail": "Username 'samreedh' matches queried name 'samreedh'"
+          }
+        ],
+        "confidence": 1.0,
+        "confidence_label": "high",
+        "face_evidence": null,
+        "face_verified": false,
+        "verification": "not_attempted",
+        "explanation": "Same handle 'samreedh' used across 6 platforms; Present on 6 platforms: instagram, twitter, reddit, x, github; Username 'samreedh' matches queried name 'samreedh'; 1 platform(s) are login-gated: content not verified",
+        "rank": 1
+      }
+    ],
+    "identifiers_extracted": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    }
+  },
+  "identity_verification": null,
+  "reference": null,
+  "reference_matches": [],
+  "candidates": [
+    {
+      "candidate_id": "candidate_1",
+      "name_hypothesis": "samreedh",
+      "platforms": [
+        "instagram",
+        "twitter",
+        "reddit",
+        "x",
+        "github",
+        "medium"
+      ],
+      "profile_urls": [
+        "https://twitter.com/samreedh",
+        "https://x.com/samreedh",
+        "https://reddit.com/user/samreedh",
+        "https://github.com/samreedh",
+        "https://medium.com/@samreedh",
+        "https://instagram.com/samreedh"
+      ],
+      "handles": [
+        "samreedh"
+      ],
+      "platform_status": {
+        "reddit": {
+          "url": "https://reddit.com/user/samreedh",
+          "handle": "samreedh",
+          "accessibility": "accessible",
+          "evidence": "profile_accessible",
+          "verification": "pending"
+        },
+        "x": {
+          "url": "https://x.com/samreedh",
+          "handle": "samreedh",
+          "accessibility": "accessible",
+          "evidence": "profile_accessible",
+          "verification": "pending"
+        },
+        "twitter": {
+          "url": "https://twitter.com/samreedh",
+          "handle": "samreedh",
+          "accessibility": "accessible",
+          "evidence": "profile_accessible",
+          "verification": "pending"
+        },
+        "github": {
+          "url": "https://github.com/samreedh",
+          "handle": "samreedh",
+          "accessibility": "accessible",
+          "evidence": "profile_accessible",
+          "verification": "pending"
+        },
+        "instagram": {
+          "url": "https://instagram.com/samreedh",
+          "handle": "samreedh",
+          "accessibility": "accessible",
+          "evidence": "profile_accessible",
+          "verification": "pending"
+        },
+        "medium": {
+          "url": "https://medium.com/@samreedh",
+          "handle": "samreedh",
+          "accessibility": "login_gated",
+          "evidence": "username_only",
+          "verification": "not_performed"
+        }
+      },
+      "accessible_count": 5,
+      "login_gated_count": 1,
+      "evidence_signals": [
+        {
+          "signal": "username_consistency",
+          "strength": "high",
+          "detail": "Same handle 'samreedh' used across 6 platforms"
+        },
+        {
+          "signal": "cross_platform_presence",
+          "strength": "medium",
+          "detail": "Present on 6 platforms: instagram, twitter, reddit, x, github"
+        },
+        {
+          "signal": "name_handle_match",
+          "strength": "high",
+          "detail": "Username 'samreedh' matches queried name 'samreedh'"
+        }
+      ],
+      "confidence": 1.0,
+      "confidence_label": "high",
+      "face_evidence": null,
+      "face_verified": false,
+      "verification": "not_attempted",
+      "explanation": "Same handle 'samreedh' used across 6 platforms; Present on 6 platforms: instagram, twitter, reddit, x, github; Username 'samreedh' matches queried name 'samreedh'; 1 platform(s) are login-gated: content not verified",
+      "rank": 1
+    }
+  ],
+  "image_results": [],
+  "decision": {
+    "verdict": "discovery_only",
+    "explanation": "No reference image provided. Identity discovery completed without verification. Provide a trusted reference photo to perform face verification.",
+    "face_verification": null,
+    "verification_confidence": null,
+    "verification_note": "A trusted reference image is required for face verification. The reference must come from a known source (investigator-provided photo, already-verified identity, or other trusted source) \u2014 not from a discovered profile."
+  },
+  "uncertainty_notes": [],
+  "enhancements": {
+    "download_manager": null,
+    "identity_memory_hit": null,
+    "consensus_verification": null,
+    "session_info": {
+      "session_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_sessions",
+      "active_sessions": {
+        "web": {
+          "platform": "web",
+          "saved_at": 1783575993.7261481,
+          "cookie_count": 19,
+          "valid": true
+        }
+      }
+    },
+    "browser_controller_available": true,
+    "url_canonicalization": {
+      "canonicalized_count": 0
+    },
+    "identifier_discovery": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    },
+    "post_metadata": {
+      "count": 0
+    },
+    "organization_graph": {
+      "nodes": [],
+      "edges": [],
+      "stats": {
+        "persons": 0,
+        "organizations": 0,
+        "projects": 0,
+        "edges": 0
+      }
+    },
+    "geolocation": {
+      "locations": [],
+      "confidence": 0.0
+    },
+    "cross_verification": [
+      {
+        "iteration": 0,
+        "queries_run": 5,
+        "new_profiles_found": 5,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "samreedh"
+          ],
+          "usernames": {
+            "reddit": "samreedh",
+            "x": "samreedh",
+            "twitter": "samreedh",
+            "github": "samreedh",
+            "instagram": "samreedh"
+          },
+          "emails": []
+        }
+      },
+      {
+        "iteration": 1,
+        "queries_run": 5,
+        "new_profiles_found": 1,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "samreedh"
+          ],
+          "usernames": {
+            "reddit": "samreedh",
+            "x": "samreedh",
+            "twitter": "samreedh",
+            "github": "samreedh",
+            "instagram": "samreedh",
+            "medium": "samreedh"
+          },
+          "emails": []
+        }
+      },
+      {
+        "iteration": 2,
+        "queries_run": 5,
+        "new_profiles_found": 0,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "samreedh"
+          ],
+          "usernames": {
+            "reddit": "samreedh",
+            "x": "samreedh",
+            "twitter": "samreedh",
+            "github": "samreedh",
+            "instagram": "samreedh",
+            "medium": "samreedh"
+          },
+          "emails": []
+        }
+      }
+    ],
+    "cross_verification_profiles": [
+      {
+        "url": "https://reddit.com/user/samreedh",
+        "platform": "reddit",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/samreedh"
+      },
+      {
+        "url": "https://x.com/samreedh",
+        "platform": "x",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:x/samreedh"
+      },
+      {
+        "url": "https://twitter.com/samreedh",
+        "platform": "twitter",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:twitter/samreedh"
+      },
+      {
+        "url": "https://github.com/samreedh",
+        "platform": "github",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.85,
+        "query": "direct:github/samreedh"
+      },
+      {
+        "url": "https://instagram.com/samreedh",
+        "platform": "instagram",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/samreedh"
+      },
+      {
+        "url": "https://medium.com/@samreedh",
+        "platform": "medium",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.65,
+        "query": "direct:medium/samreedh"
+      }
+    ],
+    "evidence_iteration": {
+      "iterations": 0,
+      "converged": false,
+      "final_confidence": 0.0
+    }
+  },
+  "timing_ms": {
+    "0_authorization": 0.0,
+    "1_query_planning": 0.0,
+    "2_collection": 30168.023824691772,
+    "3_normalization": 0.0,
+    "7a_url_canonicalization": 0.0,
+    "7b_identifier_discovery": 0.0,
+    "7c_post_metadata": 0.0,
+    "8_organization_graph": 0.0,
+    "9_geolocation": 2.0139217376708984,
+    "10_cross_verification": 58974.72381591797,
+    "12_report": 0.0
+  },
+  "total_time_ms": 89144.76156234741
+}

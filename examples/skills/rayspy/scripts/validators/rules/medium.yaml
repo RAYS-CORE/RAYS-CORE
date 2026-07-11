@@ -1,0 +1,24 @@
+positive_indicators:
+  - "stories"
+  - "followers"
+  - "following"
+  - "articles"
+  - "profile image"
+  - "bio"
+  - "medium-profile"
+negative_indicators:
+  - "404"
+  - "page not found"
+  - "this page does not exist"
+suspended_indicators: []
+private_indicators: []
+login_indicators:
+  - "sign in"
+  - "log in"
+confidence_weights:
+  profile_image: 0.2
+  bio: 0.15
+  stories: 0.2
+  followers: 0.1
+  following: 0.05
+  negative_match: -0.5

@@ -1,0 +1,83 @@
+========================================================================
+  MARKKNOFFLER — EVIDENCE-DRIVEN OSINT INVESTIGATION
+  Pipeline: 3.2-registry
+  Pipeline run: 81.4s
+========================================================================
+
+EVIDENCE SUMMARY
+  Leads:              0
+  Candidates:         9
+  Browser Loaded:     0
+  Validated:          0
+  Rejected:           0
+  High Quality:       0
+  Identity Candidates:0
+  Verified:           0
+
+FACE VERIFICATION
+  Status: SKIPPED
+  Reference source: None
+  Face verified: False
+  Confidence: 0.0
+  No independent reference image provided. Face verification skipped.
+
+IDENTITY DISCOVERY
+  Status: completed
+  Platforms: medium, x, facebook, reddit, instagram, youtube, twitter, github
+  Cross-verification cycles: 2
+  Converged: False
+  Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.
+
+DECISION
+  Verdict: verification_skipped
+  Explanation: No independent reference image provided. Face verification skipped.
+  Face verification: SKIPPED
+  Verification confidence: None
+
+IDENTIFIERS EXTRACTED
+  No emails, phones, or names publicly exposed
+
+RELATIONSHIP / ORGANIZATION GRAPH
+  Nodes: 0
+  Edges: 0
+
+GEOLOCATION
+  Locations: []
+  Confidence: 0.0
+
+TIMING
+  4_image_collection: 36287.0ms
+  10_cross_verification: 24346.0ms
+  5_quality_validation: 11069.0ms
+  6_dedup: 6148.0ms
+  7_embedding: 2849.0ms
+  2_collection: 556.0ms
+  TOTAL: 81256.0ms
+
+========================================================================
+  APPENDIX A: SHERLOCK — 0 CANDIDATE USERNAMES
+  (Sherlock matches URL patterns only — does not verify accounts)
+========================================================================
+
+
+========================================================================
+  APPENDIX B: CROSS-REFERENCE — VALIDATED vs SHERLOCK
+========================================================================
+  Validated platforms: facebook, github, instagram, medium, reddit, twitter, x, youtube
+
+  Sherlock candidate usernames: 0
+  Total unique candidate URLs: 8
+
+========================================================================
+  LIMITATIONS & NOTES
+========================================================================
+  - Reference image was not independent (sourced from discovered platform).
+    Face verification was SKIPPED — no independent biometric comparison performed.
+  - DuckDuckGo blocked by corporate proxy — name search unavailable
+  - Sherlock generated 0 URL pattern matches;
+    these are candidate usernames, not verified accounts.
+  - No emails, phone numbers, or full names found in public sources
+
+========================================================================
+  END OF REPORT
+========================================================================

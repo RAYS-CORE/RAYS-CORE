@@ -1,0 +1,179 @@
+========================================================================
+  SAMREEDH — EVIDENCE-DRIVEN OSINT INVESTIGATION
+  Pipeline: 3.2-registry
+  Pipeline run: 142.7s
+========================================================================
+
+STAGE PROGRESSION
+  Leads:              67
+  ↓ Candidates:       72
+  ↓ Browser Loaded:   67
+  ↓ Validated:        16
+  ↓ Rejected:         51
+  ↓ With Names:       4
+  ↓ With Emails:      0
+  ↓ High Quality:     4
+  ↓ Identity Cand:    0
+  ↓ Verified:         0
+
+HARVESTED EVIDENCE (from profile HTML)
+  Display names: 093, Odysee, Samreedh on Duolingo, samreedh
+
+FACE VERIFICATION
+  Status: SKIPPED
+  Reference source: None
+  Face verified: False
+  Confidence: 0.0
+  No independent reference image provided. Face verification skipped.
+
+  Auto-selected reference (NOT independent verification):
+    Image: https://pbs.twimg.com/profile_images/2051730041827205120/kBsDNHUD_400x400.jpg
+    Source profile: https://x.com/samreedh (x)
+    No cross-platform corroboration found.
+
+IDENTITY DISCOVERY
+  Status: completed
+  Platforms: x, instagram, github, twitter, reddit
+  Cross-verification cycles: 2
+  Converged: False
+  Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.
+
+  Candidate #1: samreedh
+     Confidence: 0.05 (LOW)
+     Platforms: duolingo, odysee, xboxgamertag, mastodon
+     Face verification: SKIPPED
+     Evidence [WEAK] Same username across platforms (weight=0.05)
+
+DECISION
+  Verdict: verification_skipped
+  Explanation: No independent reference image provided. Face verification skipped.
+  Face verification: SKIPPED
+  Verification confidence: None
+
+IDENTIFIERS EXTRACTED
+  No emails, phones, or names publicly exposed
+
+RELATIONSHIP / ORGANIZATION GRAPH
+  Nodes: 0
+  Edges: 0
+
+GEOLOCATION
+  Locations: []
+  Confidence: 0.0
+
+TIMING
+  a2_browser_controller: 64910.0ms
+  4_image_collection: 37367.0ms
+  10_cross_verification: 16942.0ms
+  5_quality_validation: 13362.0ms
+  6_dedup: 5295.0ms
+  7_embedding: 2924.0ms
+  2_collection: 1107.0ms
+  a3_validator: 582.0ms
+  a3b_evidence_harvester: 50.0ms
+  TOTAL: 142540.0ms
+
+========================================================================
+  APPENDIX A: SHERLOCK — 67 CANDIDATE USERNAMES
+  (Sherlock matches URL patterns only — does not verify accounts)
+========================================================================
+
+  Dev & Code:
+    https://auth.geeksforgeeks.org/user/samreedh
+    https://codesandbox.io/u/samreedh
+    https://codolio.com/profile/samreedh
+    https://dmoj.ca/user/samreedh
+    https://hackenproof.com/hackers/samreedh
+    https://hackmd.io/@samreedh
+    https://hashnode.com/@samreedh
+    https://hosted.weblate.org/user/samreedh/
+    https://hubski.com/user/samreedh
+    https://huggingface.co/samreedh
+    https://patched.sh/User/samreedh
+    https://replit.com/@samreedh
+    https://tryhackme.com/p/samreedh
+    https://www.github.com/samreedh
+
+  Social:
+    https://discords.com/api-v2/bio/details/samreedh
+    https://forums.digitalspy.com/profile/samreedh
+    https://letterboxd.com/samreedh
+    https://mastodon.cloud/@samreedh
+    https://www.dailykos.com/user/samreedh
+    https://www.interpals.net/samreedh
+    https://www.lesswrong.com/users/samreedh
+    https://www.librarything.com/profile/samreedh
+    https://www.pinterest.com/samreedh/
+    https://www.reddit.com/user/samreedh
+    https://www.snapchat.com/add/samreedh
+
+  Gaming:
+    https://data.typeracer.com/pit/profile?user=samreedh
+    https://monkeytype.com/profile/samreedh
+    https://music.yandex/users/samreedh/playlists
+    https://nationstates.net/nation=samreedh
+    https://nationstates.net/region=samreedh
+    https://open.spotify.com/user/samreedh
+    https://www.chess.com/member/samreedh
+    https://www.realmeye.com/player/samreedh
+    https://xboxgamertag.com/search/samreedh
+
+  Forum:
+    http://forum.igromania.ru/member.php?username=samreedh
+    http://www.authorstream.com/samreedh/
+    https://forum.velomania.ru/member.php?username=samreedh
+    https://forums.pcgamer.com/members/?username=samreedh
+    https://lemmy.world/u/samreedh
+    https://php.ru/forum/members/?username=samreedh
+    https://programming.dev/u/samreedh
+    https://slashdot.org/~samreedh
+    https://www.baby.ru/u/samreedh
+    https://www.mercadolivre.com.br/perfil/samreedh
+    https://www.opennet.ru/~samreedh
+
+  Creative:
+    https://archive.org/details/@samreedh
+    https://cults3d.com/en/users/samreedh/creations
+    https://sketchfab.com/samreedh
+    https://slideshare.net/samreedh
+    https://www.furaffinity.net/user/samreedh
+    https://www.scribd.com/samreedh
+    https://www.shelf.im/samreedh
+    https://www.svidbook.ru/user/samreedh
+
+  Other:
+    https://allmylinks.com/samreedh
+    https://aniworld.to/user/profil/samreedh
+    https://breachsta.rs/profile/samreedh
+    https://codesnippets.fandom.com/wiki/User:samreedh
+    https://developer.apple.com/forums/profile/samreedh
+    https://discussions.apple.com/profile/samreedh
+    https://houzz.com/user/samreedh
+    https://odysee.com/@samreedh
+    https://splice.com/samreedh
+    https://t.me/samreedh
+    https://www.7cups.com/@samreedh
+    https://www.airliners.net/user/samreedh/profile/photos
+    https://www.duolingo.com/profile/samreedh
+    https://www.mydramalist.com/profile/samreedh
+
+
+========================================================================
+  APPENDIX B: CROSS-REFERENCE — VALIDATED vs SHERLOCK
+========================================================================
+  Validated platforms: github, instagram, reddit, twitter, x
+
+  Sherlock candidate usernames: 67
+  Total unique candidate URLs: 72
+
+========================================================================
+  LIMITATIONS & NOTES
+========================================================================
+  - DuckDuckGo blocked by corporate proxy — name search unavailable
+  - Sherlock generated 67 URL pattern matches;
+    these are candidate usernames, not verified accounts.
+  - No emails or phone numbers found in public sources
+
+========================================================================
+  END OF REPORT
+========================================================================

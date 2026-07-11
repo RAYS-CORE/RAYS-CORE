@@ -1,0 +1,28 @@
+positive_indicators:
+  - "member profile"
+  - "profile image"
+  - "headline"
+  - "experience"
+  - "education"
+  - "OpenToWork"
+  - "linkedin-profile"
+negative_indicators:
+  - "profile unavailable"
+  - "page not found"
+  - "this page does not exist"
+  - "not found"
+suspended_indicators: []
+private_indicators: []
+login_indicators:
+  - "join to view profile"
+  - "sign in to view profile"
+  - "sign in"
+  - "log in"
+  - "create a free account"
+confidence_weights:
+  profile_image: 0.2
+  headline: 0.15
+  experience: 0.2
+  education: 0.15
+  name: 0.1
+  negative_match: -0.5

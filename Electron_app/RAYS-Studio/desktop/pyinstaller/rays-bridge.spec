@@ -84,3 +84,42 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
+cli_entry = desktop_dir / "pyinstaller" / "cli_entry.py"
+
+a_cli = Analysis(
+    [str(cli_entry)],
+    pathex=pathex,
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+
+pyz_cli = PYZ(a_cli.pure)
+
+exe_cli = EXE(
+    pyz_cli,
+    a_cli.scripts,
+    a_cli.binaries,
+    a_cli.datas,
+    [],
+    name="rays",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)

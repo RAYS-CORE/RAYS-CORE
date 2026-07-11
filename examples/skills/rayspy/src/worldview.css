@@ -1,0 +1,13 @@
+html, body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  background: #0B0D14;
+}
+
+#worldview-app {
+  position: relative; width: 100vw; height: 100vh;
+}
+
+/* Cesium container — untouched, fills the background */
+#cesiumContainer {
+  position: absolute; inset: 0; overflow: hidden;
+}

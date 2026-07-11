@@ -1,0 +1,309 @@
+{
+  "pipeline_version": "3.2-registry",
+  "evidence_summary": {
+    "leads": 0,
+    "candidates": 9,
+    "browser_loaded": 0,
+    "validated": 0,
+    "rejected": 0,
+    "high_quality": 0,
+    "identity_candidates": 0,
+    "verified": 0
+  },
+  "verification_summary": {
+    "face_verification": "SKIPPED",
+    "reference_source": "None",
+    "face_verified": false,
+    "verification_confidence": 0.0,
+    "explanation": "No independent reference image provided. Face verification skipped."
+  },
+  "query_plan": {
+    "raw_input": "markknoffler",
+    "normalized_name": "Markknoffler",
+    "structure": "single",
+    "search_queries_generated": 2
+  },
+  "stages": {
+    "1_query_planner": {
+      "normalized_name": "Markknoffler",
+      "tokens": [
+        "markknoffler"
+      ],
+      "search_queries": [
+        "Markknoffler",
+        "\"Markknoffler\""
+      ]
+    },
+    "2_collection": {
+      "profiles_found": 9,
+      "platforms": [
+        "medium",
+        "x",
+        "facebook",
+        "reddit",
+        "instagram",
+        "youtube",
+        "twitter",
+        "github"
+      ]
+    },
+    "3_normalization": {
+      "unique_profiles": 9,
+      "duplicates_removed": 0
+    }
+  },
+  "identity_discovery": {
+    "status": "completed",
+    "search_leads": 0,
+    "candidate_urls": 9,
+    "validated_profiles": 0,
+    "rejected": 0,
+    "high_quality_profiles": 0,
+    "platforms": [
+      "medium",
+      "x",
+      "facebook",
+      "reddit",
+      "instagram",
+      "youtube",
+      "twitter",
+      "github"
+    ],
+    "cross_verification_cycles": 2,
+    "converged": false,
+    "convergence_message": "Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.",
+    "identity_candidates": [],
+    "identifiers_extracted": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    }
+  },
+  "identity_verification": {
+    "reference": null,
+    "reference_matches": [],
+    "face_verified": false,
+    "verification_status": "SKIPPED",
+    "reference_source": null,
+    "verification_confidence": 0.0,
+    "verification_explanation": "No independent reference image provided. Face verification skipped.",
+    "face_detected_in_profiles": 0,
+    "image_results": []
+  },
+  "reference": null,
+  "reference_matches": [],
+  "candidates": [],
+  "image_results": [],
+  "decision": {
+    "verdict": "verification_skipped",
+    "explanation": "No independent reference image provided. Face verification skipped.",
+    "face_verification": "SKIPPED",
+    "verification_confidence": null
+  },
+  "uncertainty_notes": [
+    "No identity cluster met the minimum confidence threshold."
+  ],
+  "enhancements": {
+    "download_manager": {
+      "cache_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_face_cache",
+      "cached_files": 0,
+      "cached_urls": 0,
+      "disk_usage_bytes": 0
+    },
+    "identity_memory_hit": null,
+    "consensus_verification": null,
+    "session_info": {
+      "session_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_sessions",
+      "active_sessions": {
+        "web": {
+          "platform": "web",
+          "saved_at": 1783575993.7261481,
+          "cookie_count": 19,
+          "valid": true
+        }
+      }
+    },
+    "browser_controller_available": true,
+    "url_canonicalization": {
+      "canonicalized_count": 0
+    },
+    "identifier_discovery": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    },
+    "post_metadata": {
+      "count": 0
+    },
+    "organization_graph": {
+      "nodes": [],
+      "edges": [],
+      "stats": {
+        "persons": 0,
+        "organizations": 0,
+        "projects": 0,
+        "edges": 0
+      }
+    },
+    "geolocation": {
+      "locations": [],
+      "confidence": 0.0
+    },
+    "cross_verification": [
+      {
+        "iteration": 0,
+        "queries_run": 5,
+        "new_profiles_found": 9,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "markknoffler"
+          ],
+          "usernames": {
+            "reddit": "markknoffler",
+            "x": "markknoffler",
+            "twitter": "markknoffler",
+            "github": "markknoffler",
+            "youtube": "markknoffler",
+            "medium": "markknoffler",
+            "instagram": "markknoffler",
+            "facebook": "markknoffler"
+          },
+          "emails": []
+        }
+      },
+      {
+        "iteration": 1,
+        "queries_run": 5,
+        "new_profiles_found": 0,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "markknoffler"
+          ],
+          "usernames": {
+            "reddit": "markknoffler",
+            "x": "markknoffler",
+            "twitter": "markknoffler",
+            "github": "markknoffler",
+            "youtube": "markknoffler",
+            "medium": "markknoffler",
+            "instagram": "markknoffler",
+            "facebook": "markknoffler"
+          },
+          "emails": []
+        }
+      }
+    ],
+    "cross_verification_profiles": [
+      {
+        "url": "https://reddit.com/user/markknoffler",
+        "platform": "reddit",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/markknoffler"
+      },
+      {
+        "url": "https://x.com/markknoffler",
+        "platform": "x",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:x/markknoffler"
+      },
+      {
+        "url": "https://twitter.com/markknoffler",
+        "platform": "twitter",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:twitter/markknoffler"
+      },
+      {
+        "url": "https://github.com/markknoffler",
+        "platform": "github",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.85,
+        "query": "direct:github/markknoffler"
+      },
+      {
+        "url": "https://youtube.com/@markknoffler",
+        "platform": "youtube",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.7,
+        "query": "direct:youtube/markknoffler"
+      },
+      {
+        "url": "https://youtube.com/markknoffler",
+        "platform": "youtube",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.7,
+        "query": "direct:youtube/markknoffler"
+      },
+      {
+        "url": "https://medium.com/@markknoffler",
+        "platform": "medium",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.65,
+        "query": "direct:medium/markknoffler"
+      },
+      {
+        "url": "https://instagram.com/markknoffler",
+        "platform": "instagram",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/markknoffler"
+      },
+      {
+        "url": "https://facebook.com/markknoffler",
+        "platform": "facebook",
+        "handle": "markknoffler",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:facebook/markknoffler"
+      }
+    ],
+    "evidence_iteration": {
+      "iterations": 2,
+      "converged": false,
+      "final_confidence": 0.0
+    },
+    "profile_validation": []
+  },
+  "timing_ms": {
+    "0_authorization": 0.0,
+    "1_query_planning": 0.0,
+    "2_collection": 556.4589500427246,
+    "a1_candidate_generator": 0.0,
+    "a2_browser_controller": 0.0,
+    "a3_validator": 0.0,
+    "a4_quality_scorer": 0.0,
+    "3_normalization": 0.0,
+    "7a_url_canonicalization": 0.0,
+    "7b_identifier_discovery": 0.0,
+    "7c_post_metadata": 0.0,
+    "8_organization_graph": 0.0,
+    "9_geolocation": 0.0,
+    "10_cross_verification": 24346.019506454468,
+    "4_image_collection": 36287.1515750885,
+    "5_quality_validation": 11068.801164627075,
+    "6_dedup": 6148.494482040405,
+    "7_embedding": 2848.733425140381,
+    "8_clustering": 0.0,
+    "13_evidence_iteration": 0.0,
+    "12_report": 0.0
+  },
+  "total_time_ms": 81255.65910339355
+}
