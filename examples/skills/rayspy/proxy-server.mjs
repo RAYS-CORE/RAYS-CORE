@@ -78,6 +78,17 @@ const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 const agent = PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
 
 const server = http.createServer((req, res) => {
+  // CORS Headers for all responses
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+  
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
   const url = new URL(req.url, 'http://localhost');
 
   // ── "run" tab bridge: dashboard <-> rays_investigate MCP tool ────────

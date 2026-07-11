@@ -16,7 +16,14 @@ pathex = [
     str(studio_root / "bridge" / "src"),
 ]
 
-datas = [(str(config_yaml), "rays_core")]
+rayspy_path = monorepo_root / "examples" / "skills" / "rayspy"
+node_path = monorepo_root / "node"
+
+datas = [
+    (str(config_yaml), "rays_core"),
+    (str(rayspy_path), "examples/skills/rayspy"),
+    (str(node_path), "node")
+]
 binaries = []
 hiddenimports = [
     "rays_core",

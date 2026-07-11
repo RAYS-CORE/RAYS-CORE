@@ -104,7 +104,7 @@ export class FlightLayer {
   }
 
   async _fetchOpenSky() {
-    const res = await fetch('/opensky/api/states/all');
+    const res = await fetch('http://localhost:5176/opensky/api/states/all');
     if (!res.ok) throw new Error(`OpenSky ${res.status}`);
     const json = await res.json();
     return this._parseStates(json.states || []);
