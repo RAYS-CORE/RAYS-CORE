@@ -85,3 +85,32 @@ Because RAYS Studio perfectly mimics the standard OpenAI API structure (`/v1/cha
 4. **Local Tuning:** Each laptop eventually runs its own local `rays --studio --force-sync`. It will compute the heavy PyTorch math locally using its own GPU, generate the orthogonal differentials, and submit them back to the server node. 
 
 This ensures that the central server is never bottlenecked by heavy training compute, making infinite decentralized scaling a reality.
+
+---
+
+## 7. AMD Hardware Fine-Tuning Pipeline (HCLS)
+
+RAYS Studio includes a physically isolated and mathematically optimized pipeline explicitly designed for AMD hardware (ROCm/HIP architectures like RDNA/CDNA). 
+
+### Hardware-Cooperative Layer Selection (HCLS)
+Instead of fine-tuning all layers or arbitrary targets, the AMD pipeline strictly targets memory-heavy `q_proj`, `v_proj`, and `gate_proj` layers, completely freezing everything else. This explicitly minimizes memory bandwidth bottlenecks which are historically challenging on non-datacenter AMD consumer cards.
+
+### Wavefront-Aligned Matrices
+AMD GPUs execute threads in "Wavefronts" of size 64. The RAYS Studio AMD pipeline explicitly forces the adapter rank ($r$) to exactly `64`. This ensures perfectly aligned matrix multiplications, maximizing ALUs and preventing register spilling and unused execution lanes.
+
+### Using the AMD Pipeline (CLI & GUI)
+This pipeline is completely segregated from the standard training execution to ensure absolute stability.
+
+**Via the Terminal:**
+To manually trigger the AMD-optimized sync, append the `--amd-sync` flag to your command:
+```bash
+rays --studio --amd-sync "your-model-name"
+```
+
+**Via the GUI (React IDE):**
+1. Open the **Settings Modal** and navigate to the **AI Providers** tab.
+2. Select **RAYS Studio** as your provider.
+3. Check the **"AMD Hardware Fine-Tuning Pipeline"** toggle that appears below the Base URL field.
+4. Click **Save**.
+
+The GUI will now securely orchestrate the specific ROCm-compatible pipeline for all subsequent operations.

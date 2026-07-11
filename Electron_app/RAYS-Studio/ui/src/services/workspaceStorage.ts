@@ -55,6 +55,7 @@ export function loadProviderSettings(): StoredProviderSettings {
       model: parsed.model ?? defaultProvider.model,
       apiKey: parsed.apiKey ?? "",
       baseUrl: parsed.baseUrl ?? "",
+      isAmdMode: parsed.isAmdMode ?? false,
     };
   } catch {
     return { ...defaultProvider };

@@ -750,11 +750,17 @@ def main():
         default=None,
         help="Run local Execution-State Graph FOGR fine-tuning on the specified model"
     )
+    parser.add_argument(
+        "--amd-sync",
+        type=str,
+        default=None,
+        help="Run mathematically segregated ROCm-optimized Wavefront fine-tuning specifically for AMD GPUs"
+    )
     
     args = parser.parse_args()
 
     # RAYS Studio Execution Path
-    if args.studio or args.pull or args.host or args.core or args.start or args.finetune:
+    if args.studio or args.pull or args.host or args.core or args.start or args.finetune or args.amd_sync:
         try:
             import rays_studio.daemon as daemon
             from rays_studio.tui import RAYSStudioTUI
@@ -852,6 +858,31 @@ def main():
             
             out_file = engine.finetune_local(args.finetune, safetensors_path, vram_gb)
             print(f"Finetuning completed successfully. Output adapter: {out_file}")
+            
+            from rays_studio.llama_cpp_manager import manager as llama_manager
+            import os
+            if out_file and os.path.exists(out_file):
+                llama_manager.hot_swap_model(out_file)
+            
+            sys.exit(0)
+
+        if args.amd_sync:
+            print(f"=== Starting AMD Hardware-Optimized Fine-Tuning for '{args.amd_sync}' ===")
+            import torch
+            from rays_studio.finetuning_math import FinetuningEngine
+            
+            # Detect Local VRAM (hardcapped for safety)
+            vram_gb = 8.0
+            if torch.cuda.is_available():
+                vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            elif torch.backends.mps.is_available():
+                vram_gb = 8.0 # Force 8GB for Apple Silicon local tests
+                
+            engine = FinetuningEngine()
+            safetensors_path = f"~/.rays/models/{args.amd_sync}" # Mock path if not provided
+            
+            out_file = engine.finetune_amd_optimized(args.amd_sync, safetensors_path, vram_gb)
+            print(f"AMD Hardware-Optimized Finetuning completed successfully. Output adapter: {out_file}")
             
             from rays_studio.llama_cpp_manager import manager as llama_manager
             import os

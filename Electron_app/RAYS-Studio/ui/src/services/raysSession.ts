@@ -39,6 +39,7 @@ export type ProviderConfig = {
   model: string;
   apiKey?: string;
   baseUrl?: string;
+  isAmdMode?: boolean;
 };
 export type PromptMode = "agent" | "code" | "chat";
 export type ApprovalRequest = { id: string; message: string };

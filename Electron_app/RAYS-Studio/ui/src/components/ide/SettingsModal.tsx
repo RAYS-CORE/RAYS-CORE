@@ -28,6 +28,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [model, setModel] = useState("qwen3-coder:30b");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("http://localhost:8001/v1");
+  const [isAmdMode, setIsAmdMode] = useState(false);
   const [savedHint, setSavedHint] = useState<string | null>(null);
   const [mcpConfig, setMcpConfig] = useState(`{
   "servers": [],
@@ -46,13 +47,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setModel(s.model);
     setApiKey(s.apiKey || "");
     setBaseUrl(s.baseUrl || "http://localhost:8001/v1");
+    setIsAmdMode(s.isAmdMode || false);
     setAppearance(loadAppearanceSettings());
     setSavedHint(null);
     setExtensionStatus(null);
   }, [open]);
 
   const persistProvider = () => {
-    saveProviderSettings({ provider, model: model.trim(), apiKey: apiKey.trim(), baseUrl: baseUrl.trim() });
+    saveProviderSettings({ provider, model: model.trim(), apiKey: apiKey.trim(), baseUrl: baseUrl.trim(), isAmdMode });
     setSavedHint("Saved. Applies the next time you open a workspace.");
   };
 
@@ -161,6 +163,20 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                         placeholder="http://localhost:8001/v1"
                         className="w-full bg-secondary rounded-md px-3 py-2 text-ui text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
                       />
+                    </div>
+                  )}
+                  {provider === "rays_studio" && (
+                    <div className="flex items-center space-x-2 mt-2">
+                      <input
+                        type="checkbox"
+                        id="amdModeToggle"
+                        checked={isAmdMode}
+                        onChange={(e) => setIsAmdMode(e.target.checked)}
+                        className="w-4 h-4 text-rays-pink rounded focus:ring-rays-pink bg-secondary border-none"
+                      />
+                      <label htmlFor="amdModeToggle" className="text-ui font-medium text-foreground/80 cursor-pointer">
+                        AMD Hardware Fine-Tuning Pipeline
+                      </label>
                     </div>
                   )}
                   <button
