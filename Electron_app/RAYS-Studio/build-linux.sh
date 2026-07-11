@@ -7,7 +7,7 @@ echo "{\"epoch\":\"$EPOCH\"}" > "$ROOT/desktop/electron/install-epoch.json"
 echo "==> Install epoch for this build: $EPOCH"
 cd "$ROOT/ui" && npm ci && npm run build
 cd "$ROOT/desktop"
-npm ci
+npm install
 chmod +x scripts/bundle-backend.sh
 npm run dist:linux
 echo "Linux artifacts under: $ROOT/desktop/release"

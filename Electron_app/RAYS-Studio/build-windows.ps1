@@ -9,7 +9,7 @@ npm ci
 npm run build
 Pop-Location
 Push-Location (Join-Path $Root "desktop")
-npm ci
+npm install
 npm run dist:win
 Pop-Location
 Write-Host "Windows artifacts under: $Root\desktop\release"
