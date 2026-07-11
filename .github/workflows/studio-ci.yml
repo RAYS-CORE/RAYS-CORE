@@ -61,7 +61,7 @@ jobs:
   build-linux-smoke:
     needs: studio-tests
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
             build_script: ./build-dmg.sh
             verify_platform: mac
           - id: ubuntu
-            runs-on: ubuntu-latest
+            runs-on: ubuntu-22.04
             build_script: ./build-linux.sh
             verify_platform: linux
             apt: true
