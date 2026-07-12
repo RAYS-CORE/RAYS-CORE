@@ -6,7 +6,7 @@ export default function SpyLayout() {
 
   useEffect(() => {
     // Check if the Spy proxy-server is running
-    fetch("http://localhost:5174/rayspy/")
+    fetch("http://localhost:5173/rayspy/")
       .then(res => {
         if (res.ok) {
           setServerStatus("online");
@@ -27,7 +27,7 @@ export default function SpyLayout() {
       <div className="flex-1 overflow-hidden relative bg-black">
         {serverStatus === "online" ? (
           <iframe 
-            src="http://localhost:5174/rayspy/" 
+            src="http://localhost:5173/rayspy/" 
             className="w-full h-full border-none"
             title="RAYS Spy OSINT"
           />
