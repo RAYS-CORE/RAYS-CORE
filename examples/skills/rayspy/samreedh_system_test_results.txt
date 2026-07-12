@@ -1,0 +1,187 @@
+﻿=== RAYSpy Full System Test: samreedh ===
+Started: 2026-07-10 07:01:13
+==============================================
+
+Loaded 67 Sherlock leads
+[STAGE:A3]  VALIDATED:17  REJECTED:50  ERROR:33
+[STAGE:A3b]  With names:4  With emails:0
+[STAGE:A4]  VALIDATED:17  HIGH_QUALITY(>=30):17  AVG_QUALITY:60.2
+Pipeline: 127.6s
+========================================================================
+  SAMREEDH ΓÇö EVIDENCE-DRIVEN OSINT INVESTIGATION
+  Pipeline: 3.2-registry
+  Pipeline run: 127.6s
+========================================================================
+
+STAGE PROGRESSION
+  Leads:              67
+  Γåô Candidates:       86
+  Γåô Browser Loaded:   67
+  Γåô Validated:        17
+  Γåô Rejected:         50
+  Γåô With Names:       4
+  Γåô With Emails:      0
+  Γåô High Quality:     17
+  Γåô Identity Cand:    0
+  Γåô Verified:         0
+
+HARVESTED EVIDENCE (from profile HTML)
+  Display names: 093, Odysee, Samreedh on Duolingo, samreedh
+  Phones:        0221766324, 0863483811946, 1347428098760, 1394391724128, 1440502568, 1673146449633, 174829003346, 1781791509496, 1783647087, 2345364366093, 3542710689, 6637262090
+  Websites:      http://ogp.me/, https://703a51e0a136.99d63751.ap-south-1.token.awswaf.com/703a51e0a136/976a812b70d0/2164eeb6cb12/challenge.js, https://7b75e59b764e.7baf2858.ap-northeast-1.token.awswaf.com/7b75e59b764e/d5e381ecd18a/72acb57e8a53/challenge.js, https://bsky.app/profile/celphase.bsky.social, https://cdn.cookielaw.org/scripttemplates/otSDKStub.js, https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js, https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js, https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js, https://cdn.thumbs.odycdn.com/a0221766324b36b0835ad4f90e4d380c.webp, https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css, https://chivalrouscord.com/bundles/7c30141c687fcdc0a0f99a8c183b93a5fb909d.min.js, https://d35aaqx5ub95lt.cloudfront.net/css/9951-1d0dddb6.css, https://d35aaqx5ub95lt.cloudfront.net/css/app-5ff812a8.css, https://d35aaqx5ub95lt.cloudfront.net/favicon.ico, https://d35aaqx5ub95lt.cloudfront.net/js/8553-a0eeda7a.js, https://d35aaqx5ub95lt.cloudfront.net/js/9819-fda8f6f7.js, https://d35aaqx5ub95lt.cloudfront.net/js/9951-b0cdd266.js, https://d35aaqx5ub95lt.cloudfront.net/js/app-968c2bd1.js, https://d35aaqx5ub95lt.cloudfront.net/js/features-91ec4487.js, https://d35aaqx5ub95lt.cloudfront.net/js/manifest-25439f01.js, https://d35aaqx5ub95lt.cloudfront.net/js/polyfills-4de5bd64.js, https://d35aaqx5ub95lt.cloudfront.net/js/strings/en-e62e1c86.js, https://daily-mix.scdn.co, https://dev.twitter.com/docs/cards/large-image-summary-card, https://github.com/TecharoHQ/anubis, https://i.scdn.co, https://images-eds-ssl.xboxlive.com/image?url=8Oaj9Ryq1G1_p3lLnXlsaZgGzAie6Mnu24_PawYuDYIoH77pJ.X5Z.MqQPibUVTcS9jr0n8i7LY1tL3U7AiafZI67bL033O71pPM4AtyD6ebIhfQncLv4iilMgd.xuuP&amp;format=png&maxage=1d&output=webp&w=90&h=90, https://lineup-images.scdn.co, https://mosaic.scdn.co, https://pl.scdn.co, https://smartcaptcha.yandexcloud.net/captcha.js, https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496, https://techaro.lol, https://vip2.loli.io/2023/10/03/McOTYLwVylqI6HW.png, https://www.datadoghq-browser-agent.com/us1/v6/datadog-rum.js, https://www.dwin2.com/pub.2009513.min.js, https://www.facebook.com/pages/Xbox-Gamertag/134742809876061, https://www.google.com/recaptcha/api.js, https://www.google.com/recaptcha/enterprise.js?render=6LfCVLAUAAAAALFwwRnnCJ12DalriUGbj8FW_J39, https://www.googletagmanager.com/gtag/js?id=G-BB8DNPB73F, https://www.googletagmanager.com/gtag/js?id=G-C7CSH9P8T1, https://www.googletagmanager.com/gtm.js?id=, https://www.googletagmanager.com/ns.html?id=GTM-KPZDTH8, https://www.googletagmanager.com/ns.html?id=GTM-TX6Z97C, https://www.googletagmanager.com/ns.html?id=GTM-WZW2M6Z, https://www.recaptcha.net/recaptcha/enterprise.js?render=6LcLOdsjAAAAAFfwGusLLnnn492SOGhsCh-uEAvI
+
+FACE VERIFICATION
+  Status: SKIPPED
+  Reference source: None
+  Face verified: False
+  Confidence: 0.0
+  No independent reference image provided. Face verification skipped.
+
+IDENTITY DISCOVERY
+  Status: completed
+  Platforms: github, x, medium, twitter, youtube, reddit, instagram
+  Cross-verification cycles: 3
+  Converged: False
+  Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.
+
+  Candidate #1: samreedh
+     Confidence: 0.05 (LOW)
+     Platforms: 7cups, airliners, archive, duolingo, hackmd, houzz, hubski, odysee, realmeye, splice, spotify, weblate, xboxgamertag, authorstream, igromania, mastodon, opennet
+     Face verification: SKIPPED
+     Evidence [WEAK] Same username across platforms (weight=0.05)
+
+DECISION
+  Verdict: verification_skipped
+  Explanation: No independent reference image provided. Face verification skipped.
+  Face verification: SKIPPED
+  Verification confidence: None
+
+IDENTIFIERS EXTRACTED
+  No emails, phones, or names publicly exposed
+
+RELATIONSHIP / ORGANIZATION GRAPH
+  Nodes: 0
+  Edges: 0
+
+GEOLOCATION
+  Locations: []
+  Confidence: 0.0
+
+TIMING
+  a2_browser_controller: 79985.0ms
+  10_cross_verification: 38762.0ms
+  2_collection: 2175.0ms
+  a3_validator: 723.0ms
+  a3b_evidence_harvester: 26.0ms
+  TOTAL: 121672.0ms
+
+========================================================================
+  APPENDIX A: SHERLOCK ΓÇö 67 CANDIDATE USERNAMES
+  (Sherlock matches URL patterns only ΓÇö does not verify accounts)
+========================================================================
+
+  Dev & Code:
+    https://auth.geeksforgeeks.org/user/samreedh
+    https://codesandbox.io/u/samreedh
+    https://codolio.com/profile/samreedh
+    https://dmoj.ca/user/samreedh
+    https://hackenproof.com/hackers/samreedh
+    https://hackmd.io/@samreedh
+    https://hashnode.com/@samreedh
+    https://hosted.weblate.org/user/samreedh/
+    https://hubski.com/user/samreedh
+    https://huggingface.co/samreedh
+    https://patched.sh/User/samreedh
+    https://replit.com/@samreedh
+    https://tryhackme.com/p/samreedh
+    https://www.github.com/samreedh
+
+  Social:
+    https://discords.com/api-v2/bio/details/samreedh
+    https://forums.digitalspy.com/profile/samreedh
+    https://letterboxd.com/samreedh
+    https://mastodon.cloud/@samreedh
+    https://www.dailykos.com/user/samreedh
+    https://www.interpals.net/samreedh
+    https://www.lesswrong.com/users/samreedh
+    https://www.librarything.com/profile/samreedh
+    https://www.pinterest.com/samreedh/
+    https://www.reddit.com/user/samreedh
+    https://www.snapchat.com/add/samreedh
+
+  Gaming:
+    https://data.typeracer.com/pit/profile?user=samreedh
+    https://monkeytype.com/profile/samreedh
+    https://music.yandex/users/samreedh/playlists
+    https://nationstates.net/nation=samreedh
+    https://nationstates.net/region=samreedh
+    https://open.spotify.com/user/samreedh
+    https://www.chess.com/member/samreedh
+    https://www.realmeye.com/player/samreedh
+    https://xboxgamertag.com/search/samreedh
+
+  Forum:
+    http://forum.igromania.ru/member.php?username=samreedh
+    http://www.authorstream.com/samreedh/
+    https://forum.velomania.ru/member.php?username=samreedh
+    https://forums.pcgamer.com/members/?username=samreedh
+    https://lemmy.world/u/samreedh
+    https://php.ru/forum/members/?username=samreedh
+    https://programming.dev/u/samreedh
+    https://slashdot.org/~samreedh
+    https://www.baby.ru/u/samreedh
+    https://www.mercadolivre.com.br/perfil/samreedh
+    https://www.opennet.ru/~samreedh
+
+  Creative:
+    https://archive.org/details/@samreedh
+    https://cults3d.com/en/users/samreedh/creations
+    https://sketchfab.com/samreedh
+    https://slideshare.net/samreedh
+    https://www.furaffinity.net/user/samreedh
+    https://www.scribd.com/samreedh
+    https://www.shelf.im/samreedh
+    https://www.svidbook.ru/user/samreedh
+
+  Other:
+    https://allmylinks.com/samreedh
+    https://aniworld.to/user/profil/samreedh
+    https://breachsta.rs/profile/samreedh
+    https://codesnippets.fandom.com/wiki/User:samreedh
+    https://developer.apple.com/forums/profile/samreedh
+    https://discussions.apple.com/profile/samreedh
+    https://houzz.com/user/samreedh
+    https://odysee.com/@samreedh
+    https://splice.com/samreedh
+    https://t.me/samreedh
+    https://www.7cups.com/@samreedh
+    https://www.airliners.net/user/samreedh/profile/photos
+    https://www.duolingo.com/profile/samreedh
+    https://www.mydramalist.com/profile/samreedh
+
+
+========================================================================
+  APPENDIX B: CROSS-REFERENCE ΓÇö VALIDATED vs SHERLOCK
+========================================================================
+  Validated platforms: github, instagram, medium, reddit, twitter, x, youtube
+
+  Sherlock candidate usernames: 67
+  Total unique candidate URLs: 74
+
+========================================================================
+  LIMITATIONS & NOTES
+========================================================================
+  - DuckDuckGo blocked by corporate proxy ΓÇö name search unavailable
+  - Sherlock generated 67 URL pattern matches;
+    these are candidate usernames, not verified accounts.
+
+========================================================================
+  END OF REPORT
+========================================================================
+
+Saved: samreedh_investigation_raw.json
+Saved: samreedh_investigation_report.txt
+
+==============================================
+Completed: 2026-07-10 07:03:33
+==============================================

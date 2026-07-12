@@ -1,0 +1,414 @@
+{
+  "pipeline_version": "3.2-registry",
+  "evidence_summary": {
+    "leads": 0,
+    "candidates": 16,
+    "browser_loaded": 0,
+    "validated": 0,
+    "rejected": 0,
+    "high_quality": 0,
+    "harvested_with_names": 0,
+    "harvested_with_emails": 0,
+    "identity_candidates": 0,
+    "verified": 0
+  },
+  "verification_summary": {
+    "face_verification": "SKIPPED",
+    "reference_source": "None",
+    "face_verified": false,
+    "verification_confidence": 0.0,
+    "explanation": "No independent reference image provided. Face verification skipped.",
+    "auto_selected_reference": {
+      "image_url": "https://scontent.cdninstagram.com/v/t51.2885-19/19121211_251212088616270_3985661382182830080_a.jpg?stp=dst-jpg_s100x100_tt6&_nc_cat=102&ccb=7-5&_nc_sid=bf7eb4&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4zMzguQzMifQ%3D%3D&_nc_ohc=vDirrXro1o4Q7kNvwFUv8M9&_nc_oc=AdoX7Q0MF_XQ2FOGMTMt0ygL5EqDXfjtxCrM5ifoUI0CgojMd4QjVl-M006RXKzR40du5UJ8-CgWTBAw2jutZ_u3&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_ss=78689&oh=00_AQDYKlPCdD07rISBO6zEp9oKpJWIFFj7otQh6xFo64vcWw&oe=6A56AA9E",
+      "profile_url": "https://instagram.com/swamantak",
+      "platform": "instagram",
+      "image_type": "profile_photo",
+      "selection_basis": "best_ranked_profile_photo_among_discovered_candidates",
+      "note": "Auto-selected from discovered candidate photos. This is NOT independent verification \u2014 it only reports whether OTHER, independently-sourced candidate photos corroborate this one."
+    },
+    "auto_reference_matches": []
+  },
+  "query_plan": {
+    "raw_input": "swamantak roy",
+    "normalized_name": "Swamantak Roy",
+    "structure": "first_last",
+    "search_queries_generated": 4
+  },
+  "stages": {
+    "1_query_planner": {
+      "normalized_name": "Swamantak Roy",
+      "tokens": [
+        "swamantak",
+        "roy"
+      ],
+      "search_queries": [
+        "Swamantak Roy",
+        "\"Swamantak Roy\"",
+        "swamantak roy",
+        "\"swamantak\" \"roy\""
+      ]
+    },
+    "2_collection": {
+      "profiles_found": 16,
+      "platforms": [
+        "instagram",
+        "youtube",
+        "medium",
+        "github",
+        "reddit",
+        "x",
+        "twitter"
+      ]
+    },
+    "3_normalization": {
+      "unique_profiles": 16,
+      "duplicates_removed": 0
+    }
+  },
+  "identity_discovery": {
+    "status": "completed",
+    "search_leads": 0,
+    "candidate_urls": 16,
+    "validated_profiles": 0,
+    "rejected": 0,
+    "high_quality_profiles": 0,
+    "platforms": [
+      "instagram",
+      "youtube",
+      "medium",
+      "github",
+      "reddit",
+      "x",
+      "twitter"
+    ],
+    "cross_verification_cycles": 2,
+    "converged": false,
+    "convergence_message": "Cross-verification may not have converged. Additional search strategies might yield more results with different network conditions.",
+    "identity_candidates": [],
+    "identifiers_extracted": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    },
+    "harvested_evidence": {
+      "display_names": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "organizations": []
+    }
+  },
+  "identity_verification": {
+    "reference": null,
+    "reference_matches": [],
+    "face_verified": false,
+    "verification_status": "SKIPPED",
+    "reference_source": null,
+    "verification_confidence": 0.0,
+    "verification_explanation": "No independent reference image provided. Face verification skipped.",
+    "face_detected_in_profiles": 1,
+    "image_results": [
+      {
+        "id": "img_95466639",
+        "image_url": "https://scontent.cdninstagram.com/v/t51.2885-19/19121211_251212088616270_3985661382182830080_a.jpg?stp=dst-jpg_s100x100_tt6&_nc_cat=102&ccb=7-5&_nc_sid=bf7eb4&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4zMzguQzMifQ%3D%3D&_nc_ohc=vDirrXro1o4Q7kNvwFUv8M9&_nc_oc=AdoX7Q0MF_XQ2FOGMTMt0ygL5EqDXfjtxCrM5ifoUI0CgojMd4QjVl-M006RXKzR40du5UJ8-CgWTBAw2jutZ_u3&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_ss=78689&oh=00_AQDYKlPCdD07rISBO6zEp9oKpJWIFFj7otQh6xFo64vcWw&oe=6A56AA9E",
+        "platform": "instagram",
+        "profile_url": "https://instagram.com/swamantak",
+        "accepted": true,
+        "rejection_reason": null,
+        "face_detected": true,
+        "face_count": 1
+      }
+    ],
+    "auto_selected_reference": {
+      "image_url": "https://scontent.cdninstagram.com/v/t51.2885-19/19121211_251212088616270_3985661382182830080_a.jpg?stp=dst-jpg_s100x100_tt6&_nc_cat=102&ccb=7-5&_nc_sid=bf7eb4&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4zMzguQzMifQ%3D%3D&_nc_ohc=vDirrXro1o4Q7kNvwFUv8M9&_nc_oc=AdoX7Q0MF_XQ2FOGMTMt0ygL5EqDXfjtxCrM5ifoUI0CgojMd4QjVl-M006RXKzR40du5UJ8-CgWTBAw2jutZ_u3&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_ss=78689&oh=00_AQDYKlPCdD07rISBO6zEp9oKpJWIFFj7otQh6xFo64vcWw&oe=6A56AA9E",
+      "profile_url": "https://instagram.com/swamantak",
+      "platform": "instagram",
+      "image_type": "profile_photo",
+      "selection_basis": "best_ranked_profile_photo_among_discovered_candidates",
+      "note": "Auto-selected from discovered candidate photos. This is NOT independent verification \u2014 it only reports whether OTHER, independently-sourced candidate photos corroborate this one."
+    },
+    "auto_reference_matches": []
+  },
+  "reference": null,
+  "reference_matches": [],
+  "candidates": [],
+  "image_results": [
+    {
+      "id": "img_95466639",
+      "image_url": "https://scontent.cdninstagram.com/v/t51.2885-19/19121211_251212088616270_3985661382182830080_a.jpg?stp=dst-jpg_s100x100_tt6&_nc_cat=102&ccb=7-5&_nc_sid=bf7eb4&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4zMzguQzMifQ%3D%3D&_nc_ohc=vDirrXro1o4Q7kNvwFUv8M9&_nc_oc=AdoX7Q0MF_XQ2FOGMTMt0ygL5EqDXfjtxCrM5ifoUI0CgojMd4QjVl-M006RXKzR40du5UJ8-CgWTBAw2jutZ_u3&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_ss=78689&oh=00_AQDYKlPCdD07rISBO6zEp9oKpJWIFFj7otQh6xFo64vcWw&oe=6A56AA9E",
+      "platform": "instagram",
+      "profile_url": "https://instagram.com/swamantak",
+      "accepted": true,
+      "rejection_reason": null,
+      "face_detected": true,
+      "face_count": 1
+    }
+  ],
+  "decision": {
+    "verdict": "verification_skipped",
+    "explanation": "No independent reference image provided. Face verification skipped.",
+    "face_verification": "SKIPPED",
+    "verification_confidence": null
+  },
+  "uncertainty_notes": [
+    "Confidence is above minimum but below dominant threshold."
+  ],
+  "enhancements": {
+    "download_manager": {
+      "cache_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_face_cache",
+      "cached_files": 0,
+      "cached_urls": 0,
+      "disk_usage_bytes": 0
+    },
+    "identity_memory_hit": null,
+    "consensus_verification": null,
+    "session_info": {
+      "session_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_sessions",
+      "active_sessions": {
+        "web": {
+          "platform": "web",
+          "saved_at": 1783575993.7261481,
+          "cookie_count": 19,
+          "valid": true
+        }
+      }
+    },
+    "browser_controller_available": true,
+    "url_canonicalization": {
+      "canonicalized_count": 0
+    },
+    "identifier_discovery": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": [],
+      "full_names": []
+    },
+    "post_metadata": {
+      "count": 0
+    },
+    "organization_graph": {
+      "nodes": [],
+      "edges": [],
+      "stats": {
+        "persons": 0,
+        "organizations": 0,
+        "projects": 0,
+        "edges": 0
+      }
+    },
+    "geolocation": {
+      "locations": [],
+      "confidence": 0.0
+    },
+    "cross_verification": [
+      {
+        "iteration": 0,
+        "queries_run": 5,
+        "new_profiles_found": 16,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "swamantak roy"
+          ],
+          "usernames": {
+            "github": "swamantak",
+            "instagram": "swamantak",
+            "x": "swamantakroy",
+            "twitter": "swamantak",
+            "medium": "swamantakr",
+            "youtube": "swamantak",
+            "reddit": "swamantakroy"
+          },
+          "emails": []
+        }
+      },
+      {
+        "iteration": 1,
+        "queries_run": 5,
+        "new_profiles_found": 0,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "swamantak roy"
+          ],
+          "usernames": {
+            "github": "swamantak",
+            "instagram": "swamantak",
+            "x": "swamantakroy",
+            "twitter": "swamantak",
+            "medium": "swamantakr",
+            "youtube": "swamantak",
+            "reddit": "swamantakroy"
+          },
+          "emails": []
+        }
+      }
+    ],
+    "cross_verification_profiles": [
+      {
+        "url": "https://github.com/swamantak",
+        "platform": "github",
+        "handle": "swamantak",
+        "source": "direct_probe",
+        "reliability": 0.85,
+        "query": "direct:github/swamantak"
+      },
+      {
+        "url": "https://github.com/swamantakroy",
+        "platform": "github",
+        "handle": "swamantakroy",
+        "source": "direct_probe",
+        "reliability": 0.85,
+        "query": "direct:github/swamantakroy"
+      },
+      {
+        "url": "https://instagram.com/swamantak",
+        "platform": "instagram",
+        "handle": "swamantak",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/swamantak"
+      },
+      {
+        "url": "https://instagram.com/swamantakr",
+        "platform": "instagram",
+        "handle": "swamantakr",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/swamantakr"
+      },
+      {
+        "url": "https://instagram.com/swamantak.roy",
+        "platform": "instagram",
+        "handle": "swamantak.roy",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/swamantak.roy"
+      },
+      {
+        "url": "https://instagram.com/swamantakroy",
+        "platform": "instagram",
+        "handle": "swamantakroy",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/swamantakroy"
+      },
+      {
+        "url": "https://x.com/swamantakroy",
+        "platform": "x",
+        "handle": "swamantakroy",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:x/swamantakroy"
+      },
+      {
+        "url": "https://x.com/swamantak",
+        "platform": "x",
+        "handle": "swamantak",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:x/swamantak"
+      },
+      {
+        "url": "https://twitter.com/swamantak",
+        "platform": "twitter",
+        "handle": "swamantak",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:twitter/swamantak"
+      },
+      {
+        "url": "https://twitter.com/swamantakroy",
+        "platform": "twitter",
+        "handle": "swamantakroy",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:twitter/swamantakroy"
+      },
+      {
+        "url": "https://medium.com/@swamantakr",
+        "platform": "medium",
+        "handle": "swamantakr",
+        "source": "direct_probe",
+        "reliability": 0.65,
+        "query": "direct:medium/swamantakr"
+      },
+      {
+        "url": "https://youtube.com/@swamantak",
+        "platform": "youtube",
+        "handle": "swamantak",
+        "source": "direct_probe",
+        "reliability": 0.7,
+        "query": "direct:youtube/swamantak"
+      },
+      {
+        "url": "https://reddit.com/user/swamantakroy",
+        "platform": "reddit",
+        "handle": "swamantakroy",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/swamantakroy"
+      },
+      {
+        "url": "https://reddit.com/user/swamantakr",
+        "platform": "reddit",
+        "handle": "swamantakr",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/swamantakr"
+      },
+      {
+        "url": "https://reddit.com/user/swamantak",
+        "platform": "reddit",
+        "handle": "swamantak",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/swamantak"
+      },
+      {
+        "url": "https://reddit.com/user/swamantak.roy",
+        "platform": "reddit",
+        "handle": "swamantak.roy",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/swamantak.roy"
+      }
+    ],
+    "evidence_iteration": {
+      "iterations": 2,
+      "converged": false,
+      "final_confidence": 0.0
+    },
+    "profile_validation": []
+  },
+  "timing_ms": {
+    "0_authorization": 0.0,
+    "1_query_planning": 2.4030208587646484,
+    "2_collection": 950.2882957458496,
+    "a1_candidate_generator": 0.0,
+    "a2_browser_controller": 0.0,
+    "a3_validator": 0.0,
+    "a3b_evidence_harvester": 0.0,
+    "a4_quality_scorer": 0.0,
+    "3_normalization": 0.0,
+    "7a_url_canonicalization": 0.0,
+    "7b_identifier_discovery": 0.0,
+    "7c_post_metadata": 0.0,
+    "8_organization_graph": 0.0,
+    "9_geolocation": 2.8188228607177734,
+    "10_cross_verification": 30015.557289123535,
+    "4_image_collection": 94458.39047431946,
+    "5_quality_validation": 11964.684247970581,
+    "6_dedup": 4238.433122634888,
+    "7_embedding": 3698.298692703247,
+    "8_clustering": 0.0,
+    "13_evidence_iteration": 2.0074844360351562,
+    "12_report": 0.0
+  },
+  "total_time_ms": 145332.88145065308
+}

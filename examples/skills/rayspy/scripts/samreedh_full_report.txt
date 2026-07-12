@@ -1,0 +1,65 @@
+========================================================================
+  SAMREEDH — FULL OSINT REPORT (Twitter profile pic reference)
+  Pipeline: 3.1-23-improvements
+  Reference: https://pbs.twimg.com/profile_images/2051730041827205120/kBsDNHUD.jpg
+  Total time: 94.2s
+========================================================================
+
+Stage 2 — Profile Discovery
+  Profiles found: 6
+  Platforms: x, instagram, reddit, medium, twitter, github
+
+Reference image processing:
+  Face detected: True
+  Gender: Male
+  Age group: 30
+  Confidence: 0
+
+Face detection & matching:
+  Images queued: 0
+  Images accepted: 0
+  Faces detected: 0
+  Clusters formed: 0
+  Reference matches: 0
+
+Decision:
+  Verdict: no_confident_match
+  Explanation: No identity clusters were formed. No faces detected or images available.
+
+Candidates: 0
+
+--- ENHANCEMENTS ---
+  Browser controller: available
+  Identity memory hit: None
+  URLs canonicalized: 0
+
+Cross-verification profiles (6):
+  [reddit] https://reddit.com/user/samreedh
+  [x] https://x.com/samreedh
+  [github] https://github.com/samreedh
+  [twitter] https://twitter.com/samreedh
+  [instagram] https://instagram.com/samreedh
+  [medium] https://medium.com/@samreedh
+Cross-verification cycles: 3
+  Iter 0: 5 new
+  Iter 1: 1 new
+  Iter 2: 0 new
+Evidence iteration: 2 iters, converged=False
+Organization graph:
+  Nodes: [], Edges: []
+Geolocation:
+  Primary: N/A
+  Confidence: 0.0
+
+--- TIMING ---
+  10_cross_verification: 59543.0ms
+  12_report: 1213.0ms
+  2_collection: 30146.0ms
+  7_embedding: 2601.0ms
+  9_geolocation: 2.0ms
+  TOTAL: 93503.0ms
+
+--- FULL PROFILE DATA ---
+All 0 discovered profiles:
+
+========================================================================

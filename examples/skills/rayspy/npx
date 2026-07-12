@@ -1,0 +1,11 @@
+usage: [94mvite[0m [options]
+
+[32mA simple and minimal static site generator.[0m
+
+positional arguments:
+  {init,new,build,serve}
+                        Options to help create, build and serve your project.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --version         show program's version number and exit

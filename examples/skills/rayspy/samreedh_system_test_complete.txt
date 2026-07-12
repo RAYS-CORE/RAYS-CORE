@@ -1,0 +1,134 @@
+==================================================
+ SAMREEDH — FULL SYSTEM TEST RESULTS
+ Generated: 2026-07-09
+==================================================
+
+--- PIPELINE RESULT ---
+Pipeline version: 3.2-registry
+Total runtime: 57.6s
+
+--- EVIDENCE SUMMARY ---
+Search Leads:         72
+Candidate URLs:       0
+Validated Profiles:   0
+Rejected Profiles:    0
+High Quality:         0
+Identity Candidates:  0
+Verified Identities:  0
+
+--- FACE VERIFICATION ---
+Status: SKIPPED
+Reference source: None
+Face verified: False
+Explanation: No independent reference image provided.
+             (Reference was from a discovered platform — X/Twitter)
+
+--- IDENTITY DISCOVERY ---
+Platforms found: github, instagram, reddit, twitter, x
+Cross-verification cycles: 2
+Converged: False
+
+--- DECISION ---
+Verdict: verification_skipped
+
+--- SHERLOCK LEADS — 67 CANDIDATE USERNAMES ---
+
+Dev & Code (14):
+  auth.geeksforgeeks.org/user/samreedh
+  codesandbox.io/u/samreedh
+  codolio.com/profile/samreedh
+  dmoj.ca/user/samreedh
+  github.com/samreedh
+  hackenproof.com/hackers/samreedh
+  hackmd.io/@samreedh
+  hashnode.com/@samreedh
+  hosted.weblate.org/user/samreedh
+  hubski.com/user/samreedh
+  huggingface.co/samreedh
+  patched.sh/User/samreedh
+  replit.com/@samreedh
+  tryhackme.com/p/samreedh
+
+Social (12):
+  discords.com/api/v2/bio/details/samreedh
+  letterboxd.com/samreedh
+  mastodon.cloud/@samreedh
+  pinterest.com/samreedh/
+  reddit.com/user/samreedh
+  snapchat.com/add/samreedh
+  t.me/samreedh
+  dailykos.com/user/samreedh
+  digitalspy.com/profile/samreedh
+  interpals.net/samreedh
+  lesswrong.com/users/samreedh
+  librarything.com/profile/samreedh
+
+Gaming/Media (9):
+  chess.com/member/samreedh
+  monkeytype.com/profile/samreedh
+  nationstates.net/nation=samreedh
+  open.spotify.com/user/samreedh
+  realmeye.com/player/samreedh
+  typeracer.com/pit/profile?user=samreedh
+  xboxgamertag.com/search/samreedh
+  music.yandex/users/samreedh/playlists
+
+Forums (12):
+  forum.igromania.ru/member.php?username=samreedh
+  forum.velomania.ru/member.php?username=samreedh
+  forums.pcgamer.com/members/?username=samreedh
+  lemmy.world/u/samreedh
+  opennet.ru/~samreedh
+  programming.dev/u/samreedh
+  slashdot.org/~samreedh
+  authorstream.com/samreedh/
+  baby.ru/u/samreedh
+  mercadolivre.com.br/perfil/samreedh
+  php.ru/forum/members/?username=samreedh
+  svidbook.ru/user/samreedh
+
+Creative/Content (9):
+  archive.org/details/@samreedh
+  cults3d.com/en/users/samreedh/creations
+  furaffinity.net/user/samreedh
+  scribd.com/samreedh
+  sketchfab.com/samreedh
+  slideshare.net/samreedh
+  shelf.im/samreedh
+  odysee.com/@samreedh
+  splice.com/samreedh
+
+Other (11):
+  7cups.com/@samreedh
+  airliners.net/user/samreedh/profile/photos
+  allmylinks.com/samreedh
+  aniworld.to/user/profil/samreedh
+  breachsta.rs/profile/samreedh
+  codesnippets.fandom.com/wiki/User:samreedh
+  developer.apple.com/forums/profile/samreedh
+  discussions.apple.com/profile/samreedh
+  duolingo.com/profile/samreedh
+  houzz.com/user/samreedh
+  mydramalist.com/profile/samreedh
+
+--- TIMING BREAKDOWN ---
+  Image collection:        21581ms
+  Cross-verification:      16182ms
+  Quality validation:      10037ms
+  Deduplication:            5476ms
+  Embedding:                3392ms
+  Collection:                746ms
+  Report:                      6ms
+  TOTAL:                  57419ms
+
+--- LIMITATIONS ---
+  - Reference image was from a discovered platform (X/Twitter),
+    so face verification was SKIPPED — no independent biometric comparison
+  - DNS/network validators could not verify any profiles as FOUND
+  - DuckDuckGo blocked by corporate proxy — name search unavailable
+  - 67 Sherlock candidate usernames — not verified accounts
+  - No emails, phone numbers, or full names found in public sources
+
+--- RAW DATA ---
+  Full JSON:     samreedh_investigation_raw.json
+  Report:        samreedh_investigation_report.txt

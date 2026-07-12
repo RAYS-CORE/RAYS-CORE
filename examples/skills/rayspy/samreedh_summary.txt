@@ -1,0 +1,25 @@
+OSINT SUMMARY — "samreedh"
+============================
+Pipeline: 3.1-23-improvements  |  55s runtime  |  Decision: VERIFIED
+
+DISCOVERY: 5 core platforms (GitHub, X, Twitter, Reddit, Instagram),
+all accessible with handle "samreedh". Identity confidence 0.9039 (high)
+based on username consistency, cross-platform presence, and name match.
+
+VERIFICATION: Reference photo (Twitter/X) confirmed Male ~30. Face
+matched X profile at similarity 1.000 — identity VERIFIED.
+
+SHERLOCK: 67 additional platforms found — 72 total unique platforms.
+Categories: Dev & Code (14), Social (11), Gaming (9), Forum (11),
+Creative (8), Other (14).
+
+PROTECTED DATA: No emails, phones, names, locations, or org
+relationships publicly exposed.
+
+KEY PLATFORMS: GitHub, Replit, GeeksforGeeks, Hashnode, HuggingFace,
+TryHackMe, Reddit, X/Twitter, Instagram, Snapchat, Pinterest, Chess.com,
+Spotify, Telegram, Duolingo, Odysee, Apple Developer, Archive.org.
+
+LIMITATIONS: Name search unavailable (DuckDuckGo blocked). Cross-
+verification not fully converged. Sherlock entries are profile existence
+only — content requires login.

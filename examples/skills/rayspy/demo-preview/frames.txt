@@ -1,0 +1,11 @@
+file 'C:/Users/KIIT/Documents/konnexions collab project/project codebase/RAYSpy-main/demo-preview/01-orbital.png'
+duration 3
+file 'C:/Users/KIIT/Documents/konnexions collab project/project codebase/RAYSpy-main/demo-preview/02-regional.png'
+duration 3
+file 'C:/Users/KIIT/Documents/konnexions collab project/project codebase/RAYSpy-main/demo-preview/03-transition.png'
+duration 3
+file 'C:/Users/KIIT/Documents/konnexions collab project/project codebase/RAYSpy-main/demo-preview/04-city-3d.png'
+duration 3
+file 'C:/Users/KIIT/Documents/konnexions collab project/project codebase/RAYSpy-main/demo-preview/05-street.png'
+duration 3
+file 'C:/Users/KIIT/Documents/konnexions collab project/project codebase/RAYSpy-main/demo-preview/05-street.png'

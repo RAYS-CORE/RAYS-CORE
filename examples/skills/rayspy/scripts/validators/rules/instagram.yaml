@@ -1,0 +1,27 @@
+positive_indicators:
+  - "profile picture"
+  - "username"
+  - "followers"
+  - "following"
+  - "posts"
+  - "instagram-profile"
+negative_indicators:
+  - "sorry, this page isn't available"
+  - "page not found"
+  - "this page doesn't exist"
+suspended_indicators: []
+private_indicators:
+  - "private account"
+  - "this account is private"
+login_indicators:
+  - "log in"
+  - "sign in"
+  - "login"
+  - "create an account"
+confidence_weights:
+  profile_picture: 0.25
+  username: 0.15
+  followers: 0.15
+  posts: 0.15
+  bio: 0.1
+  negative_match: -0.5

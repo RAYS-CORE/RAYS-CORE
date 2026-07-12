@@ -10,6 +10,7 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 from fastapi import FastAPI, BackgroundTasks, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 import torch
@@ -26,7 +27,6 @@ except ImportError:
 
 LLAMA_CPP_AVAILABLE = True # Faking it, we will use the CLI directly
 
-
 try:
     import huggingface_hub
     from huggingface_hub import snapshot_download
@@ -35,6 +35,19 @@ except ImportError:
     HF_AVAILABLE = False
 
 app = FastAPI(title="RAYS Studio Unified Daemon", description="Local LLM Hosting + Federated Fine-Tuning")
+
+def get_base_path():
+    if hasattr(sys, '_MEIPASS'):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+base_path = get_base_path()
+rayspy_dist = os.path.join(base_path, "examples", "skills", "rayspy", "dist")
+if not os.path.exists(rayspy_dist):
+    rayspy_dist = os.path.join(base_path, "rayspy", "dist")
+
+if os.path.exists(rayspy_dist):
+    app.mount("/rayspy", StaticFiles(directory=rayspy_dist, html=True), name="rayspy")
 
 # Enable CORS for the React UI
 app.add_middleware(
@@ -615,6 +628,33 @@ def background_training_loop():
 def startup_event():
     daemon_thread = threading.Thread(target=background_training_loop, daemon=True)
     daemon_thread.start()
+    
+    # Auto-start rayspy proxy server using bundled Node
+    def start_rayspy_proxy():
+        try:
+            base_path = get_base_path()
+            rayspy_dir = os.path.join(base_path, "examples", "skills", "rayspy")
+            if not os.path.exists(rayspy_dir):
+                # Check for PyInstaller flat structure
+                rayspy_dir = os.path.join(base_path, "rayspy")
+                
+            node_binary = "node.exe" if os.name == "nt" else "node"
+            node_path = os.path.join(base_path, "node", node_binary)
+            
+            if not os.path.exists(node_path):
+                # Fallback to system node if not bundled
+                node_path = "node"
+                
+            proxy_script = os.path.join(rayspy_dir, "proxy-server.mjs")
+            if os.path.exists(proxy_script):
+                print(f"[DAEMON] Starting rayspy proxy server with {node_path}...")
+                subprocess.Popen([node_path, proxy_script], cwd=rayspy_dir)
+            else:
+                print(f"[DAEMON] Could not find rayspy proxy server at {proxy_script}")
+        except Exception as e:
+            print(f"[DAEMON] Failed to start rayspy proxy server: {e}")
+            
+    threading.Thread(target=start_rayspy_proxy, daemon=True).start()
 
 if __name__ == "__main__":
     print("Starting RAYS Studio Unified Daemon...")

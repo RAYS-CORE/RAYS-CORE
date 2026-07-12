@@ -72,6 +72,10 @@
         "zip"
       ]
     },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "perMachine": true
+    },
     "linux": {
       "icon": "build/icon.png",
       "target": [

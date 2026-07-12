@@ -1,0 +1,250 @@
+{
+  "pipeline_version": "3.1-23-improvements",
+  "query_plan": {
+    "raw_input": "samreedh",
+    "normalized_name": "Samreedh",
+    "structure": "single",
+    "search_queries_generated": 2
+  },
+  "stages": {
+    "1_query_planner": {
+      "normalized_name": "Samreedh",
+      "tokens": [
+        "samreedh"
+      ],
+      "search_queries": [
+        "Samreedh",
+        "\"Samreedh\""
+      ]
+    },
+    "2_collection": {
+      "profiles_found": 5,
+      "platforms": [
+        "twitter",
+        "github",
+        "x",
+        "reddit",
+        "instagram"
+      ]
+    },
+    "3_normalization": {
+      "unique_profiles": 5,
+      "duplicates_removed": 0
+    },
+    "4_image_collection": {
+      "images_queued": 0
+    },
+    "5_quality_validation": {
+      "total_images": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "rejection_reasons": []
+    },
+    "6_dedup": {
+      "after_quality": 0,
+      "after_dedup": 0
+    },
+    "7_embedding": {
+      "faces_detected": 0,
+      "images_with_faces": 0
+    },
+    "8_clustering": {
+      "clusters_formed": 0,
+      "total_faces_in_clusters": 0
+    },
+    "9_evidence_aggregation": {
+      "clusters_with_evidence": 0
+    },
+    "10_weighting": {
+      "clusters_weighted": 0
+    },
+    "11_scoring": {
+      "clusters_scored": 0
+    },
+    "12_ranking": {
+      "clusters_ranked": 0
+    },
+    "13_decision": {
+      "decision": "no_confident_match",
+      "reason": "No identity clusters were formed. No faces detected or images available."
+    }
+  },
+  "timing_ms": {
+    "0_authorization": 0.0,
+    "1_query_planning": 1.577615737915039,
+    "2_collection": 30167.197465896606,
+    "2b_browser_controller": 0.0,
+    "3_normalization": 0.0,
+    "4_image_collection": 0.0,
+    "5_quality_validation": 0.0,
+    "6_dedup": 0.0,
+    "7_embedding": 2784.6109867095947,
+    "8_clustering": 0.0,
+    "9_evidence": 0.0,
+    "10_weighting": 0.0,
+    "11_scoring": 0.0,
+    "7a_url_canonicalization": 0.0,
+    "7b_identifier_discovery": 0.0,
+    "7c_post_metadata": 0.0,
+    "8_organization_graph": 0.0,
+    "9_geolocation": 2.0160675048828125,
+    "10_cross_verification": 39829.60081100464,
+    "13_evidence_iteration": 0.0,
+    "12_report": 1399.0576267242432
+  },
+  "total_profiles_found": 5,
+  "total_images_processed": 0,
+  "total_faces_detected": 0,
+  "identity_clusters": 0,
+  "reference": {
+    "id": "reference",
+    "image_url": "https://pbs.twimg.com/profile_images/2051730041827205120/kBsDNHUD.jpg",
+    "platform": "reference",
+    "face_detected": true,
+    "face_count": 1,
+    "gender": "Male",
+    "age": 30
+  },
+  "reference_matches": [],
+  "image_results": [],
+  "candidates": [],
+  "decision": {
+    "verdict": "no_confident_match",
+    "explanation": "No identity clusters were formed. No faces detected or images available.",
+    "dominant_candidate": null,
+    "candidates_returned": []
+  },
+  "uncertainty_notes": [
+    "No identity cluster met the minimum confidence threshold."
+  ],
+  "enhancements": {
+    "download_manager": {
+      "cache_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_face_cache",
+      "cached_files": 0,
+      "cached_urls": 0,
+      "disk_usage_bytes": 0
+    },
+    "identity_memory_hit": null,
+    "consensus_verification": null,
+    "session_info": {
+      "session_dir": "C:\\Users\\KIIT\\AppData\\Local\\Temp\\raySpy_sessions",
+      "active_sessions": {}
+    },
+    "browser_controller_available": true,
+    "url_canonicalization": {
+      "canonicalized_count": 0
+    },
+    "identifier_discovery": {
+      "usernames": [],
+      "emails": [],
+      "phones": [],
+      "websites": [],
+      "locations": []
+    },
+    "post_metadata": {
+      "count": 0
+    },
+    "organization_graph": {
+      "nodes": [],
+      "edges": [],
+      "stats": {
+        "persons": 0,
+        "organizations": 0,
+        "projects": 0,
+        "edges": 0
+      }
+    },
+    "geolocation": {
+      "locations": [],
+      "confidence": 0.0
+    },
+    "cross_verification": [
+      {
+        "iteration": 0,
+        "queries_run": 5,
+        "new_profiles_found": 5,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "samreedh"
+          ],
+          "usernames": {
+            "github": "samreedh",
+            "reddit": "samreedh",
+            "x": "samreedh",
+            "twitter": "samreedh",
+            "instagram": "samreedh"
+          },
+          "emails": []
+        }
+      },
+      {
+        "iteration": 1,
+        "queries_run": 5,
+        "new_profiles_found": 0,
+        "new_verified": 0,
+        "new_identifiers": {
+          "names": [
+            "samreedh"
+          ],
+          "usernames": {
+            "github": "samreedh",
+            "reddit": "samreedh",
+            "x": "samreedh",
+            "twitter": "samreedh",
+            "instagram": "samreedh"
+          },
+          "emails": []
+        }
+      }
+    ],
+    "cross_verification_profiles": [
+      {
+        "url": "https://github.com/samreedh",
+        "platform": "github",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.85,
+        "query": "direct:github/samreedh"
+      },
+      {
+        "url": "https://reddit.com/user/samreedh",
+        "platform": "reddit",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.5,
+        "query": "direct:reddit/samreedh"
+      },
+      {
+        "url": "https://x.com/samreedh",
+        "platform": "x",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:x/samreedh"
+      },
+      {
+        "url": "https://twitter.com/samreedh",
+        "platform": "twitter",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.8,
+        "query": "direct:twitter/samreedh"
+      },
+      {
+        "url": "https://instagram.com/samreedh",
+        "platform": "instagram",
+        "handle": "samreedh",
+        "source": "direct_probe",
+        "reliability": 0.75,
+        "query": "direct:instagram/samreedh"
+      }
+    ],
+    "evidence_iteration": {
+      "iterations": 2,
+      "converged": false,
+      "final_confidence": 0.0
+    }
+  },
+  "total_time_ms": 74184.06057357788
+}

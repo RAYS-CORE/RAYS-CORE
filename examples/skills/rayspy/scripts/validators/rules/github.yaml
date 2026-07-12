@@ -1,0 +1,33 @@
+positive_indicators:
+  - "repository count"
+  - "followers"
+  - "following"
+  - "contribution graph"
+  - "avatar"
+  - "username"
+  - "bio"
+  - "github-profile"
+negative_indicators:
+  - "404"
+  - "this is not the web page you are looking for"
+  - "page not found"
+suspended_indicators: []
+private_indicators: []
+login_indicators:
+  - "sign in"
+  - "log in"
+  - "login"
+low_value_indicators:
+  - "identicon"
+  - "default avatar"
+  - "no name"
+  - "no bio"
+  - "0 repositories"
+confidence_weights:
+  avatar: 0.25
+  username: 0.15
+  bio: 0.15
+  repos: 0.15
+  followers: 0.1
+  contribution_graph: 0.1
+  negative_match: -0.5

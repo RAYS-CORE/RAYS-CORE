@@ -194,12 +194,22 @@ export function AgentChat({
         className="px-4 py-2 border-b flex items-center justify-between gap-2 shrink-0"
         style={{ borderColor: "rgba(255,255,255,0.05)" }}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-center gap-2">
           <div className="text-sm font-medium truncate">
             {loading ? "Loading chat…" : hudPhase || (connected ? "Ready" : "Connecting…")}
           </div>
           {hudDetail && <div className="text-[11px] text-muted-foreground truncate">{hudDetail}</div>}
         </div>
+
+        <button
+          type="button"
+          onClick={() => window.open('http://localhost:5173', '_blank', 'width=1000,height=800')}
+          className="bg-rays-pink hover:bg-rays-pink/80 text-white text-[10px] font-bold px-2 py-1 rounded transition-colors"
+          title="Open RAYS Py OSINT Dashboard"
+        >
+          Run Investigation
+        </button>
+
         <div className="text-[10px] text-muted-foreground shrink-0">
           {tokenCount > 0 ? `${tokenCount.toLocaleString()} tokens` : connected ? "Connected" : "Offline"}
         </div>

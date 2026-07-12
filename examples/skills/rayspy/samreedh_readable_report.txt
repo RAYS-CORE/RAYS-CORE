@@ -1,0 +1,34 @@
+======================================================================
+  SAMREEDH — FULL OSINT REPORT
+  Pipeline: 3.1-23-improvements
+======================================================================
+
+[QUERY]
+  Normalized name: Samreedh
+
+[PROFILES FOUND]
+  Total: 0
+
+[DECISION] no_confident_match
+  Reason: No identity clusters were formed. No faces detected or images available.
+
+[ENHANCEMENTS]
+  Browser: available
+  Memory hit: None
+  Consensus: None
+  URLs canonicalized: 0
+  Identifiers: 0 usernames, 0 emails, 0 phones, 0 websites
+  Post metadata items: 0
+  Org graph: 0 nodes, 0 edges
+  Geolocation: primary=N/A confidence=0.0
+  Cross-verification cycles: 1
+  Evidence iterations: 2, converged=False, final_conf=0.0
+
+[TIMING] Total: 5018ms
+  12_report: 1ms
+  1_query_planning: 1ms
+  2_collection: 2864ms
+  7_embedding: 2149ms
+  9_geolocation: 2ms
+
+======================================================================
