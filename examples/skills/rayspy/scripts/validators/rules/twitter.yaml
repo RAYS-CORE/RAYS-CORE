@@ -1,0 +1,32 @@
+positive_indicators:
+  - "profile image"
+  - "bio"
+  - "followers"
+  - "following"
+  - "verified"
+  - "twitter-profile"
+  - "x-profile"
+negative_indicators:
+  - "this account doesn't exist"
+  - "page not found"
+  - "this account has been suspended"
+  - "account suspended"
+suspended_indicators:
+  - "account suspended"
+  - "suspended"
+private_indicators: []
+protected_indicators:
+  - "protected posts"
+  - "these posts are protected"
+  - "this account's tweets are protected"
+login_indicators:
+  - "log in"
+  - "sign in"
+  - "login"
+confidence_weights:
+  profile_image: 0.2
+  bio: 0.15
+  followers: 0.1
+  following: 0.05
+  verified_badge: 0.2
+  negative_match: -0.5

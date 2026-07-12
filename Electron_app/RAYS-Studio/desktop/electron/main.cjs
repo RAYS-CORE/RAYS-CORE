@@ -496,11 +496,38 @@ function createWindow(options = {}) {
   return win;
 }
 
+let proxyServerProcess = null;
+
 app.whenReady().then(async () => {
   const installEpoch = readBundledInstallEpoch();
   await ensureFreshUserData(installEpoch);
   buildApplicationMenu();
   createWindow();
+  
+  // Auto-start rayspy proxy server
+  try {
+    const isWin = process.platform === "win32";
+    const nodeBinary = isWin ? "node.exe" : "node";
+    const nodePath = app.isPackaged
+      ? path.join(process.resourcesPath, "node", nodeBinary)
+      : nodeBinary;
+    const rayspyDir = app.isPackaged
+      ? path.join(process.resourcesPath, "rayspy")
+      : path.join(repoRoot(), "examples/skills/rayspy");
+      
+    const proxyScript = path.join(rayspyDir, "proxy-server.mjs");
+    if (fs.existsSync(proxyScript)) {
+      proxyServerProcess = spawn(nodePath, [proxyScript], {
+        cwd: rayspyDir,
+        env: process.env,
+        stdio: "ignore",
+        windowsHide: true
+      });
+    }
+  } catch (err) {
+    console.error("Failed to start rayspy proxy:", err);
+  }
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -514,6 +541,10 @@ app.on("window-all-closed", () => {
   if (daemonProcess) {
     daemonProcess.kill("SIGTERM");
     daemonProcess = null;
+  }
+  if (proxyServerProcess) {
+    proxyServerProcess.kill("SIGTERM");
+    proxyServerProcess = null;
   }
   if (process.platform !== "darwin") app.quit();
 });

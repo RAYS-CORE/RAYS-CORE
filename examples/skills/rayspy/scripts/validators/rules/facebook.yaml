@@ -1,0 +1,26 @@
+positive_indicators:
+  - "profile picture"
+  - "friends"
+  - "about"
+  - "posts"
+  - "facebook-profile"
+negative_indicators:
+  - "content isn't available"
+  - "page unavailable"
+  - "this page isn't available"
+  - "not found"
+suspended_indicators: []
+private_indicators:
+  - "private profile"
+  - "this profile is private"
+login_indicators:
+  - "log in"
+  - "sign in"
+  - "create a new account"
+confidence_weights:
+  profile_picture: 0.2
+  name: 0.15
+  friends: 0.15
+  about: 0.1
+  posts: 0.1
+  negative_match: -0.5

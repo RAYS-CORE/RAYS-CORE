@@ -146,6 +146,14 @@ export async function hostReadMcpConfig(
   if (window.raysDesktop) {
     return window.raysDesktop.readMcpConfig(scope, workspaceRoot);
   }
+  try {
+    const response = await fetch("/api/system/read-mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scope, workspaceRoot }),
+    });
+    if (response.ok) return response.json();
+  } catch {}
   return { mcp_servers: [] };
 }
 
@@ -202,6 +210,14 @@ export async function hostListSkills(workspaceRoot?: string): Promise<SkillEntry
   if (window.raysDesktop) {
     return window.raysDesktop.listSkills(workspaceRoot);
   }
+  try {
+    const response = await fetch("/api/system/list-skills", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ workspaceRoot }),
+    });
+    if (response.ok) return response.json();
+  } catch {}
   return [];
 }
 
@@ -213,3 +229,4 @@ export async function hostOpenSkillsDirectory(
   const result = await window.raysDesktop.openSkillsDirectory(scope, workspaceRoot);
   return result.path;
 }
+

@@ -479,6 +479,52 @@ class GUIBridgeRuntime:
 
     def _resolve_prompt_execution(self, prompt: str, mode: str) -> tuple[Optional[str], str]:
         text = (prompt or "").strip()
+        
+        # Intercept and fetch URL attachments from the UI
+        import re
+        import tempfile
+        
+        IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg', '.ico'}
+        IMAGE_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp', 'image/tiff', 'image/svg+xml', 'image/x-icon'}
+        
+        def fetch_url(match):
+            url = match.group(2)
+            try:
+                import requests
+                resp = requests.get(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': '*/*',
+                }, timeout=15)
+                resp.raise_for_status()
+                
+                content_type = (resp.headers.get('Content-Type') or '').split(';')[0].strip().lower()
+                
+                # Detect if this is an image by Content-Type or URL extension
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                path_ext = Path(parsed.path).suffix.lower()
+                is_image = content_type in IMAGE_CONTENT_TYPES or path_ext in IMAGE_EXTENSIONS
+                
+                if is_image:
+                    # Save binary image to a temp file so the agent can reference it
+                    ext = path_ext if path_ext in IMAGE_EXTENSIONS else '.jpg'
+                    tmp_dir = Path(tempfile.gettempdir()) / "rays_attachments"
+                    tmp_dir.mkdir(parents=True, exist_ok=True)
+                    tmp_file = tmp_dir / f"attachment_{uuid.uuid4().hex[:8]}{ext}"
+                    tmp_file.write_bytes(resp.content)
+                    return f"\n\n[Attached image saved to: {tmp_file}]\n(Original URL: {url})\n\n"
+                else:
+                    # Text/HTML content — decode safely
+                    text_content = resp.content.decode('utf-8', errors='replace')
+                    # Very basic HTML stripping for context
+                    text_content = re.sub(r'<[^>]+>', ' ', text_content)
+                    text_content = " ".join(text_content.split())
+                    return f"\n\n--- Content from {url} ---\n{text_content[:5000]}\n--- End of content ---\n\n"
+            except Exception as e:
+                return f"\n\n[Could not fetch attachment from {url}: {e}]\n\n"
+                
+        text = re.sub(r'\[Attachment \(url\):\s*(.+?)\s*\((.+?)\)\]', fetch_url, text)
+
         if text.startswith("/"):
             parts = text.split(None, 1)
             cmd = parts[0].lower()
@@ -955,6 +1001,38 @@ def main() -> None:
         runtime_overrides: Dict[str, Any] = {}
         if args.runtime_overrides:
             runtime_overrides = json.loads(args.runtime_overrides)
+            
+        # Auto-start rayspy proxy server using bundled Node, completely silently
+        def start_rayspy_proxy():
+            try:
+                import sys
+                if getattr(sys, 'frozen', False):
+                    # PyInstaller bundle: sys.executable is resources/backend/rays-gui-bridge.exe
+                    exe_dir = os.path.dirname(sys.executable)
+                    resources_dir = os.path.dirname(exe_dir)
+                    rayspy_dir = os.path.join(resources_dir, "rayspy")
+                    node_dir = os.path.join(resources_dir, "node")
+                else:
+                    base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
+                    rayspy_dir = os.path.join(base_path, "examples", "skills", "rayspy")
+                    if not os.path.exists(rayspy_dir):
+                        rayspy_dir = os.path.join(base_path, "rayspy")
+                    node_dir = os.path.join(base_path, "node")
+                
+                node_binary = "node.exe" if os.name == "nt" else "node"
+                node_path = os.path.join(node_dir, node_binary)
+                if not os.path.exists(node_path):
+                    node_path = "node"
+                    
+                proxy_script = os.path.join(rayspy_dir, "proxy-server.mjs")
+                if os.path.exists(proxy_script):
+                    flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                    subprocess.Popen([node_path, proxy_script], cwd=rayspy_dir, creationflags=flags)
+            except Exception:
+                pass
+                
+        threading.Thread(target=start_rayspy_proxy, daemon=True).start()
+
         asyncio.run(
             run_server(
                 args.host,

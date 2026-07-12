@@ -34,8 +34,12 @@ try {
     --noconfirm
 
   $BackendBin = Join-Path $BackendOut "rays-gui-bridge.exe"
+  $CliBin = Join-Path $BackendOut "rays.exe"
   if (-not (Test-Path $BackendBin)) {
     throw "PyInstaller did not produce $BackendBin"
+  }
+  if (-not (Test-Path $CliBin)) {
+    throw "PyInstaller did not produce $CliBin"
   }
 
   Write-Host "==> Backend bundle ready: $BackendBin"

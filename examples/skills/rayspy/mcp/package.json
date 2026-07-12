@@ -1,0 +1,16 @@
+{
+  "name": "rayspy-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "RAYSpy investigation pipeline - single MCP tool (rays_investigate) exposing a multi-agent OSINT pipeline to any host agent (Cursor, Claude, etc.)",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node test/smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  }
+}
