@@ -30,6 +30,9 @@ export function AppHeader({ onOpenSettings, onOpenSkills, onOpenMcp }: AppHeader
           <NavLink to="/ide" className={linkClass}>
             IDE
           </NavLink>
+          <NavLink to="/spy" className={linkClass}>
+            Spy
+          </NavLink>
           <NavLink to="/studio" className={linkClass}>
             Studio
           </NavLink>
