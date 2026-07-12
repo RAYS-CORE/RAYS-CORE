@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="rays-core",
-    version="1.7.1",
+    version="1.7.2",
     description="RAYS-CORE — AI-Powered Development Assistant",
     author="Samreedh Bhuyan",
     url="https://github.com/markknoffler/RAYS-CORE-CLI",
