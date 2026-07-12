@@ -6,7 +6,7 @@ export default function SpyLayout() {
 
   useEffect(() => {
     // Check if the Spy proxy-server is running
-    fetch("http://localhost:8080/")
+    fetch("http://localhost:5174/rayspy/")
       .then(res => {
         if (res.ok) {
           setServerStatus("online");
@@ -27,7 +27,7 @@ export default function SpyLayout() {
       <div className="flex-1 overflow-hidden relative bg-black">
         {serverStatus === "online" ? (
           <iframe 
-            src="http://localhost:8080/" 
+            src="http://localhost:5174/rayspy/" 
             className="w-full h-full border-none"
             title="RAYS Spy OSINT"
           />
@@ -39,7 +39,7 @@ export default function SpyLayout() {
           <div className="w-full h-full flex flex-col items-center justify-center text-center p-8 bg-black/90">
             <h2 className="text-rays-pink text-2xl font-bold mb-4">RAYS Spy Server is Offline</h2>
             <p className="text-muted-foreground text-sm max-w-md">
-              The OSINT dashboard could not be loaded because the local Spy server is not running on port 8080.
+              The OSINT dashboard could not be loaded because the local Spy server is not running on port 5174.
             </p>
             <div className="mt-6 text-xs text-muted-foreground bg-secondary/30 p-4 rounded text-left border border-border/20">
               <p className="mb-2 text-foreground font-mono">To start the RAYS Spy server, run:</p>
