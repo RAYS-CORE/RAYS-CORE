@@ -36,6 +36,9 @@ export function AppHeader({ onOpenSettings, onOpenSkills, onOpenMcp }: AppHeader
           <NavLink to="/studio" className={linkClass}>
             Studio
           </NavLink>
+          <NavLink to="/rayspy" className={linkClass}>
+            Rayspy
+          </NavLink>
         </nav>
       </div>
       <div className="flex items-center gap-1">

@@ -27,7 +27,7 @@ class Workspace:
     def create(self):
         self.root.mkdir(parents=True, exist_ok=True)
         for d in self._dirs.values():
-            d.mkdir(exist_ok=True)
+            d.mkdir(parents=True, exist_ok=True)
 
     def destroy(self):
         if self.root.exists():

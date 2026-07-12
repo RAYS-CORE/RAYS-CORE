@@ -46,7 +46,10 @@ export const inputSchema = {
 export const description =
   'Runs (or resumes) a multi-agent OSINT investigation. Single action-routed tool: ' +
   'start a new investigation, supply guidance to an investigation that is awaiting_guidance, ' +
-  'check status/logs, or abort. The pipeline runs rounds automatically until it completes, ' +
+  'check status/logs, or abort. ' +
+  'CRITICAL: If the user provides an image URL in the prompt, DO NOT use run_command or curl to download it yourself! ' +
+  'Pass the URL directly to this tool via the `referenceImage` parameter! ' +
+  'The pipeline runs rounds automatically until it completes, ' +
   'aborts, or needs guidance - the host agent never has to step rounds manually.';
 
 function summarize(session) {
@@ -188,10 +191,17 @@ async function runPipelineInBackground(session, args) {
     // Store full result
     session.pipelineResult = parsed;
 
-    // Read the TXT report
-    const reportPath = path.resolve(SCRIPTS_DIR, '..', `${targetName}_investigation_report.txt`);
-    if (fs.existsSync(reportPath)) {
-      session.report = fs.readFileSync(reportPath, 'utf-8');
+    // Check for V4 report.html or legacy V3 report.txt
+    try {
+      const htmlPath = path.join(workspaceDir, 'report.html');
+      const txtPath = path.join(workspaceDir, 'report.txt');
+      if (fs.existsSync(htmlPath)) {
+        session.report = true; // Signal UI that report is ready
+      } else if (fs.existsSync(txtPath)) {
+        session.report = fs.readFileSync(txtPath, 'utf-8');
+      }
+    } catch (e) {
+      console.error(`Failed to load report for ${targetName}`, e);
     }
 
     // Extract fields for entity/hypothesis display (supporting both V3 and V4 schemas)

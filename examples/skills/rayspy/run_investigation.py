@@ -33,18 +33,19 @@ from core.pipeline import InvestigationPipeline
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Run RAYS OSINT Investigation")
-    parser.add_argument("target", nargs="*", default=["samreedh"], help="Target name")
-    parser.add_argument("--ref", dest="reference_image", help="Reference image URL")
-    args = parser.parse_args()
-
-    target = " ".join(args.target)
+    target = sys.argv[1] if len(sys.argv) > 1 else "samreedh"
+    
+    ref_image = None
+    if "--ref" in sys.argv:
+        ref_idx = sys.argv.index("--ref")
+        if ref_idx + 1 < len(sys.argv):
+            ref_image = sys.argv[ref_idx + 1]
 
     t0 = time_module.time()
 
     # Run the new workspace-driven pipeline
-    pipeline = InvestigationPipeline(base_dir=BASE_DIR, target_name=target, reference_image=args.reference_image)
+    pipeline = InvestigationPipeline(base_dir=BASE_DIR, target_name=target)
+    pipeline.reference_image = ref_image
     result = pipeline.run()
 
     t1 = time_module.time()

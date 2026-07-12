@@ -115,7 +115,7 @@ export function mountWorldviewUI(viewer, handlers) {
 
     async function pollStatus(investigationId) {
       try {
-        const res = await fetch(`http://localhost:5176/rayspy-mcp/status?investigationId=${encodeURIComponent(investigationId)}`);
+        const res = await fetch(`/rayspy-mcp/status?investigationId=${encodeURIComponent(investigationId)}`);
         const data = await res.json();
         if (data.error) {
           statusEl.textContent = `error: ${data.error}`;
@@ -127,7 +127,7 @@ export function mountWorldviewUI(viewer, handlers) {
           `evidence: ${data.evidenceCount} | hypotheses: ${data.hypotheses?.length ?? 0}`;
         renderLogs(data.logs);
         latestData = data;
-        downloadBtn.style.display = (data.status === 'complete' && data.report) ? '' : 'none';
+        downloadBtn.style.display = (['complete', 'aborted'].includes(data.status)) ? '' : 'none';
         if (['complete', 'aborted', 'awaiting_guidance'].includes(data.status)) stopPolling();
       } catch (err) {
         statusEl.textContent = `error: ${err.message}`;
@@ -151,7 +151,7 @@ export function mountWorldviewUI(viewer, handlers) {
       latestData = null;
 
       try {
-        const res = await fetch('http://localhost:5176/rayspy-mcp/start', {
+        const res = await fetch('/rayspy-mcp/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query, maxRounds }),

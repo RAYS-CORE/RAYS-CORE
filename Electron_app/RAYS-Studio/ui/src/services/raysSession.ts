@@ -305,26 +305,34 @@ class RAYSSessionStore {
       thinkingText: "",
     });
 
-    const { sessionId, wsPort } = await hostStartSession(
-      workspacePath,
-      settings,
-      resolvedConversationId
-    );
+    try {
+      const { sessionId, wsPort } = await hostStartSession(
+        workspacePath,
+        settings,
+        resolvedConversationId
+      );
 
-    if (switchId !== this.switchToken) {
-      await hostStopSession(sessionId);
-      return;
+      if (switchId !== this.switchToken) {
+        await hostStopSession(sessionId);
+        return;
+      }
+
+      this.setState({
+        sessionId,
+        wsPort,
+        status: "ready",
+        workspaceRoot: workspacePath,
+        conversationId: resolvedConversationId,
+        turns: restoredTurns,
+      });
+      this.connectSocket(wsPort);
+    } catch (err: any) {
+      this.setState({
+        status: "disconnected",
+        connected: false,
+        error: "Failed to start session: " + err.message,
+      });
     }
-
-    this.setState({
-      sessionId,
-      wsPort,
-      status: "ready",
-      workspaceRoot: workspacePath,
-      conversationId: resolvedConversationId,
-      turns: restoredTurns,
-    });
-    this.connectSocket(wsPort);
   }
 
   async stopSession(): Promise<void> {

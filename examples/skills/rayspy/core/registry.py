@@ -268,6 +268,9 @@ class InvestigationRegistry:
 
     # ── Reporting ────────────────────────────────────────────────────────
 
+    def update_state(self, **kw):
+        self._data.setdefault('state', {}).update(kw)
+
     def evidence_chain(self) -> dict:
         c = self._data["candidates"]
         return {

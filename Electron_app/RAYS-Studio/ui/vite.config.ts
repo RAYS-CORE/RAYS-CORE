@@ -32,10 +32,11 @@ export default defineConfig(({ mode }) => ({
       name: "rays-session-manager",
       configureServer(server) {
         const sessions = new Map<string, BackendSession>();
-        const cliRoot = path.resolve(__dirname, "..");
+        const cliRoot = path.resolve(__dirname, "../../../");
+        const studioRoot = path.resolve(__dirname, "..");
         const pythonPath = [
           path.join(cliRoot, "src"),
-          path.join(cliRoot, "bridge/src"),
+          path.join(studioRoot, "bridge/src"),
           process.env.PYTHONPATH || "",
         ]
           .filter(Boolean)
@@ -223,6 +224,76 @@ export default defineConfig(({ mode }) => ({
             } catch (error) {
               res.statusCode = 500;
               res.end(JSON.stringify({ error: "Failed to read file" }));
+            }
+          });
+        });
+
+        server.middlewares.use("/api/system/list-skills", async (req, res) => {
+          let body = "";
+          req.on("data", (chunk) => { body += chunk.toString("utf8"); });
+          req.on("end", async () => {
+            try {
+              const parsed = JSON.parse(body || "{}");
+              const workspaceRoot = parsed.workspaceRoot;
+              const results: any[] = [];
+              const scopes = [
+                ["project", workspaceRoot ? path.join(workspaceRoot, "skills") : null],
+                ["global", path.join((await import("node:os")).homedir(), ".rays", "skills")],
+              ];
+              for (const [scope, dir] of scopes) {
+                if (!dir) continue;
+                try {
+                  const entries = await fs.readdir(dir as string, { withFileTypes: true });
+                  for (const entry of entries) {
+                    if (!entry.isDirectory()) continue;
+                    const skillDir = path.join(dir as string, entry.name);
+                    const mdPath = path.join(skillDir, "SKILL.md");
+                    try {
+                      await fs.access(mdPath);
+                      const content = await fs.readFile(mdPath, "utf8");
+                      const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+                      let desc = "";
+                      if (fmMatch) {
+                        const descMatch = fmMatch[1].match(/^description:\s*["']?(.+?)["']?\s*$/m);
+                        if (descMatch) desc = descMatch[1].trim();
+                      }
+                      results.push({ name: entry.name, scope, path: skillDir, description: desc });
+                    } catch {}
+                  }
+                } catch {}
+              }
+              res.setHeader("content-type", "application/json");
+              res.end(JSON.stringify(results));
+            } catch {
+              res.statusCode = 500;
+              res.end(JSON.stringify([]));
+            }
+          });
+        });
+
+        server.middlewares.use("/api/system/read-mcp", async (req, res) => {
+          let body = "";
+          req.on("data", (chunk) => { body += chunk.toString("utf8"); });
+          req.on("end", async () => {
+            try {
+              const parsed = JSON.parse(body || "{}");
+              const scope = parsed.scope;
+              const workspaceRoot = parsed.workspaceRoot;
+              const os = await import("node:os");
+              const configPath = scope === "project" 
+                ? path.join(workspaceRoot, ".rays", "mcp.json")
+                : path.join(os.homedir(), ".rays", "mcp.json");
+              try {
+                const content = await fs.readFile(configPath, "utf8");
+                res.setHeader("content-type", "application/json");
+                res.end(content);
+              } catch {
+                res.setHeader("content-type", "application/json");
+                res.end(JSON.stringify({ mcp_servers: [] }));
+              }
+            } catch {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ mcp_servers: [] }));
             }
           });
         });

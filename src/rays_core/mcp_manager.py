@@ -238,8 +238,15 @@ class MCPManager:
         env = _expand_env_value(entry.get("env") or {})
         merged_env = {**os.environ, **{k: str(v) for k, v in env.items()}}
 
+        command = str(command)
+        if os.name == "nt" and not __import__("pathlib").Path(command).is_absolute():
+            import shutil
+            resolved_cmd = shutil.which(command)
+            if resolved_cmd:
+                command = resolved_cmd
+
         params = StdioServerParameters(
-            command=str(command),
+            command=command,
             args=[str(a) for a in args],
             env=merged_env,
         )

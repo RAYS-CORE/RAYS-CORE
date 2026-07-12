@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
-    "electron": "^35.0.0",
+    "electron": "^35.7.5",
     "electron-builder": "^25.1.8",
     "wait-on": "^8.0.2"
   },
@@ -52,6 +52,20 @@
       {
         "from": "resources/backend",
         "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../../examples/skills/rayspy",
+        "to": "rayspy",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../../node",
+        "to": "node",
         "filter": [
           "**/*"
         ]

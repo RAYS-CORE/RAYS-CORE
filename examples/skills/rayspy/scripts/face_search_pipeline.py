@@ -629,7 +629,7 @@ def stage4_collect_images(
             if any(img.get("profile_url") == url and img.get("source") == "known_pattern" for img in images):
                 continue
 
-            html, method, meta = _sf.fetch(url, timeout=5, browser_timeout_ms=5_000, browser_wait_ms=500)
+            html, method, meta = _sf.fetch(url, timeout=15, browser_timeout_ms=25_000, browser_wait_ms=2_000)
 
             if not html:
                 continue

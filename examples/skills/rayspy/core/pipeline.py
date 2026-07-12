@@ -26,10 +26,9 @@ from .report_generator import generate_html_report
 
 
 class InvestigationPipeline:
-    def __init__(self, base_dir: str, target_name: str, reference_image: str = None):
+    def __init__(self, base_dir: str, target_name: str):
         self.base_dir = os.path.abspath(base_dir)
         self.target_name = target_name
-        self.reference_image = reference_image
 
         self.events = EventBus()
         self.workspace = Workspace(base_dir, target_name)
@@ -42,22 +41,19 @@ class InvestigationPipeline:
 
     # ── Helpers ──────────────────────────────────────────────────────────
 
-    def _timed(self, task_name: str, fn: callable, *args, **kw):
+    def _timed(self, action_name: str, fn: callable, *args, **kw):
         t0 = time.time()
         try:
             return fn(*args, **kw)
         finally:
-            self._timings[task_name] = (time.time() - t0) * 1000
+            self._timings[action_name] = (time.time() - t0) * 1000
 
     def _load_sherlock_leads(self) -> list[dict]:
         target_lc = self.target_name.lower().replace(" ", "_")
         sherlock_file = os.path.join(self.base_dir, f"sherlock_{target_lc}")
 
-        is_fallback = False
         if not os.path.exists(sherlock_file):
             sherlock_file = os.path.join(self.base_dir, "sherlock_samreedh")
-            is_fallback = True
-
         if not os.path.exists(sherlock_file):
             return []
 
@@ -66,8 +62,6 @@ class InvestigationPipeline:
             for line in f:
                 line = line.strip()
                 if line.startswith(("http://", "https://")):
-                    if is_fallback:
-                        line = line.replace("samreedh", target_lc)
                     urls.append(line)
         while urls and not urls[-1].startswith("http"):
             urls.pop()
@@ -112,8 +106,8 @@ class InvestigationPipeline:
             "enhanced_pipeline",
             run_enhanced_pipeline,
             name=self.target_name,
-            reference_url=self.reference_image,
             sherlock_leads=sherlock_leads,
+            reference_url=getattr(self, 'reference_image', None),
             enable_name_search=True,
             enable_browser_ctrl=False,
             enable_consensus=True,
@@ -253,7 +247,7 @@ class InvestigationPipeline:
         with open(report_html_path, "w", encoding="utf-8") as f:
             f.write(html)
 
-        self.workspace.update_state(
+        self.registry.update_state(
             report_json=str(report_json_path),
             report_html=str(report_html_path),
             timings=self._timings,

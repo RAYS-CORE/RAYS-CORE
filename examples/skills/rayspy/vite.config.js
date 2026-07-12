@@ -1,9 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/rayspy/',
   define: {
-    CESIUM_BASE_URL: JSON.stringify('/rayspy/cesium/')
+    CESIUM_BASE_URL: JSON.stringify('/cesium/')
   },
   server: {
     proxy: {

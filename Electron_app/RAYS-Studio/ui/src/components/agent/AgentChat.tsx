@@ -40,6 +40,8 @@ export function AgentChat({
 
   // Attachment states
   const [showAttachments, setShowAttachments] = useState(false);
+  const [urlInputVisible, setUrlInputVisible] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
   const [attachments, setAttachments] = useState<{ type: string; name: string; path: string }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -97,10 +99,8 @@ export function AgentChat({
   };
 
   const handleAttachUrl = () => {
-    const url = prompt("Enter URL to attach:");
-    if (url && url.trim()) {
-      setAttachments((prev) => [...prev, { type: "url", name: url.trim(), path: url.trim() }]);
-    }
+    setUrlInputVisible(true);
+    setShowAttachments(true);
   };
 
   // Drag and Drop recursive parsing
@@ -201,15 +201,6 @@ export function AgentChat({
           {hudDetail && <div className="text-[11px] text-muted-foreground truncate">{hudDetail}</div>}
         </div>
 
-        <button
-          type="button"
-          onClick={() => window.open('http://localhost:5173', '_blank', 'width=1000,height=800')}
-          className="bg-rays-pink hover:bg-rays-pink/80 text-white text-[10px] font-bold px-2 py-1 rounded transition-colors"
-          title="Open RAYS Py OSINT Dashboard"
-        >
-          Run Investigation
-        </button>
-
         <div className="text-[10px] text-muted-foreground shrink-0">
           {tokenCount > 0 ? `${tokenCount.toLocaleString()} tokens` : connected ? "Connected" : "Offline"}
         </div>
@@ -285,7 +276,7 @@ export function AgentChat({
               <Plus size={16} />
             </button>
 
-            {showAttachments && (
+            {showAttachments && !urlInputVisible && (
               <div className="absolute bottom-9 left-0 z-30 w-44 bg-card border border-border shadow-modal rounded-lg py-1 flex flex-col">
                 <button
                   onClick={() => {
@@ -320,13 +311,49 @@ export function AgentChat({
                 <button
                   onClick={() => {
                     handleAttachUrl();
-                    setShowAttachments(false);
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-secondary text-foreground/80 hover:text-foreground"
                 >
                   <Link2 size={12} className="text-rays-pink" />
                   <span>Attach URL</span>
                 </button>
+              </div>
+            )}
+
+            {showAttachments && urlInputVisible && (
+              <div className="absolute bottom-9 left-0 z-30 w-64 bg-card border border-border shadow-modal rounded-lg p-2 flex flex-col gap-2">
+                <input 
+                  autoFocus
+                  type="url" 
+                  placeholder="Enter URL..." 
+                  className="w-full bg-background border border-border rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-rays-pink"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                       if (urlInput.trim()) {
+                         setAttachments((prev) => [...prev, { type: "url", name: urlInput.trim(), path: urlInput.trim() }]);
+                       }
+                       setUrlInputVisible(false);
+                       setShowAttachments(false);
+                       setUrlInput("");
+                    } else if (e.key === 'Escape') {
+                       setUrlInputVisible(false);
+                       setShowAttachments(false);
+                    }
+                  }}
+                />
+                <div className="flex justify-end gap-1 mt-1">
+                  <button type="button" onClick={() => setUrlInputVisible(false)} className="text-xs px-2 py-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+                  <button type="button" onClick={() => {
+                       if (urlInput.trim()) {
+                         setAttachments((prev) => [...prev, { type: "url", name: urlInput.trim(), path: urlInput.trim() }]);
+                       }
+                       setUrlInputVisible(false);
+                       setShowAttachments(false);
+                       setUrlInput("");
+                  }} className="text-xs px-3 py-1 bg-rays-pink text-background font-medium rounded hover:bg-rays-pink/90 transition-colors">Add</button>
+                </div>
               </div>
             )}
           </div>
