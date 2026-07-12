@@ -14,8 +14,10 @@
     "mcp:test": "node mcp/test/smoke.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cesium": "^1.141.0",
-    "satellite.js": "^4.1.4"
+    "satellite.js": "^4.1.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
