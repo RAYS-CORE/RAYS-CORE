@@ -7,7 +7,6 @@ import { AppShell } from "@/components/AppShell";
 import IDELayout from "@/components/ide/IDELayout";
 import AgentLayout from "@/components/agent/AgentLayout";
 import StudioLayout from "@/components/studio/StudioLayout";
-import SpyLayout from "@/components/spy/SpyLayout";
 import RayspyLayout from "@/components/agent/RayspyLayout";
 import NotFound from "./pages/NotFound.tsx";
 import { useEffect } from "react";
@@ -44,7 +43,6 @@ const App = () => {
               <Route path="/" element={<Navigate to="/agent" replace />} />
               <Route path="/agent" element={<AgentLayout />} />
               <Route path="/ide" element={<IDELayout />} />
-              <Route path="/spy" element={<SpyLayout />} />
               <Route path="/studio" element={<StudioLayout />} />
               <Route path="/rayspy" element={<RayspyLayout />} />
             </Route>

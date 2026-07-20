@@ -42,6 +42,36 @@ export default defineConfig(({ mode }) => ({
           .filter(Boolean)
           .join(path.delimiter);
 
+        let proxyProcess: ChildProcessWithoutNullStreams | null = null;
+        const startRayspyProxy = async () => {
+          try {
+            const rayspyDir = path.join(cliRoot, "examples/skills/rayspy");
+            const proxyScript = path.join(rayspyDir, "proxy-server.mjs");
+            const distIndex = path.join(rayspyDir, "dist/index.html");
+            const nodeBinary = process.platform === "win32" ? "node.exe" : "node";
+
+            try {
+              await fs.access(distIndex);
+            } catch {
+              console.warn(
+                "\n\x1b[33m[rays-session-manager] WARNING: rayspy UI dist folder not found.\x1b[0m\n" +
+                "\x1b[33mPlease run 'npm run build' inside 'examples/skills/rayspy' to compile it.\x1b[0m\n"
+              );
+            }
+
+            proxyProcess = spawn(nodeBinary, [proxyScript], {
+              cwd: rayspyDir,
+              env: process.env,
+              stdio: "ignore",
+            });
+            console.log("[rays-session-manager] Auto-started rayspy proxy server from:", proxyScript);
+          } catch (err: any) {
+            console.error("[rays-session-manager] Failed to auto-start rayspy proxy server:", err);
+          }
+        };
+
+        void startRayspyProxy();
+
         const stopSession = (sessionId: string) => {
           const session = sessions.get(sessionId);
           if (!session) return false;
@@ -53,6 +83,10 @@ export default defineConfig(({ mode }) => ({
         server.httpServer?.on("close", () => {
           for (const sessionId of sessions.keys()) {
             stopSession(sessionId);
+          }
+          if (proxyProcess) {
+            proxyProcess.kill("SIGTERM");
+            console.log("[rays-session-manager] Stopped rayspy proxy server.");
           }
         });
 

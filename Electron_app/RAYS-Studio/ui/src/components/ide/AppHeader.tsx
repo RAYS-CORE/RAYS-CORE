@@ -18,7 +18,7 @@ export function AppHeader({ onOpenSettings, onOpenSkills, onOpenMcp }: AppHeader
 
   return (
     <div
-      className="h-9 bg-card flex items-center justify-between px-3 select-none border-b"
+      className="h-9 bg-card flex items-center justify-between px-3 select-none border-b relative z-50"
       style={{ borderColor: "rgba(255,255,255,0.05)" }}
     >
       <div className="flex items-center gap-3">
@@ -29,9 +29,6 @@ export function AppHeader({ onOpenSettings, onOpenSkills, onOpenMcp }: AppHeader
           </NavLink>
           <NavLink to="/ide" className={linkClass}>
             IDE
-          </NavLink>
-          <NavLink to="/spy" className={linkClass}>
-            Spy
           </NavLink>
           <NavLink to="/studio" className={linkClass}>
             Studio

@@ -16,38 +16,24 @@ export class TransitionController {
     if (stage === this._stage) return;
     this._stage = stage;
 
-    // Imagery alpha — fade satellite out as we descend into city
-    if (!imageryLayers || imageryLayers.length === 0) return;
-
-    const baseLayer = imageryLayers[0];
+    if (!imageryLayers) return;
+    const baseLayer = typeof imageryLayers.get === 'function' ? imageryLayers.get(0) : imageryLayers[0];
     if (!baseLayer) return;
 
-    switch (stage) {
-      case STAGES.ORBITAL:
-      case STAGES.REGIONAL:
-        this._animateAlpha(baseLayer, 1.0);
-        break;
-      case STAGES.TRANSITION:
-        // Lerp handled continuously by ZoomController altitude
-        break;
-      case STAGES.CITY:
-        this._animateAlpha(baseLayer, 0.15);
-        break;
-      case STAGES.STREET:
-        this._animateAlpha(baseLayer, 0.05);
-        break;
-    }
+    // Keep satellite imagery fully visible at all stages
+    this._animateAlpha(baseLayer, 1.0);
   }
 
   /**
    * Called every frame during TRANSITION stage.
-   * Lerps imagery alpha based on altitude between 50 000 and 5 000.
+   * Keeps satellite imagery fully visible.
    */
   updateTransition(alt, imageryLayers) {
     if (this._stage !== STAGES.TRANSITION) return;
-    if (!imageryLayers || !imageryLayers[0]) return;
-    const t = Cesium.Math.clamp((alt - 8_000) / (80_000 - 8_000), 0, 1);
-    imageryLayers[0].alpha = t;
+    if (!imageryLayers) return;
+    const baseLayer = typeof imageryLayers.get === 'function' ? imageryLayers.get(0) : imageryLayers[0];
+    if (!baseLayer) return;
+    baseLayer.alpha = 1.0;
   }
 
   _animateAlpha(layer, target, duration = 800) {

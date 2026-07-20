@@ -24,6 +24,23 @@ class SkillsOrchestrator:
 
     def discover_skills(self) -> List[Dict[str, str]]:
         """Scan both local and global skills directories."""
+        # ── Copy local examples/skills to global ~/.rays/skills on startup ──
+        try:
+            import shutil
+            local_src = self.codebase_root / "examples" / "skills"
+            if not local_src.exists():
+                local_src = self.codebase_root / "skills"
+
+            if local_src.exists() and local_src.resolve() != self.global_skills_dir.resolve():
+                self.global_skills_dir.mkdir(parents=True, exist_ok=True)
+                for item in local_src.iterdir():
+                    if item.is_dir() and item.name != "__pycache__":
+                        dest_dir = self.global_skills_dir / item.name
+                        if not dest_dir.exists():
+                            shutil.copytree(item, dest_dir)
+        except Exception as e:
+            rays_ui.print_warning(f"Failed to auto-copy local skills to global directory: {e}")
+
         skills = []
         seen_names = set()
 

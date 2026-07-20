@@ -16,7 +16,6 @@ export function RayspyIframe() {
       style={{
         display: isVisible ? "block" : "none",
         width: "100%",
-        height: "100%",
         position: "absolute",
         top: 36, // Below the AppHeader (which is h-9 = 36px)
         left: 0,
@@ -31,7 +30,7 @@ export function RayspyIframe() {
           src="http://localhost:5176"
         style={{
           width: "100%",
-          height: "calc(100vh - 36px)",
+          height: "100%",
           border: "none",
         }}
         title="Rayspy Interface"

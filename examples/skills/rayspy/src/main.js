@@ -73,36 +73,37 @@ async function init() {
       );
       aerialLayer.alpha = 1.0;
 
-      // Overlay layer: roads/labels, kept low-alpha so it reads as a
-      // road/label overlay ON TOP of the photographic imagery instead of
-      // masking it out with a flat, whitish vector basemap.
-      const roadLayer = viewer.imageryLayers.addImageryProvider(
-        await Cesium.createWorldImageryAsync({
-          style: Cesium.IonWorldImageryStyle.ROAD,
-        })
-      );
-      roadLayer.alpha = 0.35;
-
-      imageryCredit = 'Cesium World Imagery (satellite) + roads';
+      imageryCredit = 'Cesium World Imagery (satellite) + Reference Overlays';
     } else {
       // Fallback (no Cesium Ion token): Esri World Imagery satellite base
-      // + a translucent OSM overlay for roads/labels — same principle.
       const aerialLayer = viewer.imageryLayers.addImageryProvider(
         new Cesium.UrlTemplateImageryProvider({
-          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           maximumLevel: 19,
         })
       );
       aerialLayer.alpha = 1.0;
-      const mapLayer = viewer.imageryLayers.addImageryProvider(
-        new Cesium.UrlTemplateImageryProvider({
-          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          maximumLevel: 19,
-        })
-      );
-      mapLayer.alpha = 0.35;
-      imageryCredit = 'Esri satellite imagery + OSM roads';
+      imageryCredit = 'Esri satellite imagery + Reference Overlays';
     }
+
+    // ── PART 2: Transparent Reference Overlays (Borders, Place Names, and Roads) ──
+    // Added on top of the base satellite layer to show road maps and labels
+    // with transparent backgrounds so they do not cover or wash out the Earth.
+    const boundariesLayer = viewer.imageryLayers.addImageryProvider(
+      new Cesium.UrlTemplateImageryProvider({
+        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        maximumLevel: 19,
+      })
+    );
+    boundariesLayer.alpha = 0.65; // Clear labels and borders
+
+    const transportationLayer = viewer.imageryLayers.addImageryProvider(
+      new Cesium.UrlTemplateImageryProvider({
+        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+        maximumLevel: 19,
+      })
+    );
+    transportationLayer.alpha = 0.45; // Subtle but readable road lines
   } catch (e) {
     console.error('Imagery setup failed:', e);
   }
@@ -121,11 +122,10 @@ async function init() {
 
   // ── Holographic orbital globe overlay ──
   const holoGlobe3D = new HoloGlobe3D(viewer);
-  holoGlobe3D.mount();
 
   // ── Holographic globe styling ──────────────────────────────────────
   const globe = viewer.scene.globe;
-  globe.enableLighting = true;
+  globe.enableLighting = false;
   globe.depthTestAgainstTerrain = false;
   globe.showWaterEffect = false; // kill the animated sun-glare sheen over ocean; keeps real water-mask terrain shading
 
@@ -280,6 +280,15 @@ async function init() {
       const isOn = !toggle?.classList.contains('on');
 
       try {
+        if (layerId === 'orbital') {
+          if (isOn) {
+            holoGlobe3D.mount();
+          } else {
+            holoGlobe3D.destroy();
+          }
+          ui.setLayerOn('orbital', isOn);
+        }
+
         if (layerId === 'satellites') {
           if (isOn) {
             ui.setSummary('Loading TLE catalogs…');
