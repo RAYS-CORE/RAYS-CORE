@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => ({
     host: "127.0.0.1",
     port: 8080,
     strictPort: true,
+    allowedHosts: ["user-ms-7e06.tail3d648e.ts.net", ".ts.net"],
     hmr: {
       overlay: true,
     },

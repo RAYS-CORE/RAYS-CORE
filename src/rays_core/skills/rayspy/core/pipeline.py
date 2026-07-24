@@ -23,6 +23,15 @@ from .confidence_engine import ConfidenceEngine
 from .face_engine import FaceEngine
 from .knowledge_graph import KnowledgeGraph, GRAPH_NAMES
 from .report_generator import generate_html_report
+from .investigation_planner import InvestigationPlanner
+from .hypothesis_engine import HypothesisEngine
+
+try:
+    from rays_core.ai_client import AIClient
+    from rays_core.config import load_config
+except ImportError:
+    AIClient = None
+    load_config = None
 
 
 class InvestigationPipeline:
@@ -36,6 +45,24 @@ class InvestigationPipeline:
         self.confidence = ConfidenceEngine()
         self.face_engine = FaceEngine(str(self.workspace.root))
         self.graph = KnowledgeGraph()
+        
+        # Initialize deterministic OSINT AI components if available
+        self.ai_client = None
+        self.planner = None
+        self.hypothesis_engine = None
+        
+        if AIClient is not None:
+            # Try to load default config to initialize AI Client for planners
+            try:
+                config_path = os.path.expanduser("~/.rays/config.yaml")
+                if not os.path.exists(config_path):
+                    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(self.base_dir)))), "config.yaml")
+                config = load_config(config_path) if load_config else {"llm": {"provider": "ollama", "model": "llama3"}}
+                self.ai_client = AIClient(config)
+                self.planner = InvestigationPlanner(self.ai_client)
+                self.hypothesis_engine = HypothesisEngine(self.ai_client)
+            except Exception as e:
+                print(f"[Pipeline] Warning: Could not initialize AI planners: {e}")
 
         self._timings = {}
 
@@ -80,6 +107,17 @@ class InvestigationPipeline:
         self.registry.init(self.target_name)
         self.events.emit("initialized", target=self.target_name)
 
+        print(f"\n[Investigation Planner] Decomposing goal for target: {self.target_name}")
+        
+        # 0. Initialize autonomous planning if available
+        if self.planner:
+            initial_tasks = self._timed("goal_decomposition", self.planner.decompose_goal, f"Conduct a comprehensive OSINT investigation on {self.target_name} to map out associated accounts, faces, and locations.")
+            print(f"[Planner] Generated {len(initial_tasks)} tasks for investigation.")
+            for t in initial_tasks:
+                print(f"  - [{t.planner_type}] {t.objective}")
+        else:
+            print("[Planner] AI Client unavailable. Falling back to default deterministic execution.")
+
         # 1. Load Sherlock leads
         sherlock_leads = self._timed("load_sherlock", self._load_sherlock_leads)
         print(f"[Core] Loaded {len(sherlock_leads)} Sherlock leads", flush=True)
@@ -95,10 +133,8 @@ class InvestigationPipeline:
             self.registry.transition_candidate(cid, "LEAD", "Sherlock search result")
         self.registry.save()
 
-        # 2. Run enhanced pipeline
-        print(f"[Core] Launching enhanced pipeline for '{self.target_name}'...", flush=True)
-
-        # Import here to avoid circular imports at module level
+        # 2. Run enhanced pipeline (Execute Task Scheduled by Planner)
+        print(f"[Task Scheduler] Dispatching Media & Search Planners for '{self.target_name}'...", flush=True)
         sys.path.insert(0, os.path.join(self.base_dir, "scripts"))
         from face_search_pipeline import run_enhanced_pipeline
 
@@ -116,10 +152,31 @@ class InvestigationPipeline:
         )
         self.events.emit("pipeline_completed", result_keys=list(pipeline_result.keys()))
 
-        # 3. Sync pipeline results back into registry
+        # Mark tasks as completed
+        if self.planner:
+            for task in list(self.planner.active_tasks):
+                self.planner.complete_task(task.task_id, {"status": "success", "source": "enhanced_pipeline"})
+                
+        # 3. Sync pipeline results back into registry and graph
         self._sync_pipeline_to_registry(pipeline_result)
 
-        # 4. Generate output
+        # 4. Hypothesis Generation Engine (Post-Execution)
+        if self.hypothesis_engine:
+            print(f"\n[Hypothesis Engine] Analyzing Knowledge Graph and Contradictions...")
+            contradictions = self.confidence.get_contradictions()
+            if contradictions:
+                print(f"  > Found {len(contradictions)} contradictions. Requesting resolution hypotheses.")
+            
+            hypotheses = self._timed("hypothesis_generation", self.hypothesis_engine.generate_hypotheses, self.graph.to_dict(), contradictions)
+            if hypotheses:
+                print(f"[Hypothesis Engine] Generated {len(hypotheses)} new hypothesis paths:")
+                for h in hypotheses:
+                    print(f"  - [{h.get('id', 'H')}] {h.get('statement', '')}")
+                    self.registry.add_evidence("hypothesis", "hypothesis", "ai_engine", 0.0, h.get("statement", ""))
+            else:
+                print("[Hypothesis Engine] No further hypotheses generated.")
+
+        # 5. Generate output
         report_data = self._build_report(pipeline_result)
 
         self.registry.set_status("completed")

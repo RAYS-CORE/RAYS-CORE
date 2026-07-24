@@ -1875,6 +1875,10 @@ def select_from_menu(title: str, options: List[str], default_idx: int = 0) -> st
                 idx = int(choice) - 1
                 if 0 <= idx < len(options):
                     return options[idx]
+            except EOFError:
+                raise KeyboardInterrupt
+            except KeyboardInterrupt:
+                raise
             except Exception:
                 pass
             print(f"    {C_RED}Invalid choice.{RESET}")

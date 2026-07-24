@@ -58,3 +58,6 @@ Electron_app/**/resources/bundle-venv/
 Electron_app/**/electron/install-epoch.json
 Electron_app/**/.DS_Store
 Electron_app/**/__pycache__/
+
+# System codebase context documentation
+/RAYS-CODEBASE-EXPLANATION.md

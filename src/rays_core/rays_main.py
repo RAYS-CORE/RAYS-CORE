@@ -1067,6 +1067,11 @@ def main():
             rays.set_execution_mode("autonomous")
             execution_mode = "autonomous"
         
+        # ─── Initialize MCP and Skills ──────────────────────────
+        rays_ui.print_step("Connecting to MCP servers and auto-installing bundled skills...")
+        rays.skills_orchestrator.discover_skills()
+        rays.mcp_manager.connect_all()
+        
         # ─── Interactive Loop ───────────────────────────────────
         first_run = True
         intentional_exit = False
