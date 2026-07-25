@@ -1,0 +1,18 @@
+{
+  "investigation_id": "inv_ab0aa32629fb",
+  "target_name": "samreedh bhuyan",
+  "status": "running",
+  "created_at": "2026-07-24T20:14:33Z",
+  "updated_at": "2026-07-24T20:14:33Z",
+  "candidates": [],
+  "evidence": [],
+  "face_registry": [],
+  "graphs": {
+    "evidence": {},
+    "identity": {},
+    "organization": {},
+    "relationship": {}
+  },
+  "identities": [],
+  "report": null
+}

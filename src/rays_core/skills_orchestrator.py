@@ -78,6 +78,48 @@ class SkillsOrchestrator:
                             seen_names.add(skill_name)
                         except Exception as e:
                             rays_ui.print_warning(f"Failed to read skill at {skill_path}: {e}")
+                            
+            # Auto-register bundled MCP servers
+            for skill_path in skills_dir.iterdir():
+                if not skill_path.is_dir():
+                    continue
+                mcp_dir = skill_path / "mcp"
+                mcp_index = mcp_dir / "src" / "index.mjs"
+                if mcp_index.exists():
+                    try:
+                        # Ensure npm install is run
+                        node_modules = mcp_dir / "node_modules"
+                        if not node_modules.exists():
+                            rays_ui.print_info(f"Installing dependencies for MCP server in {skill_path.name}...")
+                            subprocess.run(["npm", "install"], cwd=str(mcp_dir), check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        
+                        # Register in mcp.json
+                        mcp_json_path = Path.home() / ".rays" / "mcp.json"
+                        mcp_data = {"mcp_servers": []}
+                        if mcp_json_path.exists():
+                            try:
+                                mcp_data = json.loads(mcp_json_path.read_text(encoding="utf-8"))
+                            except:
+                                pass
+                        
+                        if not isinstance(mcp_data, dict):
+                            mcp_data = {"mcp_servers": []}
+                        if "mcp_servers" not in mcp_data or not isinstance(mcp_data["mcp_servers"], list):
+                            mcp_data["mcp_servers"] = []
+                            
+                        server_name = f"{skill_path.name}_mcp"
+                        exists = any(s.get("name") == server_name for s in mcp_data["mcp_servers"])
+                        if not exists:
+                            mcp_data["mcp_servers"].append({
+                                "name": server_name,
+                                "command": "node",
+                                "args": [str(mcp_index)]
+                            })
+                            mcp_json_path.write_text(json.dumps(mcp_data, indent=2))
+                            rays_ui.print_info(f"Auto-registered MCP server for {skill_path.name}")
+                    except Exception as e:
+                        rays_ui.print_warning(f"Failed to auto-register MCP server for {skill_path.name}: {e}")
+
         return skills
 
     def run(self, user_prompt: str) -> Dict[str, Any]:

@@ -155,6 +155,7 @@ class MCPManager:
         return catalog
 
     def connect_all(self) -> Dict[str, MCPServerSession]:
+        self._server_configs = load_mcp_server_configs(self.config, self.codebase_root)
         names = [
             str(e.get("name", "")).strip()
             for e in self._server_configs

@@ -250,10 +250,15 @@ def _fetch_bytes(url: str, timeout: int = 20) -> bytes | None:
 
 
 def _download(url: str) -> Path | None:
+    if url.startswith("data:"):
+        return None
     if not url.startswith(("http://", "https://", "file://")):
-        p = Path(url)
-        if p.exists():
-            return p
+        try:
+            p = Path(url)
+            if p.exists():
+                return p
+        except OSError:
+            return None
     data = _fetch_bytes(url)
     if not data:
         return None
