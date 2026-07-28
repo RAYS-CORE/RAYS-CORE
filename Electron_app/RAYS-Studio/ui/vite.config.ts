@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => ({
         let proxyProcess: ChildProcessWithoutNullStreams | null = null;
         const startRayspyProxy = async () => {
           try {
-            const rayspyDir = path.join(cliRoot, "examples/skills/rayspy");
+            const rayspyDir = path.join(cliRoot, "src/rays_core/skills/rayspy");
             const proxyScript = path.join(rayspyDir, "proxy-server.mjs");
             const distIndex = path.join(rayspyDir, "dist/index.html");
             const nodeBinary = process.platform === "win32" ? "node.exe" : "node";
@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => ({
             } catch {
               console.warn(
                 "\n\x1b[33m[rays-session-manager] WARNING: rayspy UI dist folder not found.\x1b[0m\n" +
-                "\x1b[33mPlease run 'npm run build' inside 'examples/skills/rayspy' to compile it.\x1b[0m\n"
+                "\x1b[33mPlease run 'npm run build' inside 'src/rays_core/skills/rayspy' to compile it.\x1b[0m\n"
               );
             }
 

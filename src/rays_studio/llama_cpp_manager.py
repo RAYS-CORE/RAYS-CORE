@@ -7,8 +7,8 @@ import zipfile
 import urllib.request
 import threading
 import time
+from .github_downloader import download_latest_release
 
-LLAMA_CPP_RELEASES_URL = "https://github.com/ggerganov/llama.cpp/releases/latest/download"
 LLAMA_CPP_DIR = os.path.expanduser("~/.rays/llama_cpp")
 os.makedirs(LLAMA_CPP_DIR, exist_ok=True)
 
@@ -25,39 +25,26 @@ class LlamaCppManager:
 
     def download_llama_cpp_binary(self):
         if os.path.exists(self.binary_path):
-            print(f"[LLaMA.cpp] Binary already exists at {self.binary_path}")
             return
             
         sys_name = platform.system().lower()
         machine = platform.machine().lower()
         
-        # Map OS and architecture to release asset names
-        # Note: In a real system, you'd accurately map to the latest release assets (e.g. llama-bXXXX-bin-...)
-        # We will use a simplified logic mapping or mock for the sake of the architecture implementation
         print(f"[LLaMA.cpp] Detecting platform: {sys_name} {machine}")
         
-        # Placeholder for downloading real binary. For this demonstration, we'll write a mock bash script or bat file
-        # if we can't find a direct binary to download so the system doesn't crash without internet/exact asset matching.
-        print(f"[LLaMA.cpp] Downloading pre-built llama-server for {sys_name} {machine}...")
-        time.sleep(1) # Simulate download
-        
-        # Create a mock binary that simulates llama-server so the pipeline works end-to-end
-        self._create_mock_binary(sys_name)
-
-    def _create_mock_binary(self, sys_name: str):
-        # Creates a mock server script that just sleeps to simulate the server running
-        print("[LLaMA.cpp] Writing mock server binary for testing local architecture pipeline...")
+        keywords = []
         if sys_name == "windows":
-            with open(self.binary_path, "w") as f:
-                f.write("@echo off\n")
-                f.write("echo [llama-server mock] Starting server on port %*\n")
-                f.write("timeout /t 86400 /nobreak >nul\n")
+            keywords = ["win", "x64"]
+        elif sys_name == "darwin":
+            keywords = ["macos", "arm64" if "arm" in machine else "x64"]
         else:
-            with open(self.binary_path, "w") as f:
-                f.write("#!/bin/bash\n")
-                f.write("echo \"[llama-server mock] Starting server on port $@\"\n")
-                f.write("sleep infinity\n")
-            os.chmod(self.binary_path, 0o755)
+            keywords = ["ubuntu", "x64"]
+            
+        binary_names = ["llama-server.exe"] if sys_name == "windows" else ["llama-server"]
+        
+        success = download_latest_release("ggerganov/llama.cpp", LLAMA_CPP_DIR, binary_names, keywords)
+        if not success:
+            print("[LLaMA.cpp] Failed to download real binary. Please install manually.")
 
     def start_server(self, gguf_path: str):
         self.download_llama_cpp_binary()

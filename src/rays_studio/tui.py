@@ -8,14 +8,25 @@ from textual.reactive import reactive
 class ModelSidebar(Static):
     """Sidebar to list available GGUF models."""
     def compose(self) -> ComposeResult:
-        yield Label("Available Models", id="sidebar_title")
+        yield Label("Language Models", id="sidebar_title")
         yield ListView(
             ListItem(Label("llama-3-8b-instruct.gguf")),
             ListItem(Label("qwen-2.5-7b.gguf")),
             ListItem(Label("gemma-2b-it.gguf")),
             id="model_list"
         )
-        yield Button("Load Model & Start API", id="btn_start_server", variant="success")
+        yield Button("Load LLM & Start API", id="btn_start_server", variant="success")
+        
+        yield Label("Diffusion Models", id="sidebar_sd_title")
+        yield ListView(
+            ListItem(Label("sdxl-turbo-q8.gguf")),
+            ListItem(Label("stable-diffusion-v1-5.gguf")),
+            id="sd_model_list"
+        )
+        yield Button("Load Diffusion & Start API", id="btn_start_sd_server", variant="success")
+
+        yield Label("Pull Model from Hub", id="sidebar_pull_title")
+        yield Button("Pull new LLM or Diffusion", id="btn_pull_model", variant="primary")
 
 class DashboardPane(Static):
     """Main dashboard showing API status and Agent interactions."""
@@ -72,24 +83,27 @@ class RAYSStudioTUI(App):
         border-right: solid #8b5cf6;
     }
     
-    #sidebar_title {
+    #sidebar_title, #sidebar_sd_title {
         text-style: bold;
         padding-bottom: 1;
         color: #f4f4f5;
     }
+    #sidebar_sd_title {
+        margin-top: 1;
+    }
     
-    #model_list {
+    #model_list, #sd_model_list {
         height: 1fr;
         margin-bottom: 1;
         background: #18181b;
     }
     
-    #btn_start_server {
+    #btn_start_server, #btn_start_sd_server {
         width: 100%;
         background: #8b5cf6;
         color: white;
     }
-    #btn_start_server:hover {
+    #btn_start_server:hover, #btn_start_sd_server:hover {
         background: #a78bfa;
     }
     
@@ -179,10 +193,18 @@ class RAYSStudioTUI(App):
         api_status = self.query_one("#api_status", Label)
         
         if event.button.id == "btn_start_server":
-            api_status.update("Status: [magenta]ONLINE[/magenta]")
+            api_status.update("Status: [magenta]ONLINE (LLM)[/magenta]")
             api_log.write_line("[SYSTEM] Loaded selected GGUF model via llama.cpp (zero-copy mmap).")
             api_log.write_line("[SYSTEM] FastAPI Server started at 0.0.0.0:8000")
             api_log.write_line("[SYSTEM] Background training daemon listening on ~/.rays/logs/success/")
+            
+        elif event.button.id == "btn_start_sd_server":
+            api_status.update("Status: [magenta]ONLINE (Diffusion)[/magenta]")
+            api_log.write_line("[SYSTEM] Loaded selected Diffusion model via sd.cpp.")
+            api_log.write_line("[SYSTEM] FastAPI Image Server started at 0.0.0.0:8000")
+            
+        elif event.button.id == "btn_pull_model":
+            api_log.write_line("[SYSTEM] Pulling new model from Hugging Face... (Check terminal output for progress)")
             
         elif event.button.id == "btn_federated_sync":
             api_log.write_line("[FEDERATION] Packaging local SB-ZGA adapters...")

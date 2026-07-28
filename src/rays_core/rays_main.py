@@ -726,7 +726,19 @@ def main():
         "--pull",
         type=str,
         default=None,
-        help="Pull a model from Hugging Face for RAYS Studio"
+        help="Pull a LLM from Hugging Face for RAYS Studio"
+    )
+    parser.add_argument(
+        "--pull-sd",
+        type=str,
+        default=None,
+        help="Pull a Diffusion model from Hugging Face for RAYS Studio (via stable-diffusion.cpp)"
+    )
+    parser.add_argument(
+        "--generate-sd",
+        type=str,
+        default=None,
+        help="Generate an image using the loaded Diffusion model (Requires a prompt)"
     )
     parser.add_argument(
         "--auto",
@@ -760,7 +772,7 @@ def main():
     args = parser.parse_args()
 
     # RAYS Studio Execution Path
-    if args.studio or args.pull or args.host or args.core or args.start or args.finetune or args.amd_sync:
+    if args.studio or args.pull or args.pull_sd or args.generate_sd or args.host or args.core or args.start or args.finetune or args.amd_sync:
         try:
             import rays_studio.daemon as daemon
             from rays_studio.tui import RAYSStudioTUI
@@ -790,9 +802,92 @@ def main():
                             gguf_path = os.path.join(root, f)
                             print(f"Found GGUF at {gguf_path}. Starting local llama.cpp host...")
                             llama_manager.start_server(gguf_path)
+                            print("Press Ctrl+C to stop the server.")
+                            import time
+                            try:
+                                while True:
+                                    time.sleep(1)
+                            except KeyboardInterrupt:
+                                llama_manager.stop_server()
                             break
             except Exception as e:
                 print(f"Error pulling model: {e}")
+            sys.exit(0)
+
+        if args.pull_sd:
+            print(f"Pulling Diffusion model '{args.pull_sd}' from Hugging Face...")
+            try:
+                from huggingface_hub import snapshot_download
+                from rays_studio.sd_cpp_manager import manager as sd_manager
+                import os
+                
+                print(f"Downloading files for Diffusion model {args.pull_sd}...")
+                model_path = snapshot_download(
+                    repo_id=args.pull_sd,
+                    local_files_only=False,
+                    allow_patterns=["*.gguf", "*.safetensors"]
+                )
+                print(f"Successfully pulled and registered Diffusion model '{args.pull_sd}' to {model_path}.")
+                
+                # Auto-host if safetensors or gguf is found
+                found_model = False
+                for root, _, files in os.walk(model_path):
+                    for f in files:
+                        if f.endswith('.gguf') or f.endswith('.safetensors'):
+                            mod_path = os.path.join(root, f)
+                            print(f"Found model file at {mod_path}. Starting local sd.cpp server...")
+                            sd_manager.start_server(mod_path)
+                            found_model = True
+                            print("Press Ctrl+C to stop the server.")
+                            import time
+                            try:
+                                while True:
+                                    time.sleep(1)
+                            except KeyboardInterrupt:
+                                sd_manager.stop_server()
+                            found_model = True
+                            break
+                    if found_model:
+                        break
+            except Exception as e:
+                print(f"Error pulling Diffusion model: {e}")
+            sys.exit(0)
+            
+        if args.generate_sd:
+            from rays_studio.sd_cpp_manager import manager as sd_manager
+            import os
+            print(f"Generating image for prompt: '{args.generate_sd}'...")
+            
+            # Since stable-diffusion.cpp requires a model to be explicitly specified, 
+            # we'll look for a default or previously pulled model in the cache, or expect one to be set.
+            # In a real daemon, current_model would be persisted. For the CLI one-off run, 
+            # we'll scan the HF cache or ~/.rays/models for the first available SD model if not set.
+            if not sd_manager.current_model:
+                hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
+                found = False
+                if os.path.exists(hf_cache):
+                    for root, dirs, files in os.walk(hf_cache):
+                        # Skip known non-diffusion models
+                        if "sentence-transformers" in root.lower() or "llm" in root.lower():
+                            continue
+                        for f in files:
+                            if f.endswith('.gguf') and ('sd' in root.lower() or 'diffusion' in root.lower() or 'flux' in root.lower()):
+                                sd_manager.current_model = os.path.join(root, f)
+                                print(f"Auto-selected Diffusion model: {sd_manager.current_model}")
+                                found = True
+                                break
+                        if found: break
+                
+                if not found:
+                    print("Error: No valid diffusion model (.gguf) found in cache. Please run `--pull-sd` first.")
+                    sys.exit(1)
+            
+            output_file = "output.png"
+            success = sd_manager.generate_image(args.generate_sd, output_file)
+            if success:
+                print(f"Successfully generated image and saved to {output_file}")
+            else:
+                print("Failed to generate image.")
             sys.exit(0)
 
         if args.host:

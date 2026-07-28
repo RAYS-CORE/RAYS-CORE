@@ -15,12 +15,12 @@
   },
   "dependencies": {
     "cesium": "^1.141.0",
-    "satellite.js": "^4.1.4"
+    "satellite.js": "^4.1.4",
+    "https-proxy-agent": "^9.0.0",
+    "undici": "^8.7.0"
   },
   "devDependencies": {
-    "https-proxy-agent": "^9.0.0",
     "playwright": "^1.61.1",
-    "undici": "^8.7.0",
     "vite": "^5.4.0"
   }
 }

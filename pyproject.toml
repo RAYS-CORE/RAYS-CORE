@@ -22,7 +22,16 @@ dependencies = [
   "mcp>=1.2,<2",
   "posthog>=2.4,<6",
   "sherlock-project>=0.14.0",
-  "holehe>=1.61"
+  "holehe>=1.61",
+  "websockets>=12,<14",
+  "onnxruntime>=1.16,<2",
+  "tokenizers>=0.15,<1",
+  "torch>=2.0.0",
+  "fastapi>=0.100",
+  "uvicorn>=0.20",
+  "huggingface_hub>=0.19",
+  "pydantic>=2.0",
+  "textual>=0.40"
 ]
 keywords = ["ai", "codebase", "developer-tools", "cli", "agent"]
 classifiers = [
@@ -45,18 +54,6 @@ dev = [
   "twine>=6.1,<7",
   "pyinstaller>=6,<7",
 ]
-studio = [
-  "websockets>=12,<14",
-  "onnxruntime>=1.16,<2",
-  "tokenizers>=0.15,<1",
-  "torch>=2.0.0",
-  "fastapi>=0.100",
-  "uvicorn>=0.20",
-  "huggingface_hub>=0.19",
-  "pydantic>=2.0",
-  "textual>=0.40"
-]
-
 [project.scripts]
 rays = "rays_core.rays_main:main"
 
@@ -72,7 +69,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-rays_core = ["config.yaml"]
+rays_core = ["config.yaml", "skills/**/*", "skills/**/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

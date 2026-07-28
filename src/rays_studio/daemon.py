@@ -42,9 +42,10 @@ def get_base_path():
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 base_path = get_base_path()
-rayspy_dist = os.path.join(base_path, "examples", "skills", "rayspy", "dist")
+site_packages_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+rayspy_dist = os.path.join(site_packages_dir, "rays_core", "skills", "rayspy", "dist")
 if not os.path.exists(rayspy_dist):
-    rayspy_dist = os.path.join(base_path, "rayspy", "dist")
+    rayspy_dist = os.path.join(base_path, "rays_core", "skills", "rayspy", "dist")
 
 if os.path.exists(rayspy_dist):
     app.mount("/rayspy", StaticFiles(directory=rayspy_dist, html=True), name="rayspy")
@@ -633,10 +634,11 @@ def startup_event():
     def start_rayspy_proxy():
         try:
             base_path = get_base_path()
-            rayspy_dir = os.path.join(base_path, "examples", "skills", "rayspy")
+            site_packages_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            rayspy_dir = os.path.join(site_packages_dir, "rays_core", "skills", "rayspy")
             if not os.path.exists(rayspy_dir):
-                # Check for PyInstaller flat structure
-                rayspy_dir = os.path.join(base_path, "rayspy")
+                # Check for source tree structure
+                rayspy_dir = os.path.join(base_path, "src", "rays_core", "skills", "rayspy")
                 
             node_binary = "node.exe" if os.name == "nt" else "node"
             node_path = os.path.join(base_path, "node", node_binary)
@@ -647,6 +649,16 @@ def startup_event():
                 
             proxy_script = os.path.join(rayspy_dir, "proxy-server.mjs")
             if os.path.exists(proxy_script):
+                node_modules_dir = os.path.join(rayspy_dir, "node_modules")
+                if not os.path.exists(node_modules_dir):
+                    print("[DAEMON] node_modules not found for proxy server. Running npm install...")
+                    npm_binary = "npm.cmd" if os.name == "nt" else "npm"
+                    try:
+                        subprocess.run([npm_binary, "install", "--omit=dev"], cwd=rayspy_dir, check=True)
+                        print("[DAEMON] Successfully installed proxy dependencies.")
+                    except Exception as npm_err:
+                        print(f"[DAEMON] Warning: npm install failed. Proxy may crash. ({npm_err})")
+
                 print(f"[DAEMON] Starting rayspy proxy server with {node_path}...")
                 subprocess.Popen([node_path, proxy_script], cwd=rayspy_dir)
             else:
