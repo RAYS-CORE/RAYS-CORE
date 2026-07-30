@@ -60,13 +60,17 @@ function runtimeOverridesFromProvider(providerConfig: ProviderConfig) {
     model: providerConfig.model,
     api_key: providerConfig.apiKey || "",
   };
+  const embedding: Record<string, string> = {};
+
   if (providerConfig.provider === "ollama") {
-    llm.ollama_endpoint = "http://localhost:11434/api/generate";
+    const endpoint = providerConfig.baseUrl || "http://localhost:11434/api/generate";
+    llm.ollama_endpoint = endpoint;
+    embedding.ollama_endpoint = endpoint;
   }
   if (providerConfig.provider === "rays_studio" && providerConfig.baseUrl) {
     llm.base_url = providerConfig.baseUrl;
   }
-  return { llm };
+  return { llm, embedding };
 }
 
 export function isElectronHost(): boolean {

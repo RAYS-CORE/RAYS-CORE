@@ -14,6 +14,7 @@ export function WorkspacePicker({ open, busy = false, error, onBrowse, onStart }
   const [provider, setProvider] = useState<ProviderConfig["provider"]>("ollama");
   const [model, setModel] = useState("qwen2.5-coder:latest");
   const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const [browseError, setBrowseError] = useState<string | null>(null);
 
   if (!open) return null;
@@ -107,6 +108,22 @@ export function WorkspacePicker({ open, busy = false, error, onBrowse, onStart }
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
+              style={{ borderColor: "hsl(255 50% 60% / 0.2)" }}
+            />
+          </div>
+        )}
+        {provider === "ollama" && (
+          <div className="mt-3 space-y-2">
+            <label htmlFor="base-url" className="text-xs tracking-widest uppercase text-muted-foreground">
+              Ollama API Endpoint (Optional)
+            </label>
+            <input
+              id="base-url"
+              type="text"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="http://localhost:11434/api/generate"
               className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
               style={{ borderColor: "hsl(255 50% 60% / 0.2)" }}
             />

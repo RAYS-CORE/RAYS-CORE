@@ -153,14 +153,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                       />
                     </div>
                   )}
-                  {provider === "rays_studio" && (
+                  {(provider === "rays_studio" || provider === "ollama") && (
                     <div className="space-y-2">
                       <label className="text-ui font-medium text-foreground/80">Base URL</label>
                       <input
                         type="text"
                         value={baseUrl}
                         onChange={(e) => setBaseUrl(e.target.value)}
-                        placeholder="http://localhost:8001/v1"
+                        placeholder={provider === "ollama" ? "http://localhost:11434/api/generate" : "http://localhost:8001/v1"}
                         className="w-full bg-secondary rounded-md px-3 py-2 text-ui text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
                       />
                     </div>

@@ -572,7 +572,13 @@ mcp_orchestrator_prompts:
     : {{\"name\": \"<tool>\", \"arguments\": {{}}}},\n  \"exit_message\": \"when completed\"\
     \n}}\n"
 mcp_quiet_stderr: true
-mcp_servers: []
+mcp_servers:
+- args:
+  - -u
+  - src/rays_core/skills/deckforge/mcp_launcher.py
+  command: python
+  env: {}
+  name: deckforge
 mcp_subagent_max_turns: 25
 mcp_tool_policy:
   default: allow

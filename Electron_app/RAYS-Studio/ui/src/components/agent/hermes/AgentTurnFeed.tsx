@@ -77,6 +77,42 @@ function AgentTurnBlock({ turn, isLatest }: { turn: AgentTurn; isLatest: boolean
           </button>
         </div>
       )}
+      {(() => {
+        const appTool = turn.items.find(i => {
+          if (i.kind === "tool" && i.status === "done" && i.detail) {
+            try {
+              const p = JSON.parse(i.detail);
+              return p && p.__OPEN_APP === true;
+            } catch {
+              return false;
+            }
+          }
+          return false;
+        });
+        if (appTool && appTool.kind === "tool") {
+          let appData: any = null;
+          try {
+            appData = JSON.parse(appTool.detail);
+          } catch {}
+          if (appData) {
+            return (
+              <div className="mt-3 flex items-center justify-start">
+                <button
+                  type="button"
+                  onClick={() => {
+                    (window as any).__OPEN_APP = { url: appData.url, title: appData.title };
+                    window.location.hash = "#/app-extension";
+                  }}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm"
+                >
+                  Open {appData.title || "App"}
+                </button>
+              </div>
+            );
+          }
+        }
+        return null;
+      })()}
       {turn.status === "done" && turn.endedAt && (
         <div className="mt-3 flex items-center gap-1.5 text-[0.625rem] text-muted-foreground/40 tabular-nums">
           <span className="inline-block size-3 rounded-sm bg-muted-foreground/20" aria-hidden />
