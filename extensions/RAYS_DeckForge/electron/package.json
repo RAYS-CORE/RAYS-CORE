@@ -1,0 +1,76 @@
+{
+  "name": "rays-deckforge",
+  "productName": "RAYS DeckForge",
+  "version": "0.8.0-beta",
+  "exportVersion": "v0.2.6",
+  "main": "app_dist/main.js",
+  "description": "RAYS DeckForge — Local-First AI Presentation Engine",
+  "homepage": "",
+  "repository": "",
+  "keywords": [
+    "electron",
+    "electron-builder",
+    "Microsoft Store",
+    "AI presentation generator",
+    "open-source",
+    "presentation software",
+    "tailwindcss",
+    "typescript",
+    "fastapi",
+    "nextjs",
+    "puppeteer",
+    "sharp",
+    "template management",
+    "slide generation",
+    "modern UI",
+    "automation"
+  ],
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "dist": "electron-builder",
+    "postinstall": "electron-builder install-app-deps",
+    "dev": "rm -rf app_dist && tsc && electron . --no-sandbox",
+    "setup:env": "npm install && cd ../servers/fastapi && uv sync && cd ../nextjs && npm install && cd ../../electron && npm run setup:export-runtime",
+    "install:pyinstaller": "cd ../servers/fastapi && echo 'pyinstaller will be installed via uv run --with when building'",
+    "build:ts": "rm -rf app_dist && tsc",
+    "build:css": "tailwindcss -i ./resources/ui/assets/css/tailwind.import.css -o ./resources/ui/assets/css/tailwind.css --watch",
+    "build:vectorstore": "echo 'Using prebuilt shared icons vectorstore index'",
+    "build:export-runtime": "node sync_export_runtime.js",
+    "setup:export-runtime": "node sync_export_runtime.js",
+    "fetch:export-runtime": "node sync_export_runtime.js --force",
+    "fetch:export-runtime:latest": "EXPORT_RUNTIME_VERSION=latest node sync_export_runtime.js --force",
+    "build:nextjs": "node build_nextjs_resources.js",
+    "build:fastapi": "rm -rf resources/fastapi && npm run build:vectorstore && cross-env MEM0_SPACY_STRICT=true node ensure_spacy_model.js && cd ../servers/fastapi && uv run --with pyinstaller python -m PyInstaller --distpath ../../electron/resources server.spec && cd ../../electron && node copy_fastapi_assets.js",
+    "generate:version": "node generate_update.js",
+    "build:electron": "npm run generate:version && npm run build:export-runtime && rm -rf app_dist && tsc && node build.js",
+    "build:all": "npm run clean:build && npm run setup:env && npm run build:ts && npm run install:pyinstaller && npm run build:nextjs && npm run build:fastapi && npm run build:electron",
+    "clean:build": "rm -rf resources/nextjs && rm -rf resources/fastapi && rm -rf app_dist"
+  },
+  "author": {
+    "name": "RAYS"
+  },
+  "dependencies": {
+    "@llamaindex/liteparse": "^1.5.2",
+    "@puppeteer/browsers": "^1.9.1",
+
+    "@tailwindcss/cli": "^4.1.5",
+    "@types/uuid": "^10.0.0",
+    "dotenv": "^16.5.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "puppeteer": "^24.38.0",
+    "serve-handler": "^6.1.6",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4.1.5",
+    "tree-kill": "^1.2.2",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^36.1.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

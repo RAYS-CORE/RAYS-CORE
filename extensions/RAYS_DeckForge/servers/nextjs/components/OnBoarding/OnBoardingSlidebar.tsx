@@ -1,0 +1,21 @@
+import React from 'react'
+
+const OnBoardingSlidebar = ({ step }: { step: number }) => {
+    return (
+        <div className="w-[300px] relative" style={{ background: step === 3 ? '#1d1d1d' : '#000000', borderRight: '1px solid #383838' }}>
+            <div className="sticky top-8 left-0 m-6">
+                <span className="text-xl font-bold tracking-wider" style={{ color: '#ffffff', fontFamily: "'Space Mono', monospace" }}>RAYS</span>
+            </div>
+            {step !== 3 && <svg xmlns="http://www.w3.org/2000/svg" width="296" height="591" viewBox="0 0 296 591" fill="none">
+                <path d="M291.5 183.5C311.916 183.5 328.5 200.271 328.5 221C328.5 241.729 311.916 258.5 291.5 258.5C271.084 258.5 254.5 241.729 254.5 221C254.5 200.271 271.084 183.5 291.5 183.5Z" stroke="#383838" strokeWidth="3" />
+                <path d="M291.5 131.238C340.408 131.238 380.089 171.407 380.09 220.998C380.09 270.589 340.408 310.758 291.5 310.758C242.591 310.758 202.91 270.589 202.91 220.998C202.91 171.407 242.591 131.238 291.5 131.238Z" stroke="#383838" strokeWidth="3" />
+                <path d="M291.5 43.6289C388.173 43.6289 466.576 123.021 466.576 220.998C466.576 318.975 388.174 398.368 291.5 398.368C194.826 398.368 116.424 318.975 116.424 220.998C116.424 123.022 194.826 43.629 291.5 43.6289Z" stroke="#383838" strokeWidth="3" />
+                <path d="M287.5 -62.5C434.322 -62.5 553.5 64.115 553.5 220.5C553.5 376.885 434.322 503.5 287.5 503.5C140.678 503.5 21.5 376.885 21.5 220.5C21.5 64.115 140.678 -62.5 287.5 -62.5Z" stroke="#383838" strokeWidth="3" />
+                <path d="M291 -176.5C495.019 -176.5 660.5 -5.07604 660.5 206.5C660.5 418.076 495.019 589.5 291 589.5C86.9809 589.5 -78.5 418.076 -78.5 206.5C-78.5 -5.07604 86.9809 -176.5 291 -176.5Z" stroke="#383838" strokeWidth="3" />
+            </svg>}
+
+        </div>
+    )
+}
+
+export default OnBoardingSlidebar
