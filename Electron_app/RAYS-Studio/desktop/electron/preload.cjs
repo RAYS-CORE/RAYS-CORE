@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("raysDesktop", {
   isElectron: true,
   getInstallEpoch: () => ipcRenderer.invoke("rays:get-install-epoch"),
+  saveImage: (base64) => ipcRenderer.invoke("rays:save-image", { base64 }),
   selectFolder: () => ipcRenderer.invoke("rays:select-folder"),
   readFile: (workspaceRoot, relativePath) =>
     ipcRenderer.invoke("rays:read-file", { workspaceRoot, relativePath }),

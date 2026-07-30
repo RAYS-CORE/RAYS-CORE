@@ -19,6 +19,12 @@ import torch.optim as optim
 from rays_studio.adapters import SpectrallyBoundedZeroGatedAdapter
 from rays_studio.finetuning_math import FinetuningEngine
 from rays_studio.llama_cpp_manager import LlamaCppManager
+from rays_studio.sd_cpp_manager import manager as sd_manager
+
+def is_diffusion_model(repo_id: str) -> bool:
+    if not repo_id: return False
+    repo_lower = repo_id.lower()
+    return any(k in repo_lower for k in ["diffusion", "flux", "sdxl", "sd-"])
 
 try:
     import requests
@@ -191,8 +197,12 @@ class RAYSStudioState:
             
         with self.model_lock:
             if gguf_file:
-                self.start_llama_server(gguf_file)
-                print(f"Model loaded successfully from {gguf_file}.")
+                if is_diffusion_model(repo_id):
+                    sd_manager.current_model = gguf_file
+                    print(f"Diffusion Model loaded successfully from {gguf_file}.")
+                else:
+                    self.start_llama_server(gguf_file)
+                    print(f"Model loaded successfully from {gguf_file}.")
             else:
                 print(f"No .gguf file found for {repo_id}!")
                 self.stop_llama()
@@ -422,14 +432,29 @@ def get_catalog(search: str = ""):
         return {"models": [], "download_status": state.download_status}
         
     api = huggingface_hub.HfApi()
+    catalog = []
     try:
+        # If the search query looks like a repo_id, try an exact match first
+        if search and "/" in search:
+            try:
+                exact_m = api.model_info(search)
+                catalog.append({
+                    "name": exact_m.id,
+                    "size": "N/A", 
+                    "desc": getattr(exact_m, 'pipeline_tag', 'HuggingFace Model'),
+                    "downloads": f"{getattr(exact_m, 'downloads', 0):,}"
+                })
+            except Exception:
+                pass # Not found or private
+                
         if not search:
             models = api.list_models(limit=30, sort="downloads")
         else:
             models = api.list_models(search=search, limit=30, sort="downloads")
             
-        catalog = []
         for m in models:
+            if any(x["name"] == m.id for x in catalog):
+                continue
             catalog.append({
                 "name": m.id,
                 "size": "N/A", 
@@ -439,7 +464,7 @@ def get_catalog(search: str = ""):
         return {"models": catalog, "download_status": state.download_status}
     except Exception as e:
         print(f"Catalog Error: {e}")
-        return {"models": [], "error": str(e), "download_status": state.download_status}
+        return {"models": catalog, "error": str(e), "download_status": state.download_status}
 
 def background_download_model(repo_id: str):
     if not HF_AVAILABLE:
@@ -474,8 +499,11 @@ def background_download_model(repo_id: str):
         else:
             state.set_download_status(repo_id, f"completed: {model_path}")
             print(f"[DAEMON] Successfully downloaded {repo_id} to {model_path}")
-            print(f"[DAEMON] Automatically starting llama-server for {repo_id}")
-            llama_manager.start_server(gguf_path)
+            if is_diffusion_model(repo_id):
+                print(f"[DAEMON] Ready to generate images with {repo_id}")
+            else:
+                print(f"[DAEMON] Automatically starting llama-server for {repo_id}")
+                llama_manager.start_server(gguf_path)
     except Exception as e:
         state.set_download_status(repo_id, f"error: {str(e)}")
         print(f"[DAEMON] Failed to download {repo_id}: {e}")
@@ -505,8 +533,41 @@ class ChatCompletionRequest(BaseModel):
 
 @app.post("/v1/chat/completions")
 def chat_completions(req: ChatCompletionRequest):
+    if is_diffusion_model(req.model):
+        import tempfile
+        import base64
+        import uuid
+        prompt = req.messages[-1].content
+        fd, temp_path = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        
+        print(f"[DAEMON] Generating image for prompt: {prompt}")
+        success = sd_manager.generate_image(prompt, temp_path)
+        if success and os.path.exists(temp_path):
+            with open(temp_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("utf-8")
+            os.remove(temp_path)
+            return {
+                "id": "chatcmpl-" + str(uuid.uuid4()),
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": req.model,
+                "choices": [{
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "[Image Generated]",
+                        "type": "image",
+                        "base64": f"data:image/png;base64,{b64}"
+                    }
+                }]
+            }
+        else:
+            if os.path.exists(temp_path): os.remove(temp_path)
+            return {"error": "Failed to generate image with stable-diffusion.cpp. Check console for details."}
+
     if not state.llama_manager.server_process:
-        return {"error": "No model loaded. Please load a model first."}
+        return {"error": "No LLM loaded. Please load a model first."}
         
     try:
         payload = req.model_dump()

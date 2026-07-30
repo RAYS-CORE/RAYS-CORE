@@ -42,7 +42,7 @@ export default function StudioLayout() {
   const [connectedClients, setConnectedClients] = useState<any[]>([]);
   
   // Chat Interface State
-  const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
+  const [messages, setMessages] = useState<{role: string, content: string, type?: string, base64?: string}[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isInferencing, setIsInferencing] = useState(false);
   
@@ -226,7 +226,12 @@ export default function StudioLayout() {
 
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: displayContent },
+          { 
+            role: "assistant", 
+            content: displayContent,
+            type: assistantMessage.type,
+            base64: assistantMessage.base64
+          },
         ]);
       } else if (data.error) {
         setLogs(prev => [...prev, `[ERROR] Inference failed: ${data.error}`]);
@@ -237,6 +242,19 @@ export default function StudioLayout() {
       setLogs(prev => [...prev, `[ERROR] Connection failed during inference: ${err}`]);
     } finally {
       setIsInferencing(false);
+    }
+  };
+
+  const handleSaveImage = async (base64Str: string) => {
+    try {
+      const success = await (window as any).raysDesktop?.saveImage?.(base64Str);
+      if (success) {
+        setLogs(prev => [...prev, "[SYSTEM] Image saved successfully to your computer."]);
+      } else {
+        setLogs(prev => [...prev, "[SYSTEM] Image save cancelled or failed."]);
+      }
+    } catch (err) {
+      setLogs(prev => [...prev, `[ERROR] Failed to save image: ${err}`]);
     }
   };
 
@@ -484,7 +502,19 @@ export default function StudioLayout() {
                        ) : messages.map((m, i) => (
                          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                            <div className={`text-xs px-3 py-2 rounded max-w-[80%] ${m.role === 'user' ? 'bg-rays-violet text-white' : 'bg-secondary text-foreground'}`}>
-                             {m.content}
+                             {m.type === 'image' && m.base64 ? (
+                               <div className="flex flex-col gap-2 items-start">
+                                 <img src={m.base64} alt="Generated output" className="max-w-full rounded-md border border-border" />
+                                 <button 
+                                   onClick={() => handleSaveImage(m.base64!)}
+                                   className="text-[10px] bg-background text-foreground hover:bg-secondary border border-border px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 font-semibold"
+                                 >
+                                   <Download size={12} /> Save Image
+                                 </button>
+                               </div>
+                             ) : (
+                               m.content
+                             )}
                            </div>
                          </div>
                        ))}

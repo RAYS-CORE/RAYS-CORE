@@ -31,7 +31,15 @@ async function ensureFreshUserData(installEpoch) {
   } catch {
     // first launch or missing marker
   }
-  if (stored === installEpoch) return;
+  if (stored === installEpoch) {
+    if (isDev) {
+      console.log("RAYS Studio: Dev mode detected, forcing cache and storage clear...");
+      const defaultSession = session.defaultSession;
+      await defaultSession.clearStorageData();
+      await defaultSession.clearCache();
+    }
+    return;
+  }
   const defaultSession = session.defaultSession;
   await defaultSession.clearStorageData();
   await defaultSession.clearCache();
@@ -550,6 +558,23 @@ app.on("window-all-closed", () => {
 });
 
 ipcMain.handle("rays:get-install-epoch", () => ({ epoch: readBundledInstallEpoch() }));
+
+ipcMain.handle("rays:save-image", async (event, { base64 }) => {
+  const result = await dialog.showSaveDialog({
+    title: "Save Generated Image",
+    defaultPath: "generated_image.png",
+    filters: [{ name: "Images", extensions: ["png"] }]
+  });
+  if (result.canceled || !result.filePath) return false;
+  try {
+    const base64Data = base64.replace(/^data:image\/png;base64,/, "");
+    require('fs').writeFileSync(result.filePath, base64Data, 'base64');
+    return true;
+  } catch (err) {
+    console.error("Failed to save image:", err);
+    return false;
+  }
+});
 
 ipcMain.handle("rays:select-folder", async () => {
   const result = await dialog.showOpenDialog({
