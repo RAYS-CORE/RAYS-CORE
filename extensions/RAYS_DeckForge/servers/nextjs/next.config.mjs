@@ -9,6 +9,8 @@ const nextConfig = {
         allowedDevOrigins: [
           "http://127.0.0.1:40001",
           "http://localhost:40001",
+          "http://127.0.0.1:8080",
+          "http://localhost:8080",
           "127.0.0.1",
           "localhost",
         ],

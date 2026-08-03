@@ -137,7 +137,7 @@ class SymbolDetector:
         from .ai_client import AIClient
         embedding_cfg = self.config.get('embedding', {})
         embedding_provider = embedding_cfg.get('provider', self.config['llm']['provider'])
-        embedding_endpoint = embedding_cfg.get('ollama_endpoint', self.config['llm'].get('ollama_endpoint', 'http://localhost:11434/api/generate'))
+        embedding_endpoint = embedding_cfg.get('ollama_endpoint', self.config['llm'].get('ollama_endpoint', 'http://localhost:11434'))
         embedding_api_key = embedding_cfg.get('api_key', self.config['llm'].get('api_key', ''))
         embedding_client = AIClient({
             'provider': embedding_provider,

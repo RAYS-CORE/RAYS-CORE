@@ -63,7 +63,8 @@ function runtimeOverridesFromProvider(providerConfig: ProviderConfig) {
   const embedding: Record<string, string> = {};
 
   if (providerConfig.provider === "ollama") {
-    const endpoint = providerConfig.baseUrl || "http://localhost:11434/api/generate";
+    let endpoint = providerConfig.baseUrl || "http://localhost:11434";
+    endpoint = endpoint.replace("/api/generate", "").replace("/api", "");
     llm.ollama_endpoint = endpoint;
     embedding.ollama_endpoint = endpoint;
   }

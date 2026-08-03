@@ -216,6 +216,9 @@ echo -e "${CYAN}▸${RESET} FastAPI backend  → http://localhost:${FASTAPI_PORT
 echo -e "${CYAN}▸${RESET} Next.js frontend → http://localhost:${NEXTJS_PORT}"
 echo ""
 
+# Export auth bypass flag for both backend and frontend
+export DISABLE_AUTH="${DISABLE_AUTH:-true}"
+
 # ── FastAPI ─────────────────────────────────────────────────────
 echo -e "${VIOLET}Starting FastAPI backend...${RESET}"
 cd "$SCRIPT_DIR/servers/fastapi"

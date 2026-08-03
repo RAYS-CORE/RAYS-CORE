@@ -6,10 +6,12 @@ import shutil
 from pathlib import Path
 
 def _copy_skills():
-    """Copy skills to ~/.rays/skills during installation."""
+    """Copy skills and extensions to ~/.rays during installation."""
     source_skills = Path(__file__).parent / "src" / "rays_core" / "skills"
+    source_extensions = Path(__file__).parent / "extensions"
     target_rays_dir = Path.home() / ".rays"
     target_skills = target_rays_dir / "skills"
+    target_extensions = target_rays_dir / "extensions"
     
     if source_skills.exists() and source_skills.is_dir():
         target_rays_dir.mkdir(parents=True, exist_ok=True)
@@ -17,6 +19,48 @@ def _copy_skills():
             shutil.rmtree(target_skills)
         shutil.copytree(source_skills, target_skills)
         print(f"Successfully copied skills to {target_skills}")
+
+    if source_extensions.exists() and source_extensions.is_dir():
+        target_rays_dir.mkdir(parents=True, exist_ok=True)
+        if target_extensions.exists():
+            shutil.rmtree(target_extensions)
+        shutil.copytree(source_extensions, target_extensions)
+        print(f"Successfully copied extensions to {target_extensions}")
+        
+    # Auto-inject RAYS_DeckForge into mcp.json
+    mcp_json_path = target_rays_dir / "mcp.json"
+    mcp_data = {"mcp_servers": []}
+    if mcp_json_path.exists():
+        import json
+        try:
+            with open(mcp_json_path, "r") as f:
+                content = f.read().strip()
+                if content:
+                    mcp_data = json.loads(content)
+                    if isinstance(mcp_data, list):
+                        mcp_data = {"mcp_servers": mcp_data}
+        except Exception as e:
+            print(f"Warning: could not read existing mcp.json: {e}")
+            
+    deckforge_config = {
+        "name": "rays_deckforge",
+        "command": "python",
+        "args": [
+            str(target_extensions / "RAYS_DeckForge" / "servers" / "fastapi" / "rays_mcp.py")
+        ],
+        "enabled": True
+    }
+    
+    servers = mcp_data.get("mcp_servers", [])
+    # Remove existing deckforge config if present to update it
+    servers = [s for s in servers if s.get("name") != "rays_deckforge"]
+    servers.append(deckforge_config)
+    mcp_data["mcp_servers"] = servers
+    
+    with open(mcp_json_path, "w") as f:
+        import json
+        json.dump(mcp_data, f, indent=2)
+    print(f"Successfully configured RAYS_DeckForge in {mcp_json_path}")
 
 class PostInstallCommand(install):
     """Post-installation for installation mode."""

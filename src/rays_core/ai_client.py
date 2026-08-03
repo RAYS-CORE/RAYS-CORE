@@ -222,17 +222,26 @@ class AIClient:
         try:
             # Use streaming internally to show progress if needed, but for now just handle the large response better
             payload["stream"] = True
+            rays_ui.hud_set_status("Thinking", "Waiting for Ollama to process prompt (may take minutes for large context)...")
             response = requests.post(url, json=payload, timeout=3600, stream=True)
             response.raise_for_status()
             
             full_response = ""
             prompt_tokens = 0
             completion_tokens = 0
+            
+            rays_ui.hud_set_status("Thinking", "Generating response...")
+            count = 0
             for line in response.iter_lines():
                 if line:
                     chunk = json.loads(line)
                     text = chunk.get('response', '')
-                    full_response += text
+                    if text:
+                        full_response += text
+                        count += 1
+                        if count % 15 == 0:
+                            rays_ui.hud_set_status("Thinking", f"Generating... ({count} tokens)")
+                    
                     if chunk.get('done'):
                         prompt_tokens = int(
                             chunk.get('prompt_eval_count')

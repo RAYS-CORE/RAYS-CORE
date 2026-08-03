@@ -69,7 +69,7 @@ class RAYS:
         self.deterministic_history = [] 
 
         # Initialize AI client for text generation
-        llm_endpoint = self.config['llm'].get('ollama_endpoint', 'http://localhost:11434/api/generate')
+        llm_endpoint = self.config['llm'].get('ollama_endpoint', 'http://localhost:11434')
         self.ai_client = AIClient({
             'provider': self.config['llm']['provider'],
             'model': self.config['llm']['model'],
@@ -1044,7 +1044,7 @@ def main():
         session_llm_api_key = ""
         
         if chosen_provider_label == "ollama (locally)":
-            current_config['llm']['ollama_endpoint'] = "http://localhost:11434/api/generate"
+            current_config['llm']['ollama_endpoint'] = "http://localhost:11434"
             rays_ui.print_step("Fetching local models...")
             try:
                 resp = requests.get("http://localhost:11434/api/tags", timeout=2)
@@ -1097,7 +1097,7 @@ def main():
             current_config.setdefault('embedding', {})
             # Built-in default path uses local ollama embedding model from config.
             current_config['embedding']['provider'] = "ollama"
-            current_config['embedding'].setdefault('ollama_endpoint', "http://localhost:11434/api/generate")
+            current_config['embedding'].setdefault('ollama_endpoint', "http://localhost:11434")
         else:
             provider_choice = rays_ui.select_from_menu(
                 "Select Embedding Provider",
@@ -1106,7 +1106,7 @@ def main():
             if provider_choice == "ollama":
                 current_config.setdefault('embedding', {})
                 current_config['embedding']['provider'] = "ollama"
-                current_config['embedding']['ollama_endpoint'] = "http://localhost:11434/api/generate"
+                current_config['embedding']['ollama_endpoint'] = "http://localhost:11434"
                 rays_ui.print_step("Fetching local embedding models...")
                 try:
                     resp = requests.get("http://localhost:11434/api/tags", timeout=2)

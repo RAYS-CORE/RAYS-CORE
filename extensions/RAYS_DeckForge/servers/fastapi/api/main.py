@@ -64,3 +64,19 @@ async def static_icon_fallback_middleware(request: Request, call_next):
     if not os.path.isfile(placeholder):
         return response
     return FileResponse(placeholder, media_type="image/svg+xml")
+
+from fastapi.exceptions import RequestValidationError
+from starlette.responses import JSONResponse
+from fastapi import Request
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    import json
+    with open('/tmp/422_error.log', 'w') as f:
+        f.write(json.dumps(exc.errors(), indent=2))
+        f.write("\n\n")
+        f.write(str(exc.body))
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )

@@ -123,7 +123,7 @@ export function WorkspacePicker({ open, busy = false, error, onBrowse, onStart }
               type="text"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="http://localhost:11434/api/generate"
+              placeholder="http://localhost:11434"
               className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-rays-pink"
               style={{ borderColor: "hsl(255 50% 60% / 0.2)" }}
             />

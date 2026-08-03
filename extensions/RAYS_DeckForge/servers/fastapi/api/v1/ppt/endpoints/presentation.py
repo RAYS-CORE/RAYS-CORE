@@ -917,15 +917,21 @@ async def generate_presentation_handler(
             sql_session.add(async_status)
 
         # 9. Export
-        presentation_and_path = await export_presentation(
-            presentation_id,
-            presentation.title or str(uuid.uuid4()),
-            request.export_as,
-            cookie_header=export_cookie_header,
-        )
+        try:
+            presentation_and_path = await export_presentation(
+                presentation_id,
+                presentation.title or str(uuid.uuid4()),
+                request.export_as,
+                cookie_header=export_cookie_header,
+            )
+            export_path = presentation_and_path.path
+        except Exception as e:
+            logger.warning(f"Failed to export presentation {presentation_id}: {e}")
+            export_path = ""
 
         response = PresentationPathAndEditPath(
-            **presentation_and_path.model_dump(),
+            presentation_id=presentation_id,
+            path=export_path,
             edit_path=f"/presentation?id={presentation_id}",
         )
 

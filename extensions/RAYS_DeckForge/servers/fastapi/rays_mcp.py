@@ -5,10 +5,28 @@ import subprocess
 import os
 
 mcp = FastMCP(name="RAYS_MCP")
-BASE = "http://127.0.0.1:8000"
+BASE = "http://127.0.0.1:8085"
 
 _deckforge_process = None
 
+def start_backend():
+    global _deckforge_process
+    if _deckforge_process is not None:
+        return True
+        
+    script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    start_script = os.path.join(script_dir, "start-dev.sh")
+    
+    if os.path.exists(start_script):
+        _deckforge_process = subprocess.Popen(
+            ["bash", start_script, "--fastapi-port", "8085", "--nextjs-port", "3005"], 
+            cwd=script_dir,
+            env={**os.environ, "DISABLE_AUTH": "true"},
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return True
+    return False
 
 @mcp.tool(
     name="Generate presentation",
@@ -25,34 +43,55 @@ async def generate_ppt(
     instructions: str | None = None,
 ) -> dict:
     """Generate a presentation from a topic and return the file path."""
+    if start_backend():
+        await asyncio.sleep(3) # Wait for FastAPI to bind
+        
     async with httpx.AsyncClient(base_url=BASE, timeout=300.0) as client:
+        # Wait up to 10 seconds for the backend to be ready
+        for _ in range(10):
+            try:
+                # We can just hit /docs or root to check if it's up
+                await client.get("/")
+                break
+            except httpx.ConnectError:
+                await asyncio.sleep(1)
+                
+        payload = {
+            "content": topic,
+            "n_slides": n_slides,
+            "template": template,
+            "export_as": export_as,
+            "language": language,
+            "tone": tone,
+            "verbosity": verbosity,
+            "instructions": instructions,
+        }
+        with open("/tmp/deckforge_mcp_payload.log", "a") as f:
+            import json
+            f.write(json.dumps(payload) + "\n")
         response = await client.post(
             "/api/v1/ppt/presentation/generate",
-            json={
-                "content": topic,
-                "n_slides": n_slides,
-                "template": template,
-                "export_as": export_as,
-                "language": language,
-                "tone": tone,
-                "verbosity": verbosity,
-                "instructions": instructions,
-            },
+            json=payload,
         )
         response.raise_for_status()
         data = response.json()
 
-        # Download the exported file
-        file_url = data["path"]
-        file_response = await client.get(file_url)
-        filename = file_url.split("/")[-1]
-        with open(filename, "wb") as f:
-            f.write(file_response.content)
+        # Download the exported file if available
+        file_url = data.get("path")
+        filename = None
+        if file_url:
+            try:
+                file_response = await client.get(file_url)
+                filename = file_url.split("/")[-1]
+                with open(filename, "wb") as f:
+                    f.write(file_response.content)
+            except Exception:
+                pass
 
         return {
             "presentation_id": data["presentation_id"],
             "file": filename,
-            "edit_url": f"http://127.0.0.1:3000{data['edit_path']}",
+            "edit_url": f"http://127.0.0.1:3005{data['edit_path']}",
         }
 
 
@@ -68,7 +107,16 @@ async def list_templates() -> list[dict]:
         {"name": "standard", "type": "builtin"},
         {"name": "swift", "type": "builtin"},
     ]
+    if start_backend():
+        await asyncio.sleep(3)
+        
     async with httpx.AsyncClient(base_url=BASE, timeout=30.0) as client:
+        for _ in range(10):
+            try:
+                await client.get("/")
+                break
+            except httpx.ConnectError:
+                await asyncio.sleep(1)
         response = await client.get("/api/v1/ppt/template-management/summary")
         if response.status_code == 200:
             data = response.json()
@@ -89,7 +137,17 @@ async def list_templates() -> list[dict]:
 )
 async def list_presentations() -> list[dict]:
     """List all previously generated presentations."""
+    if start_backend():
+        await asyncio.sleep(3)
+        
     async with httpx.AsyncClient(base_url=BASE, timeout=30.0) as client:
+        for _ in range(10):
+            try:
+                await client.get("/")
+                break
+            except httpx.ConnectError:
+                await asyncio.sleep(1)
+                
         response = await client.get("/api/v1/ppt/presentation/all")
         response.raise_for_status()
         presentations = response.json()
@@ -114,7 +172,7 @@ def open_deckforge() -> str:
         import json
         return json.dumps({
             "__OPEN_APP": True,
-            "url": "http://localhost:3000",
+            "url": "http://localhost:3005",
             "title": "DeckForge",
             "success": True,
             "message": "DeckForge is already running. The user can access it via the UI button."
@@ -124,17 +182,18 @@ def open_deckforge() -> str:
     start_script = os.path.join(script_dir, "start-dev.sh")
     
     if os.path.exists(start_script):
-        # We spawn the process and let it run
-        _deckforge_process = subprocess.Popen(
-            ["bash", start_script], 
-            cwd=script_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        with open("/tmp/deckforge_stdout.log", "w") as out_log, open("/tmp/deckforge_stderr.log", "w") as err_log:
+            _deckforge_process = subprocess.Popen(
+                ["bash", start_script, "--fastapi-port", "8085", "--nextjs-port", "3005"], 
+                cwd=script_dir,
+                env={**os.environ, "DISABLE_AUTH": "true"},
+                stdout=out_log,
+                stderr=err_log
+            )
         import json
         return json.dumps({
             "__OPEN_APP": True,
-            "url": "http://localhost:3000",
+            "url": "http://localhost:3005",
             "title": "DeckForge",
             "success": True,
             "message": "DeckForge started successfully. Click the 'Open DeckForge' button in the chat."
