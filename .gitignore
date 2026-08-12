@@ -61,3 +61,6 @@ Electron_app/**/__pycache__/
 
 # System codebase context documentation
 /RAYS-CODEBASE-EXPLANATION.md
+pi/
+hermes-agent/
+opencode/

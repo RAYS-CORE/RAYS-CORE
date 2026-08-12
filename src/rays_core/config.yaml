@@ -546,7 +546,8 @@ git_status_summarizer_prompts:
     '
 llm:
   api_key: ''
-  model: qwen3-coder:30b
+  model: ornith:35b
+  num_ctx: 131072
   ollama_endpoint: http://localhost:11434
   provider: ollama
 mcp_backend_failure_max_turns: 10
@@ -1058,12 +1059,15 @@ terminal_execution_prompts:
     **COMMAND HISTORY (from previous attempts/intents):**\n{command_history}\n\n**STRICT\
     \ RULES:**\n1. **Batching**: Return ALL commands needed to satisfy the intent\
     \ at once. \n2. **Sequential Logic**: Ensure commands are in the correct execution\
-    \ order.\n3. **Stay in Root**: Use the codebase root provided above.\n\n**TASK:**\n\
-    Generate the list of commands to be executed. \nIf the intent requires no commands,\
-    \ return an empty list of commands or \"exit\".\n\n**JSON STRUCTURE:**\n{{\n \
-    \ \"commands\": [\"<shell command 1>\", \"<shell command 2>\", ...],\n  \"cwd\"\
-    : \"<working directory>\",\n  \"reasoning\": \"<why these commands fulfill the\
-    \ user's specific request>\"\n}}\n"
+    \ at once. \n2. **Sequential Logic**: Ensure commands are in the correct execution\
+    \ order.\n3. **Stay in Root**: Use the codebase root provided above.\n4. **Backgrounding**:\
+    \ If the command is a long-running server (like Vite or Django), set 'background'\
+    \ to true so it doesn't block the agent.\n\n**TASK:**\nGenerate the list of commands\
+    \ to be executed. \nIf the intent requires no commands, return an empty list of\
+    \ commands or \"exit\".\n\n**JSON STRUCTURE:**\n{{\n  \"commands\": [ \n    {{\
+    \ \"command\": \"<shell command>\", \"background\": false, \"timeout\": 20 }}\
+    \ \n  ],\n  \"cwd\": \"<working directory>\",\n  \"reasoning\": \"<why these commands\
+    \ fulfill the user's specific request>\"\n}}\n"
   generate_intents: "You are a terminal execution planner. Your job is to determine\
     \ IF any shell commands are strictly required BEFORE or AFTER a code edit.\n\n\
     **CODEBASE ROOT (ABSOLUTE PATH):**\n\"{codebase_root}\"\n\n**USER PROMPT:**\n\"\

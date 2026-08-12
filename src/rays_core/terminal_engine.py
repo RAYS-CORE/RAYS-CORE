@@ -157,15 +157,31 @@ class TerminalEngine:
 
         # 2. Execute all commands in sequence
         combined_output = []
-        for i, cmd_str in enumerate(cmds):
+        for i, cmd_item in enumerate(cmds):
+            # Support new schema (dict) or old schema (str)
+            if isinstance(cmd_item, dict):
+                cmd_str = cmd_item.get('command', '')
+                is_bg = cmd_item.get('background', False)
+                timeout = cmd_item.get('timeout', 20)
+            else:
+                cmd_str = cmd_item
+                is_bg = False
+                timeout = 20
+
             # ASK FOR APPROVAL IF NOT AUTONOMOUS
             if self.execution_mode != "autonomous":
                 if not rays_ui.ask_approval(f"Run command: {cmd_str}?"):
                     rays_ui.print_warning(f"Skipping command: {cmd_str}")
                     continue
 
-            rays_ui.print_info(f"Running command {i+1}/{len(cmds)}")
-            success, output = self._run_command(cmd_str, cwd)
+            # Emit Kanban Running Status
+            rays_ui.orch_emit_task_status('running', cmd_str)
+            rays_ui.print_info(f"Running command {i+1}/{len(cmds)}{' [BACKGROUND]' if is_bg else ''}")
+            
+            if is_bg:
+                success, output = self._run_command_background(cmd_str, cwd, timeout)
+            else:
+                success, output = self._run_command(cmd_str, cwd, timeout)
             
             if not output.strip():
                 output = "[No output]"
@@ -178,11 +194,14 @@ class TerminalEngine:
                 
             self.command_history.append((cmd_str, last_50))
             self.chain_command_history.append((cmd_str, last_50))
-            combined_output.append(f"Command: {cmd_str}\nOutput:\n{last_50}")
+            combined_output.append(f"Command: {cmd_str} {'(Background)' if is_bg else ''}\nOutput:\n{last_50}")
             
-            if not success:
+            if not success and not is_bg:
+                rays_ui.orch_emit_task_status('blocked', cmd_str)
                 rays_ui.print_warning("Command failed — stopping batch")
                 break
+            else:
+                rays_ui.orch_emit_task_status('done', cmd_str)
                 
         # 3. Consolidated decision after all commands (or after failure)
         aggregated_result = "\n\n".join(combined_output)
@@ -229,13 +248,65 @@ class TerminalEngine:
             rays_ui.print_error(f"Command generation error: {e}")
             return {"commands": [], "reasoning": f"Error: {e}"}
 
-    def _run_command(self, command: str, cwd: str = None) -> Tuple[bool, str]:
-        """Run a shell command and return success status and output. Defaults to codebase_root."""
+    def _run_command_background(self, command: str, cwd: str = None, timeout: int = 20, service_name: str = "background_task") -> Tuple[bool, str]:
+        """Run a command in the background (like servers)."""
         target_cwd = cwd if cwd else str(self.codebase_root)
         try:
-            # Use a timeout for long-running commands (e.g., dev servers)
-            timeout = 20  # seconds
+            import threading
+            import time
+            from . import rays_ui
             
+            # Use temp file for output so we can easily tail it
+            log_dir = self.rays_dir / "logs"
+            log_dir.mkdir(exist_ok=True)
+            log_file = log_dir / f"bg_{int(time.time())}.log"
+            
+            # Start process writing directly to log file
+            outfile = open(log_file, "w")
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                cwd=target_cwd,
+                stdout=outfile,
+                stderr=subprocess.STDOUT
+            )
+            
+            # Let it run for a couple of seconds to ensure it starts without immediate crash
+            time.sleep(2)
+            
+            if process.poll() is not None:
+                # It crashed or exited very fast
+                with open(log_file, "r") as f:
+                    output = f.read()
+                return process.returncode == 0, output
+                
+            task_id = rays_ui.bg_task_start(service_name)
+            
+            def monitor_task(p, t_id, f):
+                p.wait()
+                f.close()
+                rays_ui.bg_task_done(t_id, success=(p.returncode == 0))
+                
+            monitor_thread = threading.Thread(target=monitor_task, args=(process, task_id, outfile), daemon=True)
+            monitor_thread.start()
+                
+            # It is successfully running in background
+            msg = f"Task launched in background (PID: {process.pid}).\nLogs streaming to: {log_file}\n"
+            msg += "You can proceed with other tasks while this runs."
+            return True, msg
+            
+        except Exception as e:
+            return False, str(e)
+
+    def run_background_service(self, command: str, service_name: str, cwd: str = None) -> Tuple[bool, str]:
+        """Public interface to run a background service."""
+        return self._run_command_background(command, cwd=cwd, service_name=service_name)
+
+    def _run_command(self, command: str, cwd: str = None, timeout: int = 20) -> Tuple[bool, str]:
+        """Run a shell command and return success status and output. Defaults to codebase_root."""
+        target_cwd = cwd if cwd else str(self.codebase_root)
+        import time
+        try:
             process = subprocess.Popen(
                 command,
                 shell=True,

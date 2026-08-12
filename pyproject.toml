@@ -32,7 +32,8 @@ dependencies = [
   "uvicorn>=0.20",
   "huggingface_hub>=0.19",
   "pydantic>=2.0",
-  "textual>=0.40"
+  "textual>=0.40",
+  "prompt_toolkit>=3.0.0"
 ]
 keywords = ["ai", "codebase", "developer-tools", "cli", "agent"]
 classifiers = [

@@ -157,6 +157,9 @@ class AgentOrchestrator:
                     spawn_reason = (
                         step.get("spawn_reason") or reason or "Run workspace skill"
                     )
+                elif step_type == "service":
+                    label = f"service/{step.get('service_name', 'bg')}"
+                    spawn_reason = step.get("spawn_reason") or reason or "Run background service"
                 else:
                     label = f"mcp/{step.get('server', '?')}"
                     spawn_reason = (
@@ -178,6 +181,18 @@ class AgentOrchestrator:
                         cumulative_history,
                     )
                     cumulative_history.append(record)
+                elif step_type == "service":
+                    command = step.get("command")
+                    service_name = step.get("service_name", "background_task")
+                    from .terminal_engine import TerminalEngine
+                    te = TerminalEngine(self.ai_client, self.config, self.codebase_root)
+                    success, msg = te.run_background_service(command, service_name)
+                    cumulative_history.append({
+                        "type": "service",
+                        "command": command,
+                        "status": "success" if success else "error",
+                        "output": msg
+                    })
                 elif step_type == "mcp":
                     server_name = step.get("server")
                     if self._mcp_server_connection_lost(cumulative_history, server_name):
@@ -255,6 +270,8 @@ class AgentOrchestrator:
                 filtered.append({**step, "type": "skill"})
             elif step_type == "mcp" and step.get("server") in mcp_map:
                 filtered.append({**step, "type": "mcp"})
+            elif step_type == "service":
+                filtered.append({**step, "type": "service"})
         return filtered
 
     def _ensure_workspace_step(
@@ -286,7 +303,7 @@ class AgentOrchestrator:
         history: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         prompt = self.prompts.get("select_required_capabilities", "").format(
-            user_prompt=user_prompt,
+            user_prompt=user_prompt + "\n[SYSTEM: You can run persistent background services (like a dev server). Output a step with 'type': 'service', 'command': '<cmd>', 'service_name': '<name>']",
             skills_list=json.dumps(skills_list, indent=2),
             mcp_servers=json.dumps(mcp_capabilities, indent=2),
             execution_history=format_prior_executions(history, user_prompt),
@@ -307,7 +324,7 @@ class AgentOrchestrator:
             if c.get("name") in required_mcp_servers
         ]
         prompt = self.prompts.get("generate_agent_execution_plan", "").format(
-            user_prompt=user_prompt,
+            user_prompt=user_prompt + "\n[SYSTEM: You can run persistent background services (like a dev server). Output a step with 'type': 'service', 'command': '<cmd>', 'service_name': '<name>']",
             required_skills=json.dumps(required_skills),
             required_mcp_servers=json.dumps(required_mcp_servers),
             mcp_tool_catalog=json.dumps(catalog, indent=2, default=str),

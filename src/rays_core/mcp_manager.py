@@ -161,7 +161,12 @@ class MCPManager:
             for e in self._server_configs
             if e.get("enabled", True) is not False and e.get("name")
         ]
-        return self.connect_servers(names)
+        if names:
+            rays_ui.print_mcp_connect_header(names)
+        result = self.connect_servers(names)
+        if names:
+            rays_ui.print_mcp_connect_summary(dict(self._sessions))
+        return result
 
     def connect_servers(self, server_names: List[str]) -> Dict[str, MCPServerSession]:
         if not self._server_configs or not server_names:
@@ -183,7 +188,7 @@ class MCPManager:
         try:
             self._run_async(self._connect_servers_async(wanted))
         except Exception as exc:
-            rays_ui.print_warning(f"MCP connect failed: {exc}")
+            rays_ui.print_mcp_server_status('MCP', 'error', str(exc)[:120])
         self._connected = True
         return dict(self._sessions)
 
@@ -195,37 +200,46 @@ class MCPManager:
         ]
         await self._connect_servers_async(set(names))
 
-    async def _connect_servers_async(self, wanted: set[str]) -> None:
+    async def _connect_servers_async(self, wanted: set) -> None:
         if not wanted:
             return
 
-        for entry in self._server_configs:
-            if entry.get("enabled", True) is False:
-                continue
-            name = str(entry.get("name", "")).strip()
-            if not name or name not in wanted:
-                continue
-            existing = self._sessions.get(name)
-            if existing and existing.status == "connected":
-                continue
-            transport = (entry.get("transport") or "stdio").lower()
-            if transport != "stdio":
-                self._sessions[name] = MCPServerSession(
-                    name=name,
-                    status="error",
-                    error=f"Unsupported transport '{transport}' (stdio only in v1)",
-                )
-                rays_ui.print_warning(
-                    f"MCP server '{name}': transport '{transport}' not supported yet."
-                )
-                continue
-            try:
-                await self._connect_stdio_server(name, entry)
-            except Exception as exc:
-                self._sessions[name] = MCPServerSession(
-                    name=name, status="error", error=str(exc)
-                )
-                rays_ui.print_warning(f"MCP server '{name}' failed to connect: {exc}")
+        # Silence asyncio 'Task exception was never retrieved' noise during connect
+        import logging as _logging
+        _asyncio_logger = _logging.getLogger('asyncio')
+        _prev_level = _asyncio_logger.level
+        _asyncio_logger.setLevel(_logging.CRITICAL)
+
+        try:
+            for entry in self._server_configs:
+                if entry.get("enabled", True) is False:
+                    continue
+                name = str(entry.get("name", "")).strip()
+                if not name or name not in wanted:
+                    continue
+                existing = self._sessions.get(name)
+                if existing and existing.status == "connected":
+                    continue
+                transport = (entry.get("transport") or "stdio").lower()
+                if transport != "stdio":
+                    self._sessions[name] = MCPServerSession(
+                        name=name,
+                        status="error",
+                        error=f"Unsupported transport '{transport}' (stdio only in v1)",
+                    )
+                    rays_ui.print_mcp_server_status(
+                        name, 'error', f"transport '{transport}' not supported"
+                    )
+                    continue
+                try:
+                    await self._connect_stdio_server(name, entry)
+                except Exception as exc:
+                    self._sessions[name] = MCPServerSession(
+                        name=name, status="error", error=str(exc)
+                    )
+                    rays_ui.print_mcp_server_status(name, 'error', str(exc)[:100])
+        finally:
+            _asyncio_logger.setLevel(_prev_level)
 
     async def _connect_stdio_server(self, name: str, entry: Dict[str, Any]) -> None:
         from mcp import ClientSession, StdioServerParameters
@@ -290,11 +304,12 @@ class MCPManager:
             description=entry.get("description", ""),
             tools=tools,
         )
-        msg = f"{name} · {len(tools)} tool{'s' if len(tools) != 1 else ''}"
+        tool_label = f"{len(tools)} tool{'s' if len(tools) != 1 else ''}"
         if rays_ui.orchestration_hud_active():
-            rays_ui.hud_set_status("MCP", msg)
+            rays_ui.hud_set_status("MCP", f"{name} · {tool_label}")
         else:
-            rays_ui.print_step(f"MCP '{name}' connected ({len(tools)} tools)")
+            rays_ui.print_mcp_server_status(name, 'connected', tool_label)
+
 
     def list_capabilities(self) -> List[Dict[str, Any]]:
         """Planner-facing catalog of connected MCP servers."""

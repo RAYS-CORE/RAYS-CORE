@@ -85,6 +85,74 @@ THOUGHT_PROCESS_BUFFER = []
 _ACTIVE_SPINNER = None
 PENDING_TOGGLE = False  # Signal-safe toggle flag
 
+# ─── Background Task Tracking ────────────────────────────────────────
+# Maps task_id → (description, start_time)
+_BACKGROUND_TASKS: Dict[str, Tuple[str, float]] = {}
+_BG_LOCK = threading.Lock()
+
+
+def bg_task_start(task_id: str, description: str) -> None:
+    """Register a background task for status bar tracking."""
+    with _BG_LOCK:
+        _BACKGROUND_TASKS[task_id] = (description, time.time())
+    _pt_invalidate()
+
+
+def bg_task_done(task_id: str) -> None:
+    """Remove a background task from tracking."""
+    with _BG_LOCK:
+        _BACKGROUND_TASKS.pop(task_id, None)
+    _pt_invalidate()
+
+
+def bg_task_count() -> int:
+    """Return number of active background tasks."""
+    with _BG_LOCK:
+        return len(_BACKGROUND_TASKS)
+
+
+def _pt_invalidate() -> None:
+    """Thread-safe invalidation of the prompt_toolkit app, if running."""
+    try:
+        app = _get_pt_app()
+        if app is not None:
+            loop = getattr(app, 'loop', None)
+            if loop is not None:
+                loop.call_soon_threadsafe(app.invalidate)
+            else:
+                app.invalidate()
+    except Exception:
+        pass
+
+
+# ─── Session-level state for status bar ──────────────────────────────
+_SESSION_START_TIME: float = 0.0
+_SESSION_MODEL: str = "rays"
+_SESSION_CTX_USED: int = 0
+_SESSION_CTX_LIMIT: int = 131072
+_SESSION_AGENT_RUNNING: bool = False
+_PT_APP_REF: Any = None   # weak reference to the active pt Application
+
+
+def _get_pt_app():
+    return _PT_APP_REF
+
+
+def status_set_model(model: str) -> None:
+    global _SESSION_MODEL
+    _SESSION_MODEL = model
+
+
+def status_add_tokens(n: int) -> None:
+    global _SESSION_CTX_USED
+    _SESSION_CTX_USED += n
+
+
+def status_set_agent_running(running: bool) -> None:
+    global _SESSION_AGENT_RUNNING
+    _SESSION_AGENT_RUNNING = running
+    _pt_invalidate()
+
 
 class OrchestrationHUD:
     """Single top status line: rotating shapes + phase, tokens pinned to the right edge."""
@@ -321,6 +389,28 @@ def orch_emit_plan(summary: str, plan: List[Dict[str, Any]]) -> None:
             f"{f' — {C_DIM_GRAY}{truncate_for_display(reason, 72)}{RESET}' if reason else ''}\n"
         )
         _orch_transcript_note(f"{i}. {label}{phase} {reason}")
+
+def orch_emit_task_status(status: str, task_name: str) -> None:
+    """
+    Print a Kanban-style task status update to the terminal.
+    Statuses: 'todo' (◻), 'running' (▶), 'blocked' (⊘), 'done' (✓)
+    """
+    if status == 'done':
+        mark = f"{C_GREEN}✓{RESET}"
+        status_text = f"{C_GREEN}Goal done:{RESET}"
+    elif status == 'running':
+        mark = f"{C_YELLOW}▶{RESET}"
+        status_text = f"{C_YELLOW}Running:{RESET}"
+    elif status == 'blocked':
+        mark = f"{C_RED}⊘{RESET}"
+        status_text = f"{C_RED}Blocked:{RESET}"
+    else:
+        mark = f"{C_GRAY}◻{RESET}"
+        status_text = f"{C_GRAY}Queued:{RESET}"
+        
+    line = f"  {mark} {status_text} {C_WHITE}{task_name}{RESET}\n"
+    _orch_persistent_print(line)
+    _orch_transcript_note(f"[{status.upper()}] {task_name}")
 
 
 def orch_emit_capabilities(skills: List[str], mcp_servers: List[str], reasoning: str = "") -> None:
@@ -743,11 +833,12 @@ def _center(text: str, width: int = 0) -> str:
 #                             BANNER
 # ═══════════════════════════════════════════════════════════════════════
 
-def display_banner():
-    """Display a full-width framed banner with centered content."""
+def display_banner(skills: List[str] = None, mcp_servers: List[str] = None, model: str = "", cwd: str = ""):
+    """Display the RAYS banner with centered ANSI art and double-line ╔═╗ border."""
     inner = max(60, _safe_inner_width(margin=8, minimum=60))
 
     def _create_line(content: str) -> str:
+        """Center a styled line inside the double-line box."""
         visible_len = _vis_len(content)
         left_pad = max(0, (inner - visible_len) // 2)
         right_pad = max(0, inner - visible_len - left_pad)
@@ -760,26 +851,95 @@ def display_banner():
     lines = [
         hdr,
         gap,
-        _create_line(f"{C_PINK}██████╗   {C_LAVENDER}█████╗  {C_LILAC}██╗   ██╗ {C_MID}███████╗"),
+        _create_line(f"{C_PINK}██████╗  {C_LAVENDER} █████╗  {C_LILAC}██╗   ██╗ {C_MID}███████╗"),
         _create_line(f"{C_PINK}██╔══██╗ {C_LAVENDER}██╔══██╗ {C_LILAC}╚██╗ ██╔╝ {C_MID}██╔════╝"),
         _create_line(f"{C_PINK}██████╔╝ {C_LAVENDER}███████║  {C_LILAC}╚████╔╝  {C_MID}███████╗"),
         _create_line(f"{C_PINK}██╔══██╗ {C_LAVENDER}██╔══██║   {C_LILAC}╚██╔╝   {C_MID}╚════██║"),
         _create_line(f"{C_PINK}██║  ██║ {C_LAVENDER}██║  ██║    {C_LILAC}██║    {C_MID}███████║"),
-        _create_line(f"{C_PINK}╚═╝  ╚═╝ {C_LAVENDER}╚═╝  ╚═╝    {C_LILAC}╚═╝    {C_MID}╚══════╝"),
+        _create_line(f"{C_PINK}╚═╝  ╚═╝ {C_LAVENDER}╚═╝  ╚═╝    {C_LILAC}╚═╝    {C_MID}╚══════╝{RESET}"),
         gap,
-        _create_line(f"{C_LAVENDER}Vivid Shapes Development Assistant"),
-        _create_line(f"{C_LILAC}github.com/markknoffler/RAYS-CORE-CLI"),
+        _create_line(f"{C_LAVENDER}Vivid Shapes Development Assistant{RESET}"),
+        _create_line(f"{C_MID}github.com/markknoffler/RAYS-CORE-CLI{RESET}"),
         gap,
-        ftr,
     ]
+
+    # ── Commands grid ────────────────────────────────────────────────
+    _SLASH_COMMANDS_DEF = [
+        ("/help",         "Show available commands"),
+        ("/code <task>",  "Autonomous coding pipeline"),
+        ("/chat <q>",     "Read-only Q&A"),
+        ("/model <name>", "Switch LLM model"),
+        ("/mcp",          "List MCP servers"),
+        ("/mode auto",    "Full autonomy mode"),
+        ("/mode ask",     "Ask-permission mode"),
+        ("/git",          "Summarize git changes"),
+        ("/clear",        "Clear screen"),
+        ("/bg",           "Background tasks"),
+        ("/exit",         "Exit RAYS"),
+    ]
+
+    # Separator line
+    sep_inner = f"{C_MID}{'─' * (inner - 2)}{RESET}"
+    lines.append(f"{C_PURPLE}║{RESET} {sep_inner} {C_PURPLE}║{RESET}")
+
+    # Commands header
+    lines.append(_create_line(f"{BOLD}{C_LAVENDER}Available Commands{RESET}"))
+    lines.append(gap)
+
+    # Commands in 2 equal columns
+    half = (len(_SLASH_COMMANDS_DEF) + 1) // 2
+    col1 = _SLASH_COMMANDS_DEF[:half]
+    col2 = _SLASH_COMMANDS_DEF[half:]
+    col_w = (inner - 4) // 2
+    for i in range(max(len(col1), len(col2))):
+        c1 = col1[i][0] if i < len(col1) else ""
+        c2 = col2[i][0] if i < len(col2) else ""
+        c1s = f"{C_PINK}{c1}{RESET}" if c1 else ""
+        c2s = f"{C_PINK}{c2}{RESET}" if c2 else ""
+        pad1 = max(0, col_w - len(c1))
+        pad2 = max(0, col_w - len(c2))
+        row = f"  {c1s}{' ' * pad1}  {c2s}{' ' * pad2}"
+        row_vis = 2 + len(c1) + pad1 + 2 + len(c2) + pad2
+        rpad = max(0, inner - row_vis)
+        lines.append(f"{C_PURPLE}║{RESET}{row}{' ' * rpad}{C_PURPLE}║{RESET}")
+
+    lines.append(gap)
+
+    # ── Footer rows: model · cwd · stats ────────────────────────────
+    model_display = model or _SESSION_MODEL or "rays"
+    cwd_display = cwd or os.getcwd()
+    max_cwd = 40
+    if len(cwd_display) > max_cwd:
+        cwd_display = "…" + cwd_display[-(max_cwd - 1):]
+    skill_count = len(skills) if skills else 0
+    mcp_count = len(mcp_servers) if mcp_servers else 0
+    stats = f"{len(_SLASH_COMMANDS_DEF)} commands"
+    if skill_count:
+        stats += f"  ·  {skill_count} skills"
+    if mcp_count:
+        stats += f"  ·  {mcp_count} MCP"
+
+    lines.append(_create_line(f"{C_PINK}{model_display}{RESET}  {C_MID}·{RESET}  {C_MID}{cwd_display}{RESET}"))
+    lines.append(_create_line(f"{DIM}{C_LAVENDER}{stats}{RESET}"))
+    lines.append(ftr)
 
     print()
     for line in lines:
         print(line)
+
+    # Hint line below box
+    hint = (
+        f"  {C_MID}Type your message, or {RESET}"
+        f"{C_PINK}/help{RESET}"
+        f"{C_MID} for commands  ·  {RESET}"
+        f"{C_LAVENDER}/code <task>{RESET}"
+        f"{C_MID} to enter the coding pipeline{RESET}"
+    )
+    print(hint)
     print()
 
 
-# ═══════════════════════════════════════════════════════════════════════
+
 #                          ANIMATED SPINNER
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -1166,6 +1326,52 @@ def print_mcp_tool_done(
         f"{server}/{tool_name} {C_GRAY}→ {preview}{RESET}\n",
         force=True,
     )
+
+
+def print_mcp_server_status(name: str, status: str, detail: str = "") -> None:
+    """Print a clean per-server MCP connection status line."""
+    if status == 'connected':
+        icon = f"{C_GREEN}✓{RESET}"
+        name_color = C_WHITE
+        detail_color = C_LAVENDER
+    else:
+        icon = f"{C_MID}✗{RESET}"
+        name_color = C_MID
+        detail_color = C_MID
+    detail_str = f"  {C_MID}·{RESET}  {detail_color}{detail}{RESET}" if detail else ""
+    sys.stdout.write(f"     {icon}  {name_color}{name}{RESET}{detail_str}\n")
+    sys.stdout.flush()
+
+
+def print_mcp_connect_header(server_names: List[str]) -> None:
+    """Print a clean header before MCP connection sequence begins."""
+    inner = max(40, _safe_inner_width(margin=8, minimum=40))
+    count = len(server_names)
+    label = f"server{'s' if count != 1 else ''}"
+    # Build styled content, then compute padding
+    content_styled = f"  {BOLD}{C_PINK}MCP Connections{RESET}  {C_MID}·{RESET}  {C_WHITE}{count}{RESET} {C_MID}{label}{RESET}  "
+    content_vis = _vis_len(content_styled)
+    pad = max(0, inner - content_vis)
+    print(f"\n  {C_PURPLE}╭{'─' * inner}╮{RESET}")
+    print(f"  {C_PURPLE}│{RESET}{content_styled}{' ' * pad}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}├{'─' * inner}┤{RESET}")
+
+
+def print_mcp_connect_summary(sessions: dict) -> None:
+    """Print a summary box after all MCP connections are attempted."""
+    inner = max(40, _safe_inner_width(margin=8, minimum=40))
+    connected = [n for n, s in sessions.items() if getattr(s, 'status', '') == 'connected']
+    failed = [n for n, s in sessions.items() if getattr(s, 'status', '') != 'connected']
+    total_tools = sum(len(getattr(s, 'tools', [])) for s in sessions.values() if getattr(s, 'status', '') == 'connected')
+    ok_str = f"{C_GREEN}{len(connected)} connected{RESET}"
+    fail_str = f"{C_MID}{len(failed)} failed{RESET}"
+    tools_str = f"{C_LAVENDER}{total_tools} tool{'s' if total_tools != 1 else ''} available{RESET}"
+    content_styled = f"  {ok_str}  {C_MID}·{RESET}  {fail_str}  {C_MID}·{RESET}  {tools_str}  "
+    content_vis = _vis_len(content_styled)
+    pad = max(0, inner - content_vis)
+    print(f"  {C_PURPLE}│{RESET}{content_styled}{' ' * pad}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}╰{'─' * inner}╯{RESET}\n")
+
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1604,60 +1810,55 @@ def print_mode_change(mode: str):
 # ═══════════════════════════════════════════════════════════════════════
 
 def print_session_info(codebase_path: str, model: str, execution_mode: str, conversation_id: str = ""):
-    """Print the session info block after the banner."""
-    # total printed width = inner + 4
-    inner = _safe_inner_width(margin=8, minimum=20)
-    
-    def _line(label: str, val: str, is_mode: bool = False):
-        if is_mode:
-            display_val = "Autonomous" if val == "autonomous" else "Ask Permission"
-            v_color = C_YELLOW if val == "autonomous" else C_GREEN
-            v_str = f"{v_color}{display_val}{RESET}"
-            val_for_len = display_val
-        else:
-            max_val_len = max(8, inner - len(label) - 8)
-            if len(val) > max_val_len:
-                display_val = "..." + val[-(max_val_len-3):]
-            else:
-                display_val = val
-            v_color = C_WHITE if label == 'Codebase:' else C_PINK
-            if label == "Session:": v_color = C_LILAC
-            v_str = f"{v_color}{display_val}{RESET}"
-            val_for_len = display_val
-            
-        interior = f"  {label}  {val_for_len}  "
-        pad = max(0, inner - len(interior))
-        print(f"  {C_PURPLE}│{RESET}  {C_GRAY}{label}{RESET}  {v_str}{' ' * (pad + 1)} {C_PURPLE}│{RESET}")
+    """Print the session info block in a rounded single-line box matching the banner style."""
+    inner = max(60, _safe_inner_width(margin=8, minimum=60))
 
-    print(f"  {C_PURPLE}┌{'─' * inner}┐{RESET}")
-    _line("Codebase:", codebase_path)
-    _line("Model:   ", model)
-    _line("Exec Mode:", execution_mode, is_mode=True)
+    def _row(label: str, val: str, val_color: str = C_WHITE) -> None:
+        max_val_len = max(10, inner - len(label) - 6)
+        disp = ("\u2026" + val[-(max_val_len - 1):]) if len(val) > max_val_len else val
+        content = f"  {C_MID}{label}{RESET}  {val_color}{disp}{RESET}"
+        vis = 2 + len(label) + 2 + len(disp)
+        pad = max(0, inner - vis)
+        print(f"  {C_PURPLE}│{RESET}{content}{' ' * pad}{C_PURPLE}│{RESET}")
+
+    mode_display = "Autonomous" if execution_mode == "autonomous" else "Ask Permission"
+    mode_color = C_YELLOW if execution_mode == "autonomous" else C_GREEN
+
+    print(f"  {C_PURPLE}╭{'─' * inner}╮{RESET}")
+    _row("Codebase :", codebase_path, C_WHITE)
+    _row("Model    :", model, C_PINK)
+    _row("Mode     :", mode_display, mode_color)
     if conversation_id:
-        _line("Session: ", conversation_id)
-    print(f"  {C_PURPLE}└{'─' * inner}┘{RESET}")
+        _row("Session  :", conversation_id, C_LILAC)
+    print(f"  {C_PURPLE}╰{'─' * inner}╯{RESET}")
     print()
+
+
+# ─── Slash command definitions (shared between help and autocomplete) ─
+SLASH_COMMANDS = [
+    ("/help",          "Show available commands and shortcuts"),
+    ("/exit",          "Exit RAYS gracefully"),
+    ("/code <task>",   "Execute autonomous coding pipeline"),
+    ("/mcp",           "List MCP servers and connection status"),
+    ("/model <name>",  "Switch LLM model"),
+    ("/chat <q>",      "Read-only contextual Q&A (no file edits)"),
+    ("/mode auto",     "Full autonomy — no confirmation prompts"),
+    ("/mode ask",      "Ask-permission mode — confirm before each action"),
+    ("/done",          "Submit current multi-line paste buffer"),
+    ("/git",           "Summarize current git diff / changes"),
+    ("/clear",         "Clear the screen"),
+    ("/tui",           "Launch full-screen TUI mode (beta)"),
+    ("/skills",        "List discovered skills and capabilities"),
+    ("/bg",            "List background tasks and their status"),
+]
 
 
 def print_help():
     """Print slash command help."""
     prefix = get_shape_prefix()
     print(f"\n  {prefix} {BOLD}{C_WHITE}Available Commands{RESET}\n")
-    commands = [
-        ("/help",          "Show this help message"),
-        ("/exit",          "Exit RAYS"),
-        ("/code <prompt>", "Execute coding pipeline (edit, create, etc.)"),
-        ("/mcp",           "List configured MCP servers and connection status"),
-        ("/model <name>",  "Switch to a different model"),
-        ("/chat <prompt>", "Read-only contextual Q&A (no edit pipeline)"),
-        ("/mode auto",     "Switch to autonomous execution (no confirmations)"),
-        ("/mode ask",      "Switch to ask-permission execution"),
-        ("/done",          "Submit a multi-line paste"),
-        ("/git",           "Summarize current git changes"),
-        ("/clear",         "Clear the screen"),
-    ]
-    for cmd, desc in commands:
-        print(f"    {C_LILAC}{cmd:<18}{RESET} {C_GRAY}{desc}{RESET}")
+    for cmd, desc in SLASH_COMMANDS:
+        print(f"    {C_LILAC}{cmd:<22}{RESET} {C_GRAY}{desc}{RESET}")
     print()
 
 
@@ -1666,6 +1867,47 @@ def print_help():
 # ═══════════════════════════════════════════════════════════════════════
 
 _history_path = None
+
+
+def kawaii_thinking_animation(stop_event: threading.Event) -> None:
+    """Hermes-style kawaii thinking animation that shows while LLM is running.
+    
+    Runs in a background thread. Call stop_event.set() to end it.
+    """
+    import itertools
+    KAWAII_FACES = [
+        "(´･_･`)", "(◔_◔)", "(¬‿¬)", "( ˘⌣˘)♡", "(⊙_⊙)",
+        "(◡‿◡✿)", "ヽ(>∀<☆)☆", "(°ロ°)", "◉_◉", "ಠ_ಠ",
+    ]
+    THINK_VERBS = [
+        "reflecting", "musing", "pondering", "contemplating",
+        "cogitating", "deliberating", "analyzing", "processing",
+    ]
+    BRAILLE = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    face_cycle = itertools.cycle(KAWAII_FACES)
+    verb_cycle = itertools.cycle(THINK_VERBS)
+    braille_cycle = itertools.cycle(BRAILLE)
+    start = time.time()
+    face = next(face_cycle)
+    verb = next(verb_cycle)
+    elapsed_ticks = 0
+
+    while not stop_event.is_set():
+        elapsed_ticks += 1
+        if elapsed_ticks % 20 == 0:
+            face = next(face_cycle)
+            verb = next(verb_cycle)
+        br = next(braille_cycle)
+        elapsed = time.time() - start
+        line = f"\r  {C_LILAC}{face}{RESET} {DIM}{verb}...{RESET}  {C_MID}{br}{RESET} {C_DIM_GRAY}({elapsed:.1f}s){RESET}"
+        # Pad to clear previous content
+        sys.stdout.write(line + "   ")
+        sys.stdout.flush()
+        stop_event.wait(timeout=0.12)
+
+    # Clear the animation line on stop
+    sys.stdout.write(f"\r{' ' * 70}\r")
+    sys.stdout.flush()
 
 
 def _readline_safe_prompt(raw_prompt: str) -> str:
@@ -1710,48 +1952,255 @@ def save_history():
             pass
 
 
+_pt_session = None
+_paste_counter = 0
+
+
+from prompt_toolkit import Application
+from prompt_toolkit.layout import Layout, HSplit, VSplit, ConditionalContainer, Window
+from prompt_toolkit.layout.controls import FormattedTextControl, BufferControl
+from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.formatted_text import FormattedText, ANSI
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.styles import Style
+
+def _build_status_bar_text():
+    import time
+    
+    ctx_used_str = "0"
+    if _SESSION_CTX_USED >= 1000000:
+        ctx_used_str = f"{_SESSION_CTX_USED/1000000:.1f}M"
+    elif _SESSION_CTX_USED >= 1000:
+        ctx_used_str = f"{_SESSION_CTX_USED/1000:.1f}K"
+    else:
+        ctx_used_str = str(_SESSION_CTX_USED)
+        
+    ctx_limit_str = "0"
+    if _SESSION_CTX_LIMIT >= 1000000:
+        ctx_limit_str = f"{_SESSION_CTX_LIMIT/1000000:.1f}M"
+    elif _SESSION_CTX_LIMIT >= 1000:
+        ctx_limit_str = f"{_SESSION_CTX_LIMIT/1000:.1f}K"
+    else:
+        ctx_limit_str = str(_SESSION_CTX_LIMIT)
+        
+    pct = 0
+    if _SESSION_CTX_LIMIT > 0:
+        pct = int(100 * _SESSION_CTX_USED / _SESSION_CTX_LIMIT)
+    pct = min(100, max(0, pct))
+    
+    w = 8
+    filled = int(w * pct / 100)
+    bar = "=" * filled + " " * (w - filled)
+    
+    elapsed = 0
+    if _SESSION_START_TIME > 0:
+        elapsed = time.time() - _SESSION_START_TIME
+    
+    if elapsed < 60:
+        time_str = f"{int(elapsed)}s"
+    else:
+        m = int(elapsed // 60)
+        s = int(elapsed % 60)
+        if s == 0:
+            time_str = f"{m}m"
+        else:
+            time_str = f"{m}m {s}s"
+            
+    bg_tasks = len(_BACKGROUND_TASKS)
+    bg_str = f" | ⊙ {bg_tasks}" if bg_tasks > 0 else ""
+    
+    text = f" $ {_SESSION_MODEL} | {ctx_used_str}/{ctx_limit_str} | [{bar}] {pct}% | {time_str}{bg_str}"
+    
+    return FormattedText([("class:bottom-toolbar", text)])
+
+def _build_slash_dropdown_text(query: str, selected_idx: int):
+    q = query.lower()
+    if q.startswith('/'):
+        q = q[1:]
+    
+    filtered = [cmd for cmd in SLASH_COMMANDS if q in cmd[0].lower()]
+    
+    items = []
+    for i, (cmd, desc) in enumerate(filtered):
+        style = "class:slash-selected" if i == selected_idx else ""
+        cmd_padded = cmd.ljust(15)
+        row = f" {cmd_padded} {desc} \n"
+        items.append((style, row))
+        
+    return FormattedText(items)
+
 def get_user_prompt() -> Optional[str]:
     """
-    Get user input with multi-line support and persistent history.
-    Uses readline for Arrows (history) and better interactive experience.
+    Get user input with multi-line support, persistent history, and Hermes-style
+    bracketed paste squashing using prompt_toolkit.
     """
-    # Removed horizontal lining as requested
+    global _pt_session, _paste_counter, _PT_APP_REF
+    import os
+    import time
+    
+    history_path = os.path.join(os.path.expanduser("~"), ".rays_history")
+    
+    result = [None]
+    selected_slash_idx = [0]
+    
+    input_buffer = Buffer(
+        history=FileHistory(history_path),
+        multiline=False,
+        name='input',
+        accept_handler=lambda buf: None
+    )
+    
+    @Condition
+    def is_slash_mode():
+        return input_buffer.text.startswith('/')
+        
+    @Condition
+    def is_agent_running():
+        return _SESSION_AGENT_RUNNING
+    
+    def get_status_bar_text():
+        return _build_status_bar_text()
+        
+    def _get_slash_items():
+        return _build_slash_dropdown_text(input_buffer.text, selected_slash_idx[0])
+        
+    def get_hint_line():
+        return FormattedText([("class:hint", " > | msg=interrupt · /queue · /bg · /steer · Ctrl+C cancel")])
+    
+    body = HSplit([
+        Window(),  # spacer
+        ConditionalContainer(
+            content=Window(content=FormattedTextControl(_get_slash_items), height=min(8, len(SLASH_COMMANDS))),
+            filter=is_slash_mode
+        ),
+        ConditionalContainer(
+            content=Window(height=1, content=FormattedTextControl(get_hint_line), style='class:hint'),
+            filter=is_agent_running
+        ),
+        Window(height=1, content=BufferControl(buffer=input_buffer), get_line_prefix=lambda lnum, ww: ANSI(f'  \x1b[38;5;205m❯\x1b[0m ')),
+        Window(height=1, content=FormattedTextControl(get_status_bar_text), style='class:bottom-toolbar'),
+    ])
+    
+    layout = Layout(body, focused_element=input_buffer)
+    
+    kb = KeyBindings()
+    
+    @kb.add('enter')
+    def _(event):
+        if is_slash_mode():
+            q = input_buffer.text.lower()
+            if q.startswith('/'):
+                q = q[1:]
+            filtered = [cmd for cmd in SLASH_COMMANDS if q in cmd[0].lower()]
+            if filtered and 0 <= selected_slash_idx[0] < len(filtered):
+                input_buffer.text = filtered[selected_slash_idx[0]][0] + " "
+                input_buffer.cursor_position = len(input_buffer.text)
+                return
+        result[0] = input_buffer.text
+        event.app.exit()
+        
+    @kb.add('up', filter=is_slash_mode)
+    def _(event):
+        selected_slash_idx[0] = max(0, selected_slash_idx[0] - 1)
+        
+    @kb.add('down', filter=is_slash_mode)
+    def _(event):
+        q = input_buffer.text.lower()[1:]
+        filtered = [cmd for cmd in SLASH_COMMANDS if q in cmd[0].lower()]
+        selected_slash_idx[0] = min(len(filtered) - 1, selected_slash_idx[0] + 1)
+        
+    @kb.add('escape', filter=is_slash_mode)
+    def _(event):
+        input_buffer.text = ""
+        
+    @kb.add('tab', filter=is_slash_mode)
+    def _(event):
+        q = input_buffer.text.lower()[1:]
+        filtered = [cmd for cmd in SLASH_COMMANDS if q in cmd[0].lower()]
+        if filtered and 0 <= selected_slash_idx[0] < len(filtered):
+            input_buffer.text = filtered[selected_slash_idx[0]][0] + " "
+            input_buffer.cursor_position = len(input_buffer.text)
+            
+    @kb.add('c-c')
+    def _(event):
+        print(f"\n  \x1b[38;5;141mInterrupted — returning to prompt\x1b[0m")
+        result[0] = ""
+        event.app.exit()
+        
+    prev_text = [""]
+    
+    def on_text_changed(buf):
+        global _paste_counter
+        text = buf.text
+        if len(text) - len(prev_text[0]) > 10 and text.count('\n') - prev_text[0].count('\n') >= 5:
+            if not text.strip().startswith('/'):
+                _paste_counter += 1
+                paste_dir = os.path.join(os.path.expanduser("~"), ".rays_pastes")
+                os.makedirs(paste_dir, exist_ok=True)
+                
+                filename = f"paste_{_paste_counter}_{int(time.time())}.txt"
+                filepath = os.path.join(paste_dir, filename)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(text)
+                
+                line_count = text.count('\n') + 1
+                placeholder = f"[Pasted text #{_paste_counter}: {line_count} lines → {filepath}]"
+                
+                buf.text = placeholder
+                buf.cursor_position = len(placeholder)
+                text = placeholder
+                
+        prev_text[0] = text
+        
+        # Reset selected index on text change
+        selected_slash_idx[0] = 0
+
+    input_buffer.on_text_changed += on_text_changed
+    
+    style = Style.from_dict({
+        'bottom-toolbar': 'bg:#1a1a2e #888888',
+        'slash-selected': 'bg:#d7af00 #000000 bold',
+        'hint': '#555555',
+    })
+    
+    app = Application(layout=layout, key_bindings=kb, style=style, full_screen=False)
+    _PT_APP_REF = app
     
     try:
-        # Standard interactive input with readline support
-        user_input = input(_readline_safe_prompt(f"  {C_PINK}❯{RESET} ")).strip()
+        app.run()
     except EOFError:
+        result[0] = None
+    finally:
+        _PT_APP_REF = None
+        input_buffer.on_text_changed -= on_text_changed
+        
+    if result[0] is None:
         return None
-    except KeyboardInterrupt:
-        print(f"\n  {C_LAVENDER}Interrupted — returning to prompt{RESET}")
-        return ""
-    
-    if not user_input:
+        
+    if not result[0].strip():
         return ""
         
-    # Handle slash commands immediately
-    if user_input.startswith('/'):
-        return user_input
+    return result[0].strip()
+
+def expand_pasted_text(user_input: str) -> str:
+    """
+    Expands any squashed paste placeholders back into their full text
+    before sending the prompt to the LLM.
+    """
+    import re
     
-    # Multi-line continuation support (trailing \)
-    if user_input.endswith('\\'):
-        lines = [user_input[:-1].strip()]
-        print(f"    {C_DIM_GRAY}(continue typing, use /done or empty Enter to submit){RESET}")
-        while True:
-            try:
-                line = input(_readline_safe_prompt(f"  {C_GRAY}…{RESET} ")).strip()
-                if not line or line.lower() == '/done':
-                    break
-                if line.endswith('\\'):
-                    lines.append(line[:-1].strip())
-                else:
-                    lines.append(line)
-                    break # Auto-submit on single line without \
-            except (EOFError, KeyboardInterrupt):
-                break
-        return "\n".join(lines).strip()
-    
-    return user_input
+    def replacer(match):
+        filepath = match.group(1)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception:
+            return match.group(0)
+            
+    # Matches: [Pasted text #1: 10 lines → /path/to/file.txt]
+    return re.sub(r'\[Pasted text #\d+: \d+ lines \u2192 (.+?)\]', replacer, user_input)
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -75,6 +75,7 @@ class RAYS:
             'model': self.config['llm']['model'],
             'base_url': llm_endpoint.replace('/api/generate', '').replace('/api', ''),
             'api_key': self.config['llm'].get('api_key', ''),
+            'num_ctx': self.config['llm'].get('num_ctx', 32768),
             'delay': 0.1
         })
         
@@ -677,6 +678,12 @@ def main():
     )
     
     parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch RAYS in OpenCode-style Text User Interface (TUI) mode"
+    )
+    
+    parser.add_argument(
         "--reindex",
         action="store_true",
         help="Force re-index the codebase on startup"
@@ -986,6 +993,7 @@ def main():
             
             sys.exit(0)
 
+
         # Launch GUI/TUI Dashboard
         print("Launching RAYS Studio Dashboard...")
         app = RAYSStudioTUI()
@@ -1009,8 +1017,25 @@ def main():
     rays = None
 
     try:
-        # Show banner
-        rays_ui.display_banner()
+        # Launch OpenCode-Style TUI Dashboard
+        if args.tui:
+            try:
+                from . import rays_tui
+                rays_tui.launch_tui(str(codebase_path), config_path, args.conversation_id)
+                sys.exit(0)
+            except Exception as e:
+                print(f"Error launching TUI: {e}")
+                sys.exit(1)
+
+        # Show banner with model + MCP info
+        try:
+            _banner_model = current_model
+        except NameError:
+            _banner_model = ""
+        rays_ui.display_banner(
+            model=_banner_model,
+            cwd=str(codebase_path),
+        )
         
         import requests
 
@@ -1166,7 +1191,12 @@ def main():
         rays_ui.print_step("Connecting to MCP servers and auto-installing bundled skills...")
         rays.skills_orchestrator.discover_skills()
         rays.mcp_manager.connect_all()
-        
+
+        # ─── Initialize status bar tracking ─────────────────────
+        import time as _time
+        rays_ui._SESSION_START_TIME = _time.time()
+        rays_ui.status_set_model(current_model)
+
         # ─── Interactive Loop ───────────────────────────────────
         first_run = True
         intentional_exit = False
@@ -1181,6 +1211,9 @@ def main():
                 
                 if not user_input:
                     continue
+                
+                # Expand any squashed pasted text placeholders back into raw text
+                user_input = rays_ui.expand_pasted_text(user_input)
                 
                 # ── Slash Commands ──────────────────────────────
                 if user_input.startswith('/'):
@@ -1202,6 +1235,7 @@ def main():
                             current_model = cmd_arg.strip()
                             rays.ai_client.model = current_model
                             rays.config['llm']['model'] = current_model
+                            rays_ui.status_set_model(current_model)
                             rays_ui.print_step(f"Model switched to: {current_model}")
                         else:
                             selected = rays_ui.print_model_selector(available_models, current_model)
@@ -1209,6 +1243,7 @@ def main():
                                 current_model = selected
                                 rays.ai_client.model = selected
                                 rays.config['llm']['model'] = selected
+                                rays_ui.status_set_model(selected)
                         continue
                     
                     elif cmd == '/mode':
@@ -1235,7 +1270,32 @@ def main():
                     
                     elif cmd == '/clear':
                         os.system('clear' if os.name != 'nt' else 'cls')
-                        rays_ui.display_banner()
+                        rays_ui.display_banner(model=current_model, cwd=str(codebase_path))
+                        continue
+
+                    elif cmd == '/skills':
+                        skills = getattr(rays.skills_orchestrator, '_discovered_skills', [])
+                        if not skills:
+                            rays_ui.print_info("No skills discovered yet.")
+                        else:
+                            rays_ui.print_help()
+                        continue
+
+                    elif cmd == '/bg':
+                        import threading as _threading
+                        with rays_ui._BG_LOCK:
+                            tasks = dict(rays_ui._BACKGROUND_TASKS)
+                        if not tasks:
+                            rays_ui.print_info("No background tasks running.")
+                        else:
+                            rays_ui.print_box(
+                                "Background Tasks",
+                                "\n".join(
+                                    f"  [{tid}] {desc}" 
+                                    for tid, (desc, _st) in tasks.items()
+                                ),
+                                rays_ui.C_VIOLET
+                            )
                         continue
                     
                     elif cmd == '/code':
@@ -1267,7 +1327,21 @@ def main():
                         continue
                 
                 # ── Agent orchestrator (skills + MCP); use /code for coding pipeline ──
-                rays.agent_orchestrator.run(user_prompt=user_input)
+                import threading as _threading
+                _think_stop = _threading.Event()
+                _think_thread = _threading.Thread(
+                    target=rays_ui.kawaii_thinking_animation,
+                    args=(_think_stop,),
+                    daemon=True
+                )
+                rays_ui.status_set_agent_running(True)
+                _think_thread.start()
+                try:
+                    rays.agent_orchestrator.run(user_prompt=user_input)
+                finally:
+                    _think_stop.set()
+                    _think_thread.join(timeout=1.0)
+                    rays_ui.status_set_agent_running(False)
                 first_run = False
                 
             except KeyboardInterrupt:
