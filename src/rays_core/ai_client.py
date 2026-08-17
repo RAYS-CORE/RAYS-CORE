@@ -20,16 +20,22 @@ class AIClient:
     def is_available(self) -> bool:
         """Check if the AI provider is reachable"""
         if self.provider == "ollama":
-            try:
-                # Direct check to the base URL
-                resp = requests.get(self.base_url, timeout=2)
-                return resp.status_code == 200
-            except:
-                return False
+            candidates = [self.base_url, "http://127.0.0.1:11434", "http://localhost:11434"]
+            for u in candidates:
+                if not u:
+                    continue
+                try:
+                    resp = requests.get(f"{u.rstrip('/')}/api/tags", timeout=4)
+                    if resp.status_code == 200:
+                        self.base_url = u
+                        return True
+                except Exception:
+                    continue
+            return False
         elif self.provider == "rays_studio":
             try:
                 base = self.base_url or "http://localhost:8001/v1"
-                resp = requests.get(f"{base}/models", timeout=2)
+                resp = requests.get(f"{base}/models", timeout=4)
                 return resp.status_code == 200
             except:
                 return False
@@ -225,15 +231,10 @@ class AIClient:
             payload["stream"] = True
             rays_ui.hud_set_status("Thinking", "Waiting for Ollama to process prompt (may take minutes for large context)...")
             
-            # AGGRESSIVE DEBUG LOGGING
-            rays_ui.print_warning(f"DEBUG: Attempting to connect to {url}")
-            rays_ui.print_warning(f"DEBUG: Payload size: {len(json.dumps(payload))} bytes")
-            
             import time
             start_req = time.time()
             
             with requests.post(url, json=payload, timeout=3600, stream=True) as response:
-                rays_ui.print_warning(f"DEBUG: Connected! Received response headers in {time.time() - start_req:.2f}s. Status code: {response.status_code}")
                 response.raise_for_status()
                 
                 full_response = ""

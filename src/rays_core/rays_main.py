@@ -37,6 +37,36 @@ from .skills_orchestrator import SkillsOrchestrator
 from .mcp_manager import MCPManager
 from .agent_orchestrator import AgentOrchestrator
 
+def fetch_local_ollama_models(endpoint: Optional[str] = None) -> List[str]:
+    """Robustly fetch models from local Ollama across 127.0.0.1, localhost, and OLLAMA_HOST."""
+    import os
+    import requests
+    env_host = os.getenv("OLLAMA_HOST", "").strip()
+    candidates = []
+    if endpoint:
+        candidates.append(endpoint.rstrip("/"))
+    if env_host:
+        if not env_host.startswith("http"):
+            env_host = f"http://{env_host}"
+        candidates.append(env_host.rstrip("/"))
+    candidates.extend(["http://127.0.0.1:11434", "http://localhost:11434"])
+    
+    seen = set()
+    unique_candidates = [c for c in candidates if not (c in seen or seen.add(c))]
+    
+    for base in unique_candidates:
+        try:
+            url = f"{base}/api/tags"
+            resp = requests.get(url, timeout=6)
+            if resp.status_code == 200:
+                raw_models = resp.json().get('models', [])
+                fetched = [m['name'] for m in raw_models if isinstance(m, dict) and m.get('name')]
+                if fetched:
+                    return fetched
+        except Exception:
+            continue
+    return []
+
 class RAYS:
     def __init__(
         self,
@@ -247,15 +277,18 @@ class RAYS:
             [f"- {m['name']} ({m['file_path']}): {m['relevance_explanation']}" for m in filtered_memories]
         )
 
-        history_objs = self.deterministic_history[-2:]
-        if len(history_objs) < 2:
-            persistent_history = self.memory_mgr.retrieve_last_n_memories(2 - len(history_objs))
+        history_objs = self.deterministic_history[-3:]
+        if len(history_objs) < 3:
+            persistent_history = self.memory_mgr.retrieve_last_n_memories(3 - len(history_objs))
             history_objs = persistent_history + history_objs
 
         history_context = "\n".join([f"CHAT HISTORY SUMMARY:\n{json.dumps(h, indent=2)}" for h in history_objs])
+        active_proc_ctx = self.skills_orchestrator.get_active_processes_context()
         augmented_prompt = (
-            f"{user_prompt}\n\nHISTORICAL CONTEXT (SIMILAR PAST CHANGES):\n{memory_context_text}\n\n"
-            f"RECENT ACTIVITY (LAST 2 TASKS):\n{history_context}"
+            f"{user_prompt}\n\n"
+            f"ACTIVE BACKGROUND SERVICES & PROCESSES (live state & logs):\n{active_proc_ctx}\n\n"
+            f"HISTORICAL CONTEXT (SIMILAR PAST CHANGES):\n{memory_context_text}\n\n"
+            f"RECENT ACTIVITY (LAST 3 TASKS & TURNS):\n{history_context}"
         )
 
         return {
@@ -1069,15 +1102,10 @@ def main():
         session_llm_api_key = ""
         
         if chosen_provider_label == "ollama (locally)":
-            current_config['llm']['ollama_endpoint'] = "http://localhost:11434"
+            current_config['llm']['ollama_endpoint'] = "http://127.0.0.1:11434"
             rays_ui.print_step("Fetching local models...")
-            try:
-                resp = requests.get("http://localhost:11434/api/tags", timeout=2)
-                resp.raise_for_status()
-                models = [m['name'] for m in resp.json().get('models', [])]
-                if not models:
-                    models = ["llama3:latest", "qwen2.5-coder:latest", "mistral:latest"]
-            except Exception:
+            models = fetch_local_ollama_models("http://127.0.0.1:11434")
+            if not models:
                 rays_ui.print_warning("Could not reach local Ollama. Ensure it's running.")
                 models = ["llama3:latest", "qwen2.5-coder:latest", "mistral:latest"]
                 
@@ -1122,7 +1150,7 @@ def main():
             current_config.setdefault('embedding', {})
             # Built-in default path uses local ollama embedding model from config.
             current_config['embedding']['provider'] = "ollama"
-            current_config['embedding'].setdefault('ollama_endpoint', "http://localhost:11434")
+            current_config['embedding'].setdefault('ollama_endpoint', "http://127.0.0.1:11434")
         else:
             provider_choice = rays_ui.select_from_menu(
                 "Select Embedding Provider",
@@ -1131,15 +1159,10 @@ def main():
             if provider_choice == "ollama":
                 current_config.setdefault('embedding', {})
                 current_config['embedding']['provider'] = "ollama"
-                current_config['embedding']['ollama_endpoint'] = "http://localhost:11434"
+                current_config['embedding']['ollama_endpoint'] = "http://127.0.0.1:11434"
                 rays_ui.print_step("Fetching local embedding models...")
-                try:
-                    resp = requests.get("http://localhost:11434/api/tags", timeout=2)
-                    resp.raise_for_status()
-                    embedding_models = [m['name'] for m in resp.json().get('models', [])]
-                    if not embedding_models:
-                        embedding_models = [current_config.get('embedding', {}).get('model', "qwen3-embedding:4b")]
-                except Exception:
+                embedding_models = fetch_local_ollama_models("http://127.0.0.1:11434")
+                if not embedding_models:
                     rays_ui.print_warning("Could not reach local Ollama. Ensure it's running.")
                     embedding_models = [current_config.get('embedding', {}).get('model', "qwen3-embedding:4b")]
                 chosen_embedding_model = rays_ui.select_from_menu("Select Embedding Model (ollama)", embedding_models)
@@ -1260,11 +1283,17 @@ def main():
                         if not cmd_arg.strip():
                             rays_ui.print_warning("Usage: /chat <your question>")
                             continue
-                        _ = rays.run_chat_mode(
-                            user_prompt=cmd_arg.strip(),
-                            force_reindex=args.reindex if first_run else False,
-                            force_rebuild_db=args.rebuild_db if first_run else False
-                        )
+                        rays_ui.status_set_agent_running(True)
+                        try:
+                            with rays_ui.orchestration_hud():
+                                rays_ui.hud_set_status("Chat Context", cmd_arg.strip())
+                                _ = rays.run_chat_mode(
+                                    user_prompt=cmd_arg.strip(),
+                                    force_reindex=args.reindex if first_run else False,
+                                    force_rebuild_db=args.rebuild_db if first_run else False
+                                )
+                        finally:
+                            rays_ui.status_set_agent_running(False)
                         first_run = False
                         continue
                     
@@ -1302,11 +1331,17 @@ def main():
                         if not cmd_arg.strip():
                             rays_ui.print_warning("Usage: /code <your coding request>")
                             continue
-                        results = rays.run(
-                            user_prompt=cmd_arg.strip(),
-                            force_reindex=args.reindex if first_run else False,
-                            force_rebuild_db=args.rebuild_db if first_run else False
-                        )
+                        rays_ui.status_set_agent_running(True)
+                        try:
+                            with rays_ui.orchestration_hud():
+                                rays_ui.hud_set_status("Code Pipeline", cmd_arg.strip())
+                                results = rays.run(
+                                    user_prompt=cmd_arg.strip(),
+                                    force_reindex=args.reindex if first_run else False,
+                                    force_rebuild_db=args.rebuild_db if first_run else False
+                                )
+                        finally:
+                            rays_ui.status_set_agent_running(False)
                         first_run = False
                         _save_results(results, cmd_arg.strip(), rays_dir)
                         continue
@@ -1327,20 +1362,10 @@ def main():
                         continue
                 
                 # ── Agent orchestrator (skills + MCP); use /code for coding pipeline ──
-                import threading as _threading
-                _think_stop = _threading.Event()
-                _think_thread = _threading.Thread(
-                    target=rays_ui.kawaii_thinking_animation,
-                    args=(_think_stop,),
-                    daemon=True
-                )
                 rays_ui.status_set_agent_running(True)
-                _think_thread.start()
                 try:
                     rays.agent_orchestrator.run(user_prompt=user_input)
                 finally:
-                    _think_stop.set()
-                    _think_thread.join(timeout=1.0)
                     rays_ui.status_set_agent_running(False)
                 first_run = False
                 

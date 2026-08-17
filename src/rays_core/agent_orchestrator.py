@@ -39,6 +39,7 @@ class AgentOrchestrator:
         )
         self.execution_mode = execution_mode
         self.prompts = config.get("agent_orchestrator_prompts") or {}
+        self.session_turn_history: List[Dict[str, Any]] = []
 
     def set_execution_mode(self, mode: str) -> None:
         normalized = "autonomous" if mode == "autonomous" else "ask"
@@ -46,7 +47,8 @@ class AgentOrchestrator:
         self.mcp_orchestrator.set_execution_mode(normalized)
 
     def run(self, user_prompt: str) -> Dict[str, Any]:
-        cumulative_history: List[Dict[str, Any]] = []
+        # Carry forward prior turns so the agent remembers what was asked and done
+        cumulative_history: List[Dict[str, Any]] = list(self.session_turn_history)
         max_loops = 3
 
         with rays_ui.orchestration_hud():
@@ -57,6 +59,18 @@ class AgentOrchestrator:
             user_prompt, result
         )
         rays_ui.orch_render_final_summary(result)
+
+        # Store turn summary in rolling session history (last 5 turns)
+        turn_entry = {
+            "type": "turn_summary",
+            "user_prompt": user_prompt,
+            "summary": result.get("narrative_summary", ""),
+            "history": result.get("history", []),
+            "complete": result.get("complete", False),
+        }
+        self.session_turn_history.append(turn_entry)
+        if len(self.session_turn_history) > 5:
+            self.session_turn_history = self.session_turn_history[-5:]
         
         # Save Execution-State Graph for FOGR Fine-Tuning
         try:
@@ -185,7 +199,9 @@ class AgentOrchestrator:
                     command = step.get("command")
                     service_name = step.get("service_name", "background_task")
                     from .terminal_engine import TerminalEngine
-                    te = TerminalEngine(self.ai_client, self.config, self.codebase_root)
+                    import os
+                    _rays_dir = Path(os.path.expanduser(self.config.get("rays_dir", "~/.rays")))
+                    te = TerminalEngine(self.codebase_root, _rays_dir, self.ai_client, self.config)
                     success, msg = te.run_background_service(command, service_name)
                     cumulative_history.append({
                         "type": "service",

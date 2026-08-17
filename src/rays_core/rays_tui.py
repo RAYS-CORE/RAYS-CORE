@@ -15,7 +15,7 @@ from typing import Optional, List
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Center, Middle, Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widgets import (
@@ -73,7 +73,8 @@ class SlashOverlay(ListView):
         height: 1;
     }
     SlashOverlay > ListItem.--highlight {
-        background: #2a1a4a;
+        background: #7b2fbe;
+        color: #ffffff;
     }
     SlashOverlay > ListItem > Label {
         width: 100%;
@@ -105,8 +106,19 @@ class SlashOverlay(ListView):
         return None
 
 
+# ── OPENCODE-STYLE STARTUP LOGO (RAYS SIGNATURE THEME) ───────────────
+WELCOME_LOGO = """
+[#ff79c6]██████╗   [/#ff79c6][#e0aaff]█████╗  [/#e0aaff][#c77dff]██╗   ██╗ [/#c77dff][#9d4edd]███████╗[/#9d4edd]
+[#ff79c6]██╔══██╗ [/#ff79c6][#e0aaff]██╔══██╗ [/#e0aaff][#c77dff]╚██╗ ██╔╝ [/#c77dff][#9d4edd]██╔════╝[/#9d4edd]
+[#ff79c6]██████╔╝ [/#ff79c6][#e0aaff]███████║  [/#e0aaff][#c77dff]╚████╔╝  [/#c77dff][#9d4edd]███████╗[/#9d4edd]
+[#ff79c6]██╔══██╗ [/#ff79c6][#e0aaff]██╔══██║   [/#e0aaff][#c77dff]╚██╔╝   [/#c77dff][#9d4edd]╚════██║[/#9d4edd]
+[#ff79c6]██║  ██║ [/#ff79c6][#e0aaff]██║  ██║    [/#e0aaff][#c77dff]██║    [/#c77dff][#9d4edd]███████║[/#9d4edd]
+[#ff79c6]╚═╝  ╚═╝ [/#ff79c6][#e0aaff]╚═╝  ╚═╝    [/#e0aaff][#c77dff]╚═╝    [/#c77dff][#9d4edd]╚══════╝[/#9d4edd]
+"""
+
+
 class RAYSTui(App):
-    """OpenCode-style full-screen TUI for RAYS."""
+    """OpenCode-style full-screen TUI for RAYS with centered startup transition."""
 
     TITLE = "RAYS"
     SUB_TITLE = "Vivid Shapes Development Assistant"
@@ -119,10 +131,49 @@ class RAYSTui(App):
         layers: base overlay;
     }
 
-    /* ── Main split ────────────────────────────────────── */
+    /* ── Centered OpenCode-style Welcome Screen ───────── */
+    #welcome_view {
+        width: 100%;
+        height: 100%;
+        background: #0d0d12;
+    }
+    #welcome_logo {
+        width: auto;
+        text-align: center;
+        margin-bottom: 1;
+    }
+    #welcome_card {
+        width: 70;
+        max-width: 80;
+        height: auto;
+        background: #14141e;
+        border: solid #7b2cbf;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+    #welcome_input {
+        width: 100%;
+        background: #14141e;
+        border: none;
+        color: #ffffff;
+        height: 1;
+        padding: 0;
+    }
+    #welcome_input:focus {
+        border: none;
+    }
+    #welcome_meta {
+        color: #c77dff;
+    }
+    #welcome_hint {
+        color: #8888aa;
+    }
+
+    /* ── Main 2-Panel Workspace ────────────────────────── */
     #main_layout {
         height: 1fr;
         width: 100%;
+        display: none;
     }
 
     /* ── Conversation panel (left 75%) ─────────────────── */
@@ -150,7 +201,7 @@ class RAYSTui(App):
         border: none;
         color: #e0e0e0;
         height: 1;
-        padding: 1 0;
+        padding: 0 1;
     }
     #input_box:focus {
         border: none;
@@ -176,19 +227,27 @@ class RAYSTui(App):
         margin-bottom: 1;
     }
     .sidebar_section_label {
-        color: #560bad;
+        color: #9d4edd;
         text-style: bold;
         margin-top: 1;
     }
     .sidebar_value {
-        color: #9d4edd;
+        color: #c4b5e8;
         padding-left: 1;
+    }
+    #subagents_log {
+        height: 1fr;
+        background: #161622;
+        border: solid #2a1040;
+        margin-top: 1;
+        padding: 0 1;
     }
     #bg_log {
         height: 1fr;
-        background: #111118;
-        border: none;
+        background: #161622;
+        border: solid #2a1040;
         margin-top: 1;
+        padding: 0 1;
     }
 
     /* ── Status bar (bottom 2 rows) ─────────────────────── */
@@ -215,9 +274,6 @@ class RAYSTui(App):
         padding: 0 1;
         color: #555577;
     }
-
-    /* ── Message styling ─────────────────────────────────── */
-    /* Applied via RichLog markup, not CSS */
     """
 
     BINDINGS = [
@@ -241,6 +297,29 @@ class RAYSTui(App):
     # ─── Layout ────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
+        # Initial Centered OpenCode-style Welcome Screen
+        with Middle(id="welcome_view"):
+            with Center():
+                yield Static(WELCOME_LOGO, id="welcome_logo")
+            with Center():
+                with Vertical(id="welcome_card"):
+                    yield Input(
+                        placeholder="Ask anything... \"Fix broken tests\"",
+                        id="welcome_input",
+                    )
+                    yield Label(
+                        f"[#c77dff]{self.model_name}[/]",
+                        id="welcome_meta",
+                        markup=True,
+                    )
+            with Center():
+                yield Label(
+                    "[#8888aa]tab agents  ctrl+p commands  /help for all commands[/]",
+                    id="welcome_hint",
+                    markup=True,
+                )
+
+        # Full 2-panel Workspace (Chat log left 75%, Sidebar right 25%)
         with Horizontal(id="main_layout"):
             # Left: chat + input
             with Vertical(id="chat_panel"):
@@ -261,8 +340,10 @@ class RAYSTui(App):
                 yield Static("RAYS", id="sidebar_title")
                 yield Label("Model", classes="sidebar_section_label")
                 yield Label("...", id="model_label", classes="sidebar_value")
-                yield Label("Context", classes="sidebar_section_label")
+                yield Label("Context Tokens", classes="sidebar_section_label")
                 yield Label("0 / 0", id="tokens_label", classes="sidebar_value")
+                yield Label("Sub-Agents", classes="sidebar_section_label")
+                yield RichLog(id="subagents_log", wrap=True, markup=True, highlight=False)
                 yield Label("Background Tasks", classes="sidebar_section_label")
                 yield RichLog(id="bg_log", wrap=True, markup=True, highlight=False)
 
@@ -282,7 +363,7 @@ class RAYSTui(App):
                     markup=True,
                 )
                 yield Label(
-                    "[dim]ctrl+p commands  RAYS 2.0[/dim]",
+                    "[dim]ctrl+p commands  RAYS 1.7.1[/dim]",
                     classes="status-right",
                     markup=True,
                 )
@@ -298,6 +379,9 @@ class RAYSTui(App):
             self.query_one("#status_r1_l", Label).update(
                 f"[bold #9d4edd]auto[/]  [dim]·[/]  [#c77dff]{value}[/]"
             )
+            self.query_one("#welcome_meta", Label).update(
+                f"[#c77dff]{value}[/]"
+            )
         except NoMatches:
             pass
 
@@ -311,16 +395,63 @@ class RAYSTui(App):
 
     async def on_mount(self) -> None:
         chat = self.query_one("#chat_log", RichLog)
-        # Welcome message
+        # Welcome message inside chat panel
         chat.write("")
-        chat.write("[bold #c77dff]RAYS[/bold #c77dff]  [dim #560bad]Vivid Shapes Development Assistant[/dim #560bad]")
-        chat.write(f"[dim #444466]Workspace: {self.codebase_root}[/dim #444466]")
+        chat.write("[bold #c77dff]RAYS[/]  [#560bad]Vivid Shapes Development Assistant[/]")
+        chat.write(f"[#444466]Workspace: {self.codebase_root}[/]")
         chat.write("")
-        chat.write("[dim #555577]Type a message and press Enter. Use [bold #c77dff]/help[/bold #c77dff] for commands.[/dim #555577]")
+        chat.write("[#555577]Type a message and press Enter. Use [bold #c77dff]/help[/] for commands.[/]")
         chat.write("")
-        self.query_one("#input_box", Input).focus()
+        # Focus initial welcome input
+        try:
+            self.query_one("#welcome_input", Input).focus()
+        except NoMatches:
+            self.query_one("#input_box", Input).focus()
+        # Periodic sidebar refresh for live subagents & bg tasks
+        self.set_interval(0.5, self._refresh_sidebar)
         # Initialize engine in background
         threading.Thread(target=self._init_engine, daemon=True).start()
+
+    def _refresh_sidebar(self) -> None:
+        """Poll and update subagents, bg tasks, and token metrics reactively."""
+        try:
+            if rays_ui._SESSION_MODEL:
+                self.model_name = rays_ui._SESSION_MODEL
+            ctx_used = rays_ui._SESSION_CTX_USED
+            ctx_limit = rays_ui._SESSION_CTX_LIMIT
+            pct = int(100 * ctx_used / max(ctx_limit, 1)) if ctx_limit > 0 else 0
+            self.ctx_tokens = f"{ctx_used:,} / {ctx_limit:,} ({pct}%)"
+            
+            # Refresh active subagents
+            sub_log = self.query_one("#subagents_log", RichLog)
+            active_subs = rays_ui.get_active_subagents()
+            sub_log.clear()
+            if active_subs:
+                for tid, data in active_subs:
+                    role = data.get("role", "subagent")
+                    action = data.get("action", "working...")
+                    elapsed = int(time.time() - data.get("start_time", time.time()))
+                    sub_log.write(
+                        f"[bold #e0aaff]• Agent({role})[/]\n  [#d8b4fe]{action[:35]}[/] [dim #8888aa]· {elapsed}s[/]"
+                    )
+            else:
+                sub_log.write("[#444466]No active subagents[/]")
+
+            # Refresh background services
+            bg_log = self.query_one("#bg_log", RichLog)
+            with rays_ui._BG_LOCK:
+                tasks = list(rays_ui._BACKGROUND_TASKS.items())
+            bg_log.clear()
+            if tasks:
+                for tid, (desc, st) in tasks:
+                    elapsed = int(time.time() - st)
+                    bg_log.write(
+                        f"[bold #00d7af]• [{tid}][/] [#ffffff]{desc[:30]}[/]\n  [dim #8888aa]running {elapsed}s[/]"
+                    )
+            else:
+                bg_log.write("[#444466]No background services[/]")
+        except Exception:
+            pass
 
     # ─── Engine init ───────────────────────────────────────────────────
 
@@ -338,7 +469,7 @@ class RAYSTui(App):
         except Exception as exc:
             self.call_from_thread(
                 self.query_one("#chat_log", RichLog).write,
-                f"[bold red]Init error:[/bold red] {exc}",
+                f"[bold red]Init error:[/] {exc}",
             )
 
     def _patch_rays_ui(self) -> None:
@@ -350,13 +481,13 @@ class RAYSTui(App):
             self.call_from_thread(chat.write, str(text))
 
         def _chat_ok(text: str) -> None:
-            self.call_from_thread(chat.write, f"[green]{text}[/green]")
+            self.call_from_thread(chat.write, f"[green]{text}[/]")
 
         def _chat_warn(text: str) -> None:
-            self.call_from_thread(chat.write, f"[#9d4edd]{text}[/#9d4edd]")
+            self.call_from_thread(chat.write, f"[#9d4edd]{text}[/]")
 
         def _chat_err(text: str) -> None:
-            self.call_from_thread(chat.write, f"[bold #c77dff]{text}[/bold #c77dff]")
+            self.call_from_thread(chat.write, f"[bold #c77dff]{text}[/]")
 
         rays_ui.print_info = _chat
         rays_ui.print_step = _chat
@@ -369,14 +500,38 @@ class RAYSTui(App):
 
         def _bg_start(task_id: str, description: str) -> None:
             _orig_bg_start(task_id, description)
-            self.call_from_thread(bg.write, f"[#9d4edd]+ {description}[/#9d4edd]  [dim]{task_id}[/dim]")
+            self.call_from_thread(bg.write, f"[#9d4edd]+ {description}[/]  [dim]{task_id}[/dim]")
 
         def _bg_done(task_id: str) -> None:
             _orig_bg_done(task_id)
-            self.call_from_thread(bg.write, f"[green]done[/green]  [dim]{task_id}[/dim]")
+            self.call_from_thread(bg.write, f"[green]done[/]  [dim]{task_id}[/dim]")
 
         rays_ui.bg_task_start = _bg_start
         rays_ui.bg_task_done = _bg_done
+
+        # Patch animated spinners to prevent ANSI corruption in TUI
+        app_self = self
+        class DummySpinnerMock:
+            def __init__(self, message="Working", *args, **kwargs):
+                self.message = message
+            def __enter__(self):
+                if self.message:
+                    app_self.call_from_thread(chat.write, f"[#c77dff]… {self.message}[/]")
+                return self
+            def __exit__(self, *args): pass
+            def start(self): pass
+            def stop(self, final_message="", success=True): pass
+            def set_sub_message(self, msg=""): pass
+            def set_message(self, msg=""): pass
+
+        def _dummy_spinner_ctx(message: str = "Working", *args, **kwargs):
+            return DummySpinnerMock(message)
+
+        rays_ui.spinner = _dummy_spinner_ctx
+        rays_ui.local_shape_spinner = _dummy_spinner_ctx
+        rays_ui.thinking = _dummy_spinner_ctx
+        rays_ui.AnimatedShapeSpinner = DummySpinnerMock
+        rays_ui.CoolAnimation = DummySpinnerMock
 
     def _token_poll_loop(self) -> None:
         while True:
@@ -422,6 +577,17 @@ class RAYSTui(App):
         if not user_input:
             return
 
+        user_input = rays_ui.expand_pasted_text(user_input)
+
+        # If submitted from the centered welcome screen, transition smoothly to 2-panel workspace
+        if event.input.id == "welcome_input":
+            try:
+                self.query_one("#welcome_view").display = False
+                self.query_one("#main_layout").display = True
+                self.query_one("#input_box", Input).focus()
+            except NoMatches:
+                pass
+
         event.input.value = ""
         overlay = self.query_one("#slash_overlay", SlashOverlay)
         overlay.hide()
@@ -431,7 +597,7 @@ class RAYSTui(App):
 
         # Render user message block (OpenCode style)
         chat.write("")
-        chat.write(f"[bold #c77dff]> {user_input}[/bold #c77dff]")
+        chat.write(f"[bold #c77dff]> {user_input}[/]")
         chat.write("")
 
         # Handle slash commands locally
@@ -449,7 +615,7 @@ class RAYSTui(App):
                 return
 
         # Agent turn header
-        chat.write("[bold #560bad]── RAYS[/bold #560bad]")
+        chat.write("[bold #560bad]── RAYS[/]")
         chat.write("")
 
         # Run agent in background thread
@@ -460,9 +626,9 @@ class RAYSTui(App):
         ).start()
 
     def _show_help(self, chat: RichLog) -> None:
-        chat.write("[bold #c77dff]Available Commands[/bold #c77dff]")
+        chat.write("[bold #c77dff]Available Commands[/]")
         for cmd, desc in _SLASH_CMDS:
-            chat.write(f"  [#9d4edd]{cmd:<20}[/#9d4edd]  [dim]{desc}[/dim]")
+            chat.write(f"  [#9d4edd]{cmd:<20}[/]  [dim]{desc}[/dim]")
         chat.write("")
 
     def _run_agent(self, user_input: str) -> None:
@@ -470,7 +636,7 @@ class RAYSTui(App):
         if not self.rays_engine:
             self.call_from_thread(
                 chat.write,
-                "[dim #555577]Agent still initializing — please wait...[/dim #555577]",
+                "[#555577]Agent still initializing — please wait...[/]",
             )
             return
         try:
@@ -484,12 +650,12 @@ class RAYSTui(App):
             elapsed = round(time.time() - t0, 1)
             self.call_from_thread(
                 chat.write,
-                f"[#d7af00]+ Thought: {elapsed}s[/#d7af00]",
+                f"[#d7af00]+ Thought: {elapsed}s[/]",
             )
         except Exception as exc:
             self.call_from_thread(
                 chat.write,
-                f"[bold #c77dff]Error:[/bold #c77dff] {exc}",
+                f"[bold #c77dff]Error:[/] {exc}",
             )
 
     # ─── Actions ───────────────────────────────────────────────────────

@@ -67,10 +67,10 @@ C_RED      = "\033[38;5;201m" # Remapped to Hot Pink for "Forget Red"
 C_YELLOW   = "\033[38;5;228m"
 C_WHITE    = "\033[38;5;255m"
 
-# V8.0 Error Trace Palette
+# Thought and Summary Palette — Elegant Soft Orchid Violet & Slate Lilac
 C_NEON_BLUE = "\033[38;5;27m" # Navy Neon Blue
-C_CREAM     = "\033[38;5;230m" # Light Creamish Color
-C_DIM_CREAM = "\033[38;5;187m" # Muted Cream
+C_CREAM     = "\033[38;5;183m" # Soft Orchid Violet (Model Thoughts & Summaries)
+C_DIM_CREAM = "\033[38;5;146m" # Muted Slate Lilac
 DEVMODE = False
 
 # Grey palette mapped to vibrant for compatibility
@@ -91,11 +91,22 @@ _BACKGROUND_TASKS: Dict[str, Tuple[str, float]] = {}
 _BG_LOCK = threading.Lock()
 
 
-def bg_task_start(task_id: str, description: str) -> None:
-    """Register a background task for status bar tracking."""
+def bg_task_start(task_id: str = None, description: str = "") -> str:
+    """Register a background task for status bar tracking. Returns task_id."""
+    if task_id is None:
+        tid = f"bg_{int(time.time() * 1000) % 100000}"
+        desc = description or "Background Task"
+    elif not description:
+        # Single argument passed: bg_task_start(description)
+        desc = str(task_id)
+        tid = f"bg_{int(time.time() * 1000) % 100000}"
+    else:
+        tid = str(task_id)
+        desc = str(description)
     with _BG_LOCK:
-        _BACKGROUND_TASKS[task_id] = (description, time.time())
+        _BACKGROUND_TASKS[tid] = (desc, time.time())
     _pt_invalidate()
+    return tid
 
 
 def bg_task_done(task_id: str) -> None:
@@ -154,8 +165,121 @@ def status_set_agent_running(running: bool) -> None:
     _pt_invalidate()
 
 
+# ─── Live Subagents State ──────────────────────────────────────────
+_ACTIVE_SUBAGENTS: Dict[str, Dict[str, Any]] = {}
+_SUBAGENT_LOCK = threading.Lock()
+
+def subagent_start(task_id: str, role: str, prompt: str) -> None:
+    """Register an active subagent starting execution."""
+    with _SUBAGENT_LOCK:
+        _ACTIVE_SUBAGENTS[task_id] = {
+            "role": role,
+            "prompt": prompt,
+            "action": "Starting...",
+            "start_time": time.time(),
+            "status": "running"
+        }
+    _pt_invalidate()
+
+def subagent_update(task_id: str, action: str) -> None:
+    """Update current tool or task for a running subagent in-place."""
+    with _SUBAGENT_LOCK:
+        if task_id in _ACTIVE_SUBAGENTS:
+            _ACTIVE_SUBAGENTS[task_id]["action"] = action
+    _pt_invalidate()
+
+def subagent_done(task_id: str, summary: str = "", duration: float = 0.0) -> None:
+    """Mark subagent as completed."""
+    with _SUBAGENT_LOCK:
+        _ACTIVE_SUBAGENTS.pop(task_id, None)
+    _pt_invalidate()
+
+def active_subagent_count() -> int:
+    with _SUBAGENT_LOCK:
+        return len(_ACTIVE_SUBAGENTS)
+
+def get_active_subagents() -> List[Tuple[str, Dict[str, Any]]]:
+    with _SUBAGENT_LOCK:
+        return list(_ACTIVE_SUBAGENTS.items())
+
+
+def _build_status_bar_ansi_string(
+    phase: str = "",
+    detail: str = "",
+    tokens: int = 0,
+    s1: str = "▲",
+    s2: str = "⬟",
+    c1: str = C_HOT_PINK,
+    c2: str = C_PURPLE,
+) -> str:
+    """Build full ANSI status bar string matching prompt_toolkit bottom toolbar."""
+    ctx_used = _SESSION_CTX_USED
+    ctx_limit = _SESSION_CTX_LIMIT
+    
+    if ctx_used >= 1000000:
+        ctx_used_str = f"{ctx_used/1000000:.1f}M"
+    elif ctx_used >= 1000:
+        ctx_used_str = f"{ctx_used/1000:.1f}K"
+    else:
+        ctx_used_str = str(ctx_used)
+        
+    if ctx_limit >= 1000000:
+        ctx_limit_str = f"{ctx_limit/1000000:.1f}M"
+    elif ctx_limit >= 1000:
+        ctx_limit_str = f"{ctx_limit/1000:.1f}K"
+    else:
+        ctx_limit_str = str(ctx_limit)
+        
+    pct = int(100 * ctx_used / max(ctx_limit, 1)) if ctx_limit > 0 else 0
+    pct = min(100, max(0, pct))
+    
+    w = 8
+    filled = int(w * pct / 100)
+    bar = "=" * filled + " " * (w - filled)
+    
+    elapsed = time.time() - _SESSION_START_TIME if _SESSION_START_TIME > 0 else 0
+    if elapsed < 60:
+        time_str = f"{int(elapsed)}s"
+    else:
+        m = int(elapsed // 60)
+        s = int(elapsed % 60)
+        time_str = f"{m}m" if s == 0 else f"{m}m {s}s"
+        
+    bg_tasks = len(_BACKGROUND_TASKS)
+    bg_str = f" | {C_YELLOW}⊙ {bg_tasks}{RESET}" if bg_tasks > 0 else ""
+    
+    with _SUBAGENT_LOCK:
+        sub_cnt = len(_ACTIVE_SUBAGENTS)
+    sub_str = f" | {C_LILAC}❖ {sub_cnt} subagent{'s' if sub_cnt != 1 else ''}{RESET}" if sub_cnt > 0 else ""
+    
+    model_display = _SESSION_MODEL or "rays"
+    
+    spinner = f"{c1}{s1}{RESET}{c2}{s2}{RESET} " if s1 and s2 else ""
+    left = f" {spinner}{BOLD}{C_PINK}${RESET} {C_WHITE}{model_display}{RESET} | {C_LAVENDER}{ctx_used_str}/{ctx_limit_str}{RESET} | [{C_MID}{bar}{RESET}] {pct}% | {C_LILAC}{time_str}{RESET}{bg_str}{sub_str}"
+    
+    # Right side: phase / detail / tokens
+    right_parts = []
+    if phase:
+        right_parts.append(f"{C_PINK}{phase}{RESET}")
+    if detail:
+        right_parts.append(f"{C_GRAY}· {truncate_for_display(detail, 28)}{RESET}")
+    if tokens > 0:
+        right_parts.append(f"{C_DIM_GRAY}tokens {tokens:,}{RESET}")
+    elif _SESSION_AGENT_RUNNING:
+        right_parts.append(f"{C_DIM_GRAY}msg=interrupt · ^C cancel{RESET}")
+    
+    right = " ".join(right_parts)
+    
+    width = _term_width()
+    left_vis = _vis_len(left)
+    right_vis = _vis_len(right)
+    gap = max(2, width - left_vis - right_vis - 1)
+    
+    return f"{left}{' ' * gap}{right} "
+
+
 class OrchestrationHUD:
-    """Single top status line: rotating shapes + phase, tokens pinned to the right edge."""
+    """Persistent bottom status bar with rotating shapes and live telemetry."""
 
     def __init__(self) -> None:
         self.active = False
@@ -187,7 +311,8 @@ class OrchestrationHUD:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=1.0)
-        sys.stdout.write(f"\r{' ' * _term_width()}\r\n")
+        sys.stdout.write(f"\r\033[K")
+        sys.stdout.write(f"{_build_status_bar_ansi_string(phase='Done', detail='', tokens=self.tokens, s1='', s2='')}\n")
         sys.stdout.flush()
 
     def set_status(self, phase: str, detail: str = "") -> None:
@@ -199,78 +324,60 @@ class OrchestrationHUD:
             self.tokens += int(count)
 
     def print_below(self, text: str) -> None:
-        """Print a persistent line above the HUD spinner without losing animation."""
+        """Print a persistent line above the HUD status bar without losing animation."""
         if not self.active:
             sys.stdout.write(text if text.endswith("\n") else text + "\n")
             sys.stdout.flush()
             return
         with self._lock:
             self._pause_print = True
-            time.sleep(0.14)
-            sys.stdout.write(f"\r{' ' * _term_width()}\r")
+            time.sleep(0.02)
+            sys.stdout.write(f"\r\033[K")
             sys.stdout.write(text if text.endswith("\n") else text + "\n")
+            # Immediately restore status line at the bottom
+            status_line = _build_status_bar_ansi_string(
+                phase=self.phase,
+                detail=self.detail,
+                tokens=self.tokens,
+                s1="▲",
+                s2="⬟"
+            )
+            sys.stdout.write(f"\r{status_line}")
             sys.stdout.flush()
             self._pause_print = False
 
     def _animate(self) -> None:
-        has_tty = False
-        fd = None
-        old_settings = None
-        try:
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            tty.setcbreak(fd)
-            has_tty = True
-        except Exception:
-            has_tty = False
-
         try:
             while not self._stop.is_set():
                 if self._pause_print:
-                    time.sleep(0.04)
+                    time.sleep(0.03)
                     continue
                 process_pending_ui_events()
                 s1 = SHAPE_SEQUENCE[self._shape_idx % len(SHAPE_SEQUENCE)]
                 s2 = SHAPE_SEQUENCE[(self._shape_idx + 3) % len(SHAPE_SEQUENCE)]
                 c1 = THEME_COLORS[self._color_idx % len(THEME_COLORS)]
                 c2 = THEME_COLORS[(self._color_idx + 2) % len(THEME_COLORS)]
-                left = f" {c1}{s1}{RESET}{c2}{s2}{RESET} {C_LILAC}{self.phase}{RESET}"
-                if self.detail:
-                    left += f" {C_GRAY}· {self.detail}{RESET}"
-                token_label = f"tokens {self.tokens:,}"
-                token_part = f"{C_DIM_GRAY}{token_label}{RESET}"
-                width = _term_width()
-                left_vis = _vis_len(left)
-                token_vis = _vis_len(token_label)
-                gap = max(2, width - left_vis - token_vis - 1)
+                
+                status_line = _build_status_bar_ansi_string(
+                    phase=self.phase,
+                    detail=self.detail,
+                    tokens=self.tokens,
+                    s1=s1,
+                    s2=s2,
+                    c1=c1,
+                    c2=c2
+                )
+                
                 with self._lock:
                     if not self._pause_print:
-                        sys.stdout.write(f"\r{left}{' ' * gap}{token_part} ")
+                        sys.stdout.write(f"\r{status_line}")
                         sys.stdout.flush()
-                if has_tty:
-                    try:
-                        if select.select([sys.stdin], [], [], 0)[0]:
-                            char = sys.stdin.read(1)
-                            if char == "\x15":  # Ctrl+U — detail toggle
-                                _toggle_ui_mode_now()
-                            elif char == "\x14":  # Ctrl+T — transcript (some terminals)
-                                show_orchestration_transcript()
-                    except Exception:
-                        pass
                 self._shape_idx += 1
                 if self._shape_idx % len(SHAPE_SEQUENCE) == 0:
                     self._color_idx += 1
-                time.sleep(0.15)
+                time.sleep(0.12)
         finally:
-            if has_tty and old_settings is not None and fd is not None:
-                try:
-                    termios.tcsetattr(
-                        fd,
-                        termios.TCSABRAIN if hasattr(termios, "TCSABRAIN") else termios.TCSADRAIN,
-                        old_settings,
-                    )
-                except Exception:
-                    pass
+            pass
 
 
 class OrchestrationTranscript:
@@ -347,10 +454,11 @@ def orch_emit_section(title: str) -> None:
 def orch_emit_thinking(thought: str) -> None:
     if not thought or not thought.strip():
         return
-    wrapped = textwrap.wrap(thought.strip(), width=max(40, _term_width() - 10))
-    _orch_persistent_print(f"    {C_LILAC}{ITALIC}thinking{RESET}\n")
+    wrapped = textwrap.wrap(thought.strip(), width=max(40, _term_width() - 8))
+    _orch_persistent_print(f"  {C_LILAC}✦{RESET} {BOLD}{C_LAVENDER}Thought{RESET}\n")
     for w in wrapped:
-        _orch_persistent_print(f"    {C_DIM_GRAY}{ITALIC}{w}{RESET}\n")
+        _orch_persistent_print(f"    {C_CREAM}{w}{RESET}\n")
+    _orch_persistent_print("\n")
     _orch_transcript_note(f"thinking: {thought.strip()}")
 
 
@@ -431,19 +539,94 @@ def orch_emit_step_header(label: str, spawn_reason: str = "") -> None:
         orch_emit_thinking(spawn_reason)
 
 
+def orch_emit_progress(message: str) -> None:
+    """Print an intermediate progress milestone / summary from the agent."""
+    if not message or not message.strip():
+        return
+    prefix = get_shape_prefix()
+    _orch_persistent_print(f"\n  {prefix} {BOLD}{C_PINK}Progress Update{RESET}\n")
+    for w in textwrap.wrap(message.strip(), width=max(40, _term_width() - 8)):
+        _orch_persistent_print(f"    {C_CREAM}{w}{RESET}\n")
+    _orch_persistent_print("\n")
+    _orch_transcript_note(f"progress: {message.strip()}")
+
+
+def orch_emit_subagent_start(count: int, descriptions: List[str]) -> None:
+    """Print header when subagents are spawned."""
+    prefix = get_shape_prefix()
+    _orch_persistent_print(f"\n  {prefix} {BOLD}{C_PINK}Sub-Agent Delegation ({count} workers){RESET}\n")
+    for desc in descriptions:
+        _orch_persistent_print(f"    {C_LAVENDER}•{RESET} {C_WHITE}{desc}{RESET}\n")
+    _orch_persistent_print("\n")
+
+
+def orch_emit_subagent_progress(sub_id: str, role: str, status: str) -> None:
+    """Update live HUD with subagent activity."""
+    subagent_update(sub_id, status)
+    hud_set_status(f"subagent:{role}", f"[{sub_id}] {status}")
+
+
+def orch_emit_subagent_done(sub_id: str, role: str, summary: str, duration: float, prompt: str = "") -> None:
+    """Print completed subagent card in terminal matching reference layout."""
+    subagent_done(sub_id, summary, duration)
+    dur_str = f"{duration:.1f}s"
+    prompt_snip = f"({truncate_for_display(prompt, 50)})" if prompt else ""
+    _orch_persistent_print(f"  {C_GREEN}•{RESET} {BOLD}{C_YELLOW}Agent({role}: {sub_id}){RESET}{C_LAVENDER}{prompt_snip}{RESET} {C_MID}({dur_str}){RESET}\n")
+    if summary:
+        lines = [l.rstrip() for l in summary.strip().split("\n") if l.strip()]
+        for line in lines[:8]:
+            _orch_persistent_print(f"    {C_CREAM}{truncate_for_display(line, max(40, _term_width() - 8))}{RESET}\n")
+        if len(lines) > 8:
+            _orch_persistent_print(f"    {C_DIM_GRAY}… +{len(lines) - 8} more lines{RESET}\n")
+    _orch_persistent_print("\n")
+
+
 def _format_tool_verb(tool: str, arguments: Any) -> Tuple[str, str]:
     args = arguments if isinstance(arguments, dict) else {}
+    if tool in ("delegate_subagent", "delegate_task", "invoke_subagent"):
+        tasks = args.get("tasks") or args.get("chain") or []
+        cnt = len(tasks) if isinstance(tasks, list) else 1
+        r = args.get("role") or (tasks[0].get("role") if tasks and isinstance(tasks[0], dict) else "subagent")
+        return "Delegated", f"to {cnt} {r} subagent{'s' if cnt != 1 else ''}"
+    if tool in ("web_search", "search_web"):
+        q = args.get("query") or args.get("search_query") or args.get("q") or ""
+        return "Searched web", f"`{truncate_for_display(q, 60)}`"
+    if tool in ("web_fetch", "fetch_url", "web_extract"):
+        u = args.get("url") or args.get("link") or ""
+        return "Fetched", f"`{truncate_for_display(u, 60)}`"
     if tool == "list_directory":
         return "Listed", f"`{args.get('path', '.')}`"
     if tool == "read_file":
-        return "Read", f"`{args.get('path', '?')}`"
+        p = args.get('path', '?')
+        sl, el = args.get('start_line'), args.get('end_line')
+        range_str = f" (L{sl}-L{el})" if sl and el else ""
+        return "Read", f"`{p}`{range_str}"
     if tool == "write_file":
         return "Wrote", f"`{args.get('path', '?')}`"
     if tool == "patch_file":
         return "Edited", f"`{args.get('path', '?')}`"
     if tool == "run_shell_command":
         cmd = str(args.get("command", "")).strip()
-        return "Ran", f"`{truncate_for_display(cmd, 64)}`"
+        bg = " (bg)" if args.get("is_background") or args.get("background") else ""
+        return "Ran", f"`{truncate_for_display(cmd, 64)}`{bg}"
+    if tool == "check_process":
+        tid = args.get("task_id") or args.get("pid") or "all"
+        return "Checked", f"process `{tid}`"
+    if tool == "wait_process":
+        tid = args.get("task_id") or args.get("pid") or "process"
+        sec = args.get("timeout", 30)
+        return "Waited", f"for `{tid}` ({sec}s)"
+    if tool in ("sleep", "wait"):
+        sec = args.get("seconds", 5)
+        return "Waited", f"{sec}s"
+    if tool == "kill_process":
+        tid = args.get("task_id") or args.get("pid") or "?"
+        return "Killed", f"process `{tid}`"
+    if tool == "list_processes":
+        return "Listed", "background processes"
+    if tool == "report_progress":
+        msg = str(args.get("message", "")).strip()
+        return "Progress", f"{truncate_for_display(msg, 64)}"
     return "Called", tool or "?"
 
 
@@ -834,109 +1017,116 @@ def _center(text: str, width: int = 0) -> str:
 # ═══════════════════════════════════════════════════════════════════════
 
 def display_banner(skills: List[str] = None, mcp_servers: List[str] = None, model: str = "", cwd: str = ""):
-    """Display the RAYS banner with centered ANSI art and double-line ╔═╗ border."""
-    inner = max(60, _safe_inner_width(margin=8, minimum=60))
-
-    def _create_line(content: str) -> str:
-        """Center a styled line inside the double-line box."""
-        visible_len = _vis_len(content)
-        left_pad = max(0, (inner - visible_len) // 2)
-        right_pad = max(0, inner - visible_len - left_pad)
-        return f"{C_PURPLE}║{RESET}{' ' * left_pad}{content}{' ' * right_pad}{C_PURPLE}║{RESET}"
-
-    hdr = f"{C_PURPLE}╔{'═' * inner}╗{RESET}"
-    ftr = f"{C_PURPLE}╚{'═' * inner}╝{RESET}"
-    gap = f"{C_PURPLE}║{' ' * inner}║{RESET}"
-
-    lines = [
-        hdr,
-        gap,
-        _create_line(f"{C_PINK}██████╗  {C_LAVENDER} █████╗  {C_LILAC}██╗   ██╗ {C_MID}███████╗"),
-        _create_line(f"{C_PINK}██╔══██╗ {C_LAVENDER}██╔══██╗ {C_LILAC}╚██╗ ██╔╝ {C_MID}██╔════╝"),
-        _create_line(f"{C_PINK}██████╔╝ {C_LAVENDER}███████║  {C_LILAC}╚████╔╝  {C_MID}███████╗"),
-        _create_line(f"{C_PINK}██╔══██╗ {C_LAVENDER}██╔══██║   {C_LILAC}╚██╔╝   {C_MID}╚════██║"),
-        _create_line(f"{C_PINK}██║  ██║ {C_LAVENDER}██║  ██║    {C_LILAC}██║    {C_MID}███████║"),
-        _create_line(f"{C_PINK}╚═╝  ╚═╝ {C_LAVENDER}╚═╝  ╚═╝    {C_LILAC}╚═╝    {C_MID}╚══════╝{RESET}"),
-        gap,
-        _create_line(f"{C_LAVENDER}Vivid Shapes Development Assistant{RESET}"),
-        _create_line(f"{C_MID}github.com/markknoffler/RAYS-CORE-CLI{RESET}"),
-        gap,
+    """Display the RAYS banner with signature Vivid Shapes purple/pink/lavender theme and 2-column layout."""
+    inner = max(78, _safe_inner_width(margin=4, minimum=78))
+    
+    # Exact RAYS signature logo lines with pink/lavender/lilac/mid color mapping
+    logo_lines = [
+        f"{C_PINK}██████╗   {C_LAVENDER}█████╗  {C_LILAC}██╗   ██╗ {C_MID}███████╗{RESET}",
+        f"{C_PINK}██╔══██╗ {C_LAVENDER}██╔══██╗ {C_LILAC}╚██╗ ██╔╝ {C_MID}██╔════╝{RESET}",
+        f"{C_PINK}██████╔╝ {C_LAVENDER}███████║  {C_LILAC}╚████╔╝  {C_MID}███████╗{RESET}",
+        f"{C_PINK}██╔══██╗ {C_LAVENDER}██╔══██║   {C_LILAC}╚██╔╝   {C_MID}╚════██║{RESET}",
+        f"{C_PINK}██║  ██║ {C_LAVENDER}██║  ██║    {C_LILAC}██║    {C_MID}███████║{RESET}",
+        f"{C_PINK}╚═╝  ╚═╝ {C_LAVENDER}╚═╝  ╚═╝    {C_LILAC}╚═╝    {C_MID}╚══════╝{RESET}",
     ]
+    
+    print()
+    for l in logo_lines:
+        vlen = _vis_len(l)
+        pad = max(0, (inner - vlen) // 2)
+        print(f"  {' ' * pad}{l}")
+    print()
 
-    # ── Commands grid ────────────────────────────────────────────────
-    _SLASH_COMMANDS_DEF = [
-        ("/help",         "Show available commands"),
-        ("/code <task>",  "Autonomous coding pipeline"),
-        ("/chat <q>",     "Read-only Q&A"),
-        ("/model <name>", "Switch LLM model"),
-        ("/mcp",          "List MCP servers"),
-        ("/mode auto",    "Full autonomy mode"),
-        ("/mode ask",     "Ask-permission mode"),
-        ("/git",          "Summarize git changes"),
-        ("/clear",        "Clear screen"),
-        ("/bg",           "Background tasks"),
-        ("/exit",         "Exit RAYS"),
+    # Double-line box container in signature C_PURPLE
+    top_title = f" {BOLD}{C_LAVENDER}RAYS Agent v1.7.1{RESET} {C_MID}·{RESET} {C_LILAC}github.com/markknoffler/RAYS-CORE-CLI{RESET} "
+    top_title_vis = _vis_len(top_title)
+    top_dashes = max(2, inner - top_title_vis - 2)
+    hdr = f"  {C_PURPLE}╔═{RESET}{top_title}{C_PURPLE}{'═' * top_dashes}╗{RESET}"
+    ftr = f"  {C_PURPLE}╚{'═' * inner}╝{RESET}"
+    gap = f"  {C_PURPLE}║{' ' * inner}║{RESET}"
+    
+    # ── Left Column: Commands ──
+    left_rows = [
+        f"{BOLD}{C_LAVENDER}Available Commands{RESET}",
+        f"{C_PINK}/help{RESET}        {C_GRAY}Show available commands{RESET}",
+        f"{C_PINK}/code <task>{RESET} {C_GRAY}Autonomous coding pipeline{RESET}",
+        f"{C_PINK}/chat <q>{RESET}    {C_GRAY}Read-only Q&A{RESET}",
+        f"{C_PINK}/model <name>{RESET}{C_GRAY}Switch LLM model{RESET}",
+        f"{C_PINK}/mcp{RESET}         {C_GRAY}List MCP servers{RESET}",
+        f"{C_PINK}/mode auto{RESET}   {C_GRAY}Full autonomy mode{RESET}",
+        f"{C_PINK}/mode ask{RESET}    {C_GRAY}Ask-permission mode{RESET}",
+        f"{C_PINK}/git{RESET}         {C_GRAY}Summarize git changes{RESET}",
+        f"{C_PINK}/clear{RESET}       {C_GRAY}Clear screen{RESET}",
+        f"{C_PINK}/bg{RESET}          {C_GRAY}Background tasks{RESET}",
+        f"{C_PINK}/exit{RESET}        {C_GRAY}Exit RAYS{RESET}",
     ]
-
-    # Separator line
-    sep_inner = f"{C_MID}{'─' * (inner - 2)}{RESET}"
-    lines.append(f"{C_PURPLE}║{RESET} {sep_inner} {C_PURPLE}║{RESET}")
-
-    # Commands header
-    lines.append(_create_line(f"{BOLD}{C_LAVENDER}Available Commands{RESET}"))
-    lines.append(gap)
-
-    # Commands in 2 equal columns
-    half = (len(_SLASH_COMMANDS_DEF) + 1) // 2
-    col1 = _SLASH_COMMANDS_DEF[:half]
-    col2 = _SLASH_COMMANDS_DEF[half:]
+    
+    # ── Right Column: Tools & Skills ──
+    right_rows = [
+        f"{BOLD}{C_LAVENDER}Available Tools{RESET}",
+        f"{C_LILAC}web_search:{RESET}  {C_WHITE}DuckDuckGo search{RESET}",
+        f"{C_LILAC}web_fetch:{RESET}   {C_WHITE}Page content extract{RESET}",
+        f"{C_LILAC}code_edit:{RESET}   {C_WHITE}patch_file, write_file{RESET}",
+        f"{C_LILAC}filesystem:{RESET}  {C_WHITE}read_file, list_dir{RESET}",
+        f"{C_LILAC}terminal:{RESET}    {C_WHITE}run_command, bg_tasks{RESET}",
+        f"{C_LILAC}subagents:{RESET}   {C_WHITE}delegate_subagent{RESET}",
+        f"",
+        f"{BOLD}{C_LAVENDER}Available Skills{RESET}",
+        f"{C_MID}deckforge:{RESET}   {C_LILAC}AI presentation engine{RESET}",
+        f"{C_MID}docx, pptx:{RESET}  {C_LILAC}Office document editors{RESET}",
+        f"{C_MID}workspace:{RESET}   {C_LILAC}Codebase indexing & AST{RESET}",
+    ]
+    
     col_w = (inner - 4) // 2
-    for i in range(max(len(col1), len(col2))):
-        c1 = col1[i][0] if i < len(col1) else ""
-        c2 = col2[i][0] if i < len(col2) else ""
-        c1s = f"{C_PINK}{c1}{RESET}" if c1 else ""
-        c2s = f"{C_PINK}{c2}{RESET}" if c2 else ""
-        pad1 = max(0, col_w - len(c1))
-        pad2 = max(0, col_w - len(c2))
-        row = f"  {c1s}{' ' * pad1}  {c2s}{' ' * pad2}"
-        row_vis = 2 + len(c1) + pad1 + 2 + len(c2) + pad2
-        rpad = max(0, inner - row_vis)
-        lines.append(f"{C_PURPLE}║{RESET}{row}{' ' * rpad}{C_PURPLE}║{RESET}")
-
-    lines.append(gap)
-
-    # ── Footer rows: model · cwd · stats ────────────────────────────
+    max_r = max(len(left_rows), len(right_rows))
+    
+    body_lines = [hdr, gap]
+    for i in range(max_r):
+        l_text = left_rows[i] if i < len(left_rows) else ""
+        r_text = right_rows[i] if i < len(right_rows) else ""
+        
+        l_vis = _vis_len(l_text)
+        r_vis = _vis_len(r_text)
+        
+        l_pad = max(0, col_w - l_vis)
+        r_pad = max(0, col_w - r_vis)
+        
+        row_str = f"  {l_text}{' ' * l_pad}  {r_text}{' ' * r_pad}"
+        row_vis = _vis_len(row_str)
+        rem_pad = max(0, inner - row_vis)
+        
+        body_lines.append(f"  {C_PURPLE}║{RESET}{row_str}{' ' * rem_pad}{C_PURPLE}║{RESET}")
+    
+    body_lines.append(gap)
+    
+    # ── Separator & Footer stats inside box ──
+    sep = f"  {C_PURPLE}╠{'═' * inner}╣{RESET}"
+    body_lines.append(sep)
+    
     model_display = model or _SESSION_MODEL or "rays"
     cwd_display = cwd or os.getcwd()
-    max_cwd = 40
+    max_cwd = 35
     if len(cwd_display) > max_cwd:
         cwd_display = "…" + cwd_display[-(max_cwd - 1):]
-    skill_count = len(skills) if skills else 0
-    mcp_count = len(mcp_servers) if mcp_servers else 0
-    stats = f"{len(_SLASH_COMMANDS_DEF)} commands"
-    if skill_count:
-        stats += f"  ·  {skill_count} skills"
-    if mcp_count:
-        stats += f"  ·  {mcp_count} MCP"
-
-    lines.append(_create_line(f"{C_PINK}{model_display}{RESET}  {C_MID}·{RESET}  {C_MID}{cwd_display}{RESET}"))
-    lines.append(_create_line(f"{DIM}{C_LAVENDER}{stats}{RESET}"))
-    lines.append(ftr)
-
-    print()
-    for line in lines:
-        print(line)
-
-    # Hint line below box
-    hint = (
-        f"  {C_MID}Type your message, or {RESET}"
-        f"{C_PINK}/help{RESET}"
-        f"{C_MID} for commands  ·  {RESET}"
-        f"{C_LAVENDER}/code <task>{RESET}"
-        f"{C_MID} to enter the coding pipeline{RESET}"
-    )
-    print(hint)
-    print()
+    skill_cnt = len(skills) if skills else 5
+    mcp_cnt = len(mcp_servers) if mcp_servers else 0
+    
+    stats_left = f" {C_PINK}${RESET} {C_WHITE}{model_display}{RESET}  {C_MID}·{RESET}  {C_GRAY}{cwd_display}{RESET}"
+    stats_right = f"{C_LAVENDER}{skill_cnt} skills{RESET}  {C_MID}·{RESET}  {C_LILAC}{mcp_cnt} MCP{RESET}  {C_MID}·{RESET}  {C_PINK}11 cmds{RESET}  {C_MID}·{RESET}  {C_PINK}/help{RESET} "
+    
+    sl_vis = _vis_len(stats_left)
+    sr_vis = _vis_len(stats_right)
+    gap_pad = max(1, inner - sl_vis - sr_vis)
+    stats_row = f"{stats_left}{' ' * gap_pad}{stats_right}"
+    
+    body_lines.append(f"  {C_PURPLE}║{RESET}{stats_row}{C_PURPLE}║{RESET}")
+    body_lines.append(ftr)
+    
+    for bl in body_lines:
+        print(bl)
+        
+    hint = f"  {C_MID}Welcome to RAYS! Type your message or {RESET}{C_PINK}/help{RESET}{C_MID}  ·  {RESET}{C_LAVENDER}/code <task>{RESET}{C_MID} for coding pipeline{RESET}"
+    print(f"\n{hint}\n")
 
 
 
@@ -992,6 +1182,11 @@ class AnimatedShapeSpinner:
     def start(self):
         global _ACTIVE_SPINNER
         if self.use_global:
+            if _ACTIVE_SPINNER is not None and getattr(_ACTIVE_SPINNER, 'stop', None):
+                try:
+                    _ACTIVE_SPINNER.stop()
+                except Exception:
+                    pass
             _ACTIVE_SPINNER = self
         self._stop_event.clear()
         self.start_time = time.time()
@@ -1094,10 +1289,7 @@ class CoolAnimation(AnimatedShapeSpinner):
 
         try:
             while not self._stop_event.is_set():
-                # Cycle messages every 4 seconds
-                if tick % 25 == 0:
-                    self.message = self.cool_messages[msg_idx % len(self.cool_messages)]
-                    msg_idx += 1
+                tick += 1
                 
                 # Dual unsynchronized rotating shapes
                 s1 = SHAPE_SEQUENCE[(shape_idx) % len(SHAPE_SEQUENCE)]
@@ -1106,7 +1298,7 @@ class CoolAnimation(AnimatedShapeSpinner):
                 c2 = THEME_COLORS[(color_idx + 2) % len(THEME_COLORS)]  # different color
                 
                 # Formatting: Dual shapes + phase message
-                main_text = f" {c1}{s1}{RESET}{c2}{s2}{RESET} {C_LILAC}{self.title}: {C_WHITE}{self.message}{RESET}"
+                main_text = f" {c1}{s1}{RESET}{c2}{s2}{RESET} {C_LILAC}{self.title}{RESET}"
                 detail_hint = f" {C_DIM_GRAY}(ctrl+u toggle){RESET}"
                 
                 # Stuck detector: If no sub_message update for 5s, show "Working..."
@@ -1184,18 +1376,10 @@ GENERATION_MESSAGES = [
 ]
 
 def print_phase(title: str):
-    """Print a styled phase header OR trigger a vivid animation."""
+    """Print a styled phase header."""
     global _ACTIVE_SPINNER
-    
-    # Auto-Vivid Logic: If moving between major phases, start appropriate animation
-    if title == "Planning edits":
-        if _ACTIVE_SPINNER: _ACTIVE_SPINNER.stop()
-        _ACTIVE_SPINNER = CoolAnimation("PLANNING", PLANNING_MESSAGES)
-        _ACTIVE_SPINNER.start()
-    elif title == "Generating Code":
-        if _ACTIVE_SPINNER: _ACTIVE_SPINNER.stop()
-        _ACTIVE_SPINNER = CoolAnimation("GENERATING", GENERATION_MESSAGES)
-        _ACTIVE_SPINNER.start()
+    if _ACTIVE_SPINNER: 
+        _ACTIVE_SPINNER.stop()
         
     prefix = get_shape_prefix()
     capture_print(f"\n  {prefix} {BOLD}{C_WHITE}{title}{RESET}\n")
@@ -1553,37 +1737,32 @@ def print_final_run_summary(summary_text: str):
 #                      DIFF DISPLAY
 # ═══════════════════════════════════════════════════════════════════════
 
-def print_diff(file_path: str, search_block: str, replace_block: str, reason: str = ""):
-    """Print a professional full-width diff with line numbers and background highlights."""
+def print_diff(file_path: str, old_content: str, new_content: str, reason: str = "") -> None:
+    """Print a clean Claude/OpenCode-style diff with line numbers and green/red highlights."""
     prefix = get_shape_prefix()
+    s_lines = (old_content or "").splitlines()
+    r_lines = (new_content or "").splitlines()
     
-    # Calculate counts
-    s_lines = search_block.splitlines()
-    r_lines = replace_block.splitlines()
-    removed_count = len(s_lines)
-    added_count = len(r_lines)
-    
-    out = []
-    
-    header = f"\n  {prefix} {BOLD}{C_WHITE}Update({C_LAVENDER}{file_path}{C_WHITE}){RESET}\n"
-    header += f"  {C_MID}⎿{RESET}  {C_PINK}Added {added_count} lines, removed {removed_count} lines{RESET}\n"
-    if reason:
-        header += f"    {C_LAVENDER}{reason}{RESET}\n"
-    header += "\n"
-    
-    out.append(header)
-
-    # Generate unified diff
     diff = list(difflib.unified_diff(
         s_lines, r_lines,
         fromfile='original', tofile='modified',
         lineterm='', n=3
     ))
     
+    added_count = sum(1 for l in diff if l.startswith('+') and not l.startswith('+++'))
+    removed_count = sum(1 for l in diff if l.startswith('-') and not l.startswith('---'))
+
+    header = f"\n  {prefix} {BOLD}{C_WHITE}Update({C_LAVENDER}{file_path}{C_WHITE}){RESET}\n"
+    header += f"  {C_MID}⎿{RESET}  {C_PINK}Added {added_count} lines, removed {removed_count} lines{RESET}\n"
+    if reason:
+        header += f"    {C_LAVENDER}{reason}{RESET}\n"
+    header += "\n"
+    _orch_persistent_print(header)
+
     if not diff:
         return
 
-    w = shutil.get_terminal_size().columns
+    w = max(60, min(120, _term_width() - 4))
     lineno_left = 0
     lineno_right = 0
     
@@ -1592,68 +1771,69 @@ def print_diff(file_path: str, search_block: str, replace_block: str, reason: st
             continue
             
         if line.startswith('@@'):
-            # Parse @@ -1,7 +1,7 @@
             match = re.search(r'@@ -(\d+),?\d* \+(\d+),?\d* @@', line)
             if match:
                 lineno_left = int(match.group(1))
                 lineno_right = int(match.group(2))
-            out.append(f"     {C_DIM_GRAY}...\n") # Use plain ANSI for buffering
+            _orch_persistent_print(f"     {C_DIM_GRAY}...\n{RESET}")
             continue
             
-        # Format the line with numbering and content
         if line.startswith('+'):
             marking = "+"
             content = line[1:]
             num_str = f"{' ' * 6}{lineno_right:>5} {marking} "
             lineno_right += 1
-            bg_style = "on #003300" # Rich Green
-            markup = f"[{bg_style}][bold white]{num_str}{content.ljust(w - len(num_str))}[/]"
+            # Emerald green background with bold white text
+            formatted = f"\033[48;2;0;50;20m\033[1;37m{num_str}{content.ljust(max(0, w - len(num_str)))}\033[0m\n"
+            _orch_persistent_print(formatted)
         elif line.startswith('-'):
             marking = "-"
             content = line[1:]
             num_str = f"{lineno_left:>6}{' ' * 6}{marking} "
             lineno_left += 1
-            bg_style = "on #440022" # Hot Pink / Forget Red
-            markup = f"[{bg_style}][bold white]{num_str}{content.ljust(w - len(num_str))}[/]"
+            # Wine red background with bold white text
+            formatted = f"\033[48;2;68;0;34m\033[1;37m{num_str}{content.ljust(max(0, w - len(num_str)))}\033[0m\n"
+            _orch_persistent_print(formatted)
         else:
             marking = " "
             content = line[1:]
             num_str = f"{lineno_left:>6} {lineno_right:>5} {marking} "
             lineno_left += 1
             lineno_right += 1
-            markup = f"[dim white]{num_str}[/][white]{content}[/]"
+            formatted = f"  {C_DIM_GRAY}{num_str}{RESET}{C_CREAM}{content}{RESET}\n"
+            _orch_persistent_print(formatted)
             
-        _console.print(Text.from_markup(markup))
+    _orch_persistent_print("\n")
 
 
-def print_file_created(file_path: str, content: str):
+def print_file_created(file_path: str, content: str) -> None:
     """Print a file creation display with line numbers and full-width highlights."""
     prefix = get_shape_prefix()
-    import shutil
-    lines = content.splitlines()
+    lines = (content or "").splitlines()
     num_lines = len(lines)
     
-    print(f"\n  {prefix} {BOLD}{C_WHITE}Write({C_LAVENDER}{file_path}{C_WHITE}){RESET}")
-    print(f"  {C_MID}⎿{RESET}  {C_PINK}Wrote {num_lines} lines to {file_path}{RESET}")
-    print()
+    header = f"\n  {prefix} {BOLD}{C_WHITE}Write({C_LAVENDER}{file_path}{C_WHITE}){RESET}\n"
+    header += f"  {C_MID}⎿{RESET}  {C_PINK}Wrote {num_lines} lines to {file_path}{RESET}\n\n"
+    _orch_persistent_print(header)
     
-    w = shutil.get_terminal_size().columns
-    preview_limit = 15
+    w = max(60, min(120, _term_width() - 4))
+    preview_limit = 25
     for i, line in enumerate(lines[:preview_limit], 1):
         num_str = f"{i:>6} + "
-        bg_style = "on #003300" # Rich Green
-        markup = f"[{bg_style}][bold white]{num_str}{line.ljust(w - len(num_str))}[/]"
-        _console.print(Text.from_markup(markup))
+        formatted = f"\033[48;2;0;50;20m\033[1;37m{num_str}{line.ljust(max(0, w - len(num_str)))}\033[0m\n"
+        _orch_persistent_print(formatted)
     
     if num_lines > preview_limit:
-        print(f"     {C_LILAC}… +{num_lines - preview_limit} lines (ctrl+o to expand){RESET}")
+        _orch_persistent_print(f"     {C_LILAC}… +{num_lines - preview_limit} lines{RESET}\n")
+    _orch_persistent_print("\n")
 
 
-def print_file_modified(file_path: str, edits_count: int):
+def print_file_modified(file_path: str, edits_count: int) -> None:
     """Print a modification header (Shape Update style)."""
     prefix = get_shape_prefix()
-    print(f"\n  {prefix} {BOLD}{C_WHITE}Update({C_LAVENDER}{file_path}{C_WHITE}){RESET}")
-    print(f"  {C_MID}⎿{RESET}  {C_LILAC}Applied {edits_count} edit(s){RESET}")
+    line = f"\n  {prefix} {BOLD}{C_WHITE}Update({C_LAVENDER}{file_path}{C_WHITE}){RESET}\n"
+    line += f"  {C_MID}⎿{RESET}  {C_LILAC}Applied {edits_count} edit(s){RESET}\n"
+    _orch_persistent_print(line)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1956,7 +2136,7 @@ _pt_session = None
 _paste_counter = 0
 
 
-from prompt_toolkit import Application
+from prompt_toolkit import Application, PromptSession
 from prompt_toolkit.layout import Layout, HSplit, VSplit, ConditionalContainer, Window
 from prompt_toolkit.layout.controls import FormattedTextControl, BufferControl
 from prompt_toolkit.buffer import Buffer
@@ -1965,6 +2145,8 @@ from prompt_toolkit.formatted_text import FormattedText, ANSI
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.styles import Style
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.output.color_depth import ColorDepth
 
 def _build_status_bar_text():
     import time
@@ -2010,10 +2192,18 @@ def _build_status_bar_text():
             
     bg_tasks = len(_BACKGROUND_TASKS)
     bg_str = f" | ⊙ {bg_tasks}" if bg_tasks > 0 else ""
+    sub_cnt = active_subagent_count()
+    sub_str = f" | ❖ {sub_cnt} subagent{'s' if sub_cnt != 1 else ''}" if sub_cnt > 0 else ""
+    model_display = _SESSION_MODEL or "rays"
     
-    text = f" $ {_SESSION_MODEL} | {ctx_used_str}/{ctx_limit_str} | [{bar}] {pct}% | {time_str}{bg_str}"
+    left_part = f" $ {model_display} | {ctx_used_str}/{ctx_limit_str} | [{bar}] {pct}% | {time_str}{bg_str}{sub_str}"
+    right_part = "/help commands · /code pipeline · /exit"
     
-    return FormattedText([("class:bottom-toolbar", text)])
+    term_w = _term_width()
+    gap_len = max(2, term_w - len(left_part) - len(right_part) - 2)
+    full_text = f"{left_part}{' ' * gap_len}{right_part} "
+    
+    return FormattedText([("class:bottom-toolbar", full_text)])
 
 def _build_slash_dropdown_text(query: str, selected_idx: int):
     q = query.lower()
@@ -2031,158 +2221,155 @@ def _build_slash_dropdown_text(query: str, selected_idx: int):
         
     return FormattedText(items)
 
+def _build_bg_services_widget() -> FormattedText:
+    """Render attractive, non-emoji banner showing active background commands above prompt."""
+    with _BG_LOCK:
+        tasks = list(_BACKGROUND_TASKS.items())
+    if not tasks:
+        return FormattedText([])
+    
+    parts = []
+    header_text = f"  · Active Services ({len(tasks)}) ·\n"
+    parts.append(("class:bg-header", header_text))
+    
+    for tid, (desc, st) in tasks:
+        elapsed = int(time.time() - st)
+        elapsed_str = f"{elapsed}s" if elapsed < 60 else f"{elapsed//60}m {elapsed%60}s"
+        parts.append(("class:bg-dot", "   • "))
+        parts.append(("class:bg-tid", f"[{tid}] "))
+        parts.append(("class:bg-desc", f"{desc} "))
+        parts.append(("class:bg-time", f"({elapsed_str})\n"))
+    
+    return FormattedText(parts)
+
+_SESSION_PROMPT_INSTANCE: Any = None
+_PASTE_COUNTER: int = 0
+
+class SlashCommandCompleter(Completer):
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        if text.startswith('/'):
+            query = text.lower()
+            for cmd, desc in SLASH_COMMANDS:
+                if cmd.lower().startswith(query) or query == '/':
+                    yield Completion(
+                        cmd,
+                        start_position=-len(text),
+                        display=cmd,
+                        display_meta=desc
+                    )
+
 def get_user_prompt() -> Optional[str]:
     """
-    Get user input with multi-line support, persistent history, and Hermes-style
-    bracketed paste squashing using prompt_toolkit.
+    Get user input using persistent PromptSession with slash completions,
+    live subagents / active services banner, and bottom status toolbar.
     """
-    global _pt_session, _paste_counter, _PT_APP_REF
+    global _SESSION_PROMPT_INSTANCE, _PASTE_COUNTER
     import os
     import time
     
-    history_path = os.path.join(os.path.expanduser("~"), ".rays_history")
-    
-    result = [None]
-    selected_slash_idx = [0]
-    
-    input_buffer = Buffer(
-        history=FileHistory(history_path),
-        multiline=False,
-        name='input',
-        accept_handler=lambda buf: None
-    )
-    
-    @Condition
-    def is_slash_mode():
-        return input_buffer.text.startswith('/')
-        
-    @Condition
-    def is_agent_running():
-        return _SESSION_AGENT_RUNNING
-    
-    def get_status_bar_text():
-        return _build_status_bar_text()
-        
-    def _get_slash_items():
-        return _build_slash_dropdown_text(input_buffer.text, selected_slash_idx[0])
-        
-    def get_hint_line():
-        return FormattedText([("class:hint", " > | msg=interrupt · /queue · /bg · /steer · Ctrl+C cancel")])
-    
-    body = HSplit([
-        Window(),  # spacer
-        ConditionalContainer(
-            content=Window(content=FormattedTextControl(_get_slash_items), height=min(8, len(SLASH_COMMANDS))),
-            filter=is_slash_mode
-        ),
-        ConditionalContainer(
-            content=Window(height=1, content=FormattedTextControl(get_hint_line), style='class:hint'),
-            filter=is_agent_running
-        ),
-        Window(height=1, content=BufferControl(buffer=input_buffer), get_line_prefix=lambda lnum, ww: ANSI(f'  \x1b[38;5;205m❯\x1b[0m ')),
-        Window(height=1, content=FormattedTextControl(get_status_bar_text), style='class:bottom-toolbar'),
-    ])
-    
-    layout = Layout(body, focused_element=input_buffer)
-    
-    kb = KeyBindings()
-    
-    @kb.add('enter')
-    def _(event):
-        if is_slash_mode():
-            q = input_buffer.text.lower()
-            if q.startswith('/'):
-                q = q[1:]
-            filtered = [cmd for cmd in SLASH_COMMANDS if q in cmd[0].lower()]
-            if filtered and 0 <= selected_slash_idx[0] < len(filtered):
-                input_buffer.text = filtered[selected_slash_idx[0]][0] + " "
-                input_buffer.cursor_position = len(input_buffer.text)
-                return
-        result[0] = input_buffer.text
-        event.app.exit()
-        
-    @kb.add('up', filter=is_slash_mode)
-    def _(event):
-        selected_slash_idx[0] = max(0, selected_slash_idx[0] - 1)
-        
-    @kb.add('down', filter=is_slash_mode)
-    def _(event):
-        q = input_buffer.text.lower()[1:]
-        filtered = [cmd for cmd in SLASH_COMMANDS if q in cmd[0].lower()]
-        selected_slash_idx[0] = min(len(filtered) - 1, selected_slash_idx[0] + 1)
-        
-    @kb.add('escape', filter=is_slash_mode)
-    def _(event):
-        input_buffer.text = ""
-        
-    @kb.add('tab', filter=is_slash_mode)
-    def _(event):
-        q = input_buffer.text.lower()[1:]
-        filtered = [cmd for cmd in SLASH_COMMANDS if q in cmd[0].lower()]
-        if filtered and 0 <= selected_slash_idx[0] < len(filtered):
-            input_buffer.text = filtered[selected_slash_idx[0]][0] + " "
-            input_buffer.cursor_position = len(input_buffer.text)
-            
-    @kb.add('c-c')
-    def _(event):
-        print(f"\n  \x1b[38;5;141mInterrupted — returning to prompt\x1b[0m")
-        result[0] = ""
-        event.app.exit()
-        
-    prev_text = [""]
-    
-    def on_text_changed(buf):
-        global _paste_counter
-        text = buf.text
-        if len(text) - len(prev_text[0]) > 10 and text.count('\n') - prev_text[0].count('\n') >= 5:
-            if not text.strip().startswith('/'):
-                _paste_counter += 1
-                paste_dir = os.path.join(os.path.expanduser("~"), ".rays_pastes")
-                os.makedirs(paste_dir, exist_ok=True)
-                
-                filename = f"paste_{_paste_counter}_{int(time.time())}.txt"
-                filepath = os.path.join(paste_dir, filename)
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(text)
-                
-                line_count = text.count('\n') + 1
-                placeholder = f"[Pasted text #{_paste_counter}: {line_count} lines → {filepath}]"
-                
-                buf.text = placeholder
-                buf.cursor_position = len(placeholder)
-                text = placeholder
-                
-        prev_text[0] = text
-        
-        # Reset selected index on text change
-        selected_slash_idx[0] = 0
+    # 1. Print Active Background Services Widget if any exist
+    if bg_task_count() > 0:
+        with _BG_LOCK:
+            tasks = list(_BACKGROUND_TASKS.items())
+        if tasks:
+            sys.stdout.write(f"\n  {C_LAVENDER}{BOLD}· Active Services ({len(tasks)}) ·{RESET}\n")
+            for tid, (desc, st) in tasks:
+                elapsed = int(time.time() - st)
+                elapsed_str = f"{elapsed}s" if elapsed < 60 else f"{elapsed//60}m {elapsed%60}s"
+                sys.stdout.write(f"   {C_GREEN}•{RESET} {C_PINK}[{tid}]{RESET} {C_WHITE}{desc}{RESET} {C_GRAY}({elapsed_str}){RESET}\n")
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
-    input_buffer.on_text_changed += on_text_changed
-    
-    style = Style.from_dict({
-        'bottom-toolbar': 'bg:#1a1a2e #888888',
-        'slash-selected': 'bg:#d7af00 #000000 bold',
-        'hint': '#555555',
-    })
-    
-    app = Application(layout=layout, key_bindings=kb, style=style, full_screen=False)
-    _PT_APP_REF = app
-    
+    # 2. Print Live Sub-Agents Status Widget if any exist (matching Screenshot 1)
+    if active_subagent_count() > 0:
+        active_subagents = get_active_subagents()
+        if active_subagents:
+            inner = max(40, _term_width() - 8)
+            sys.stdout.write(f"\n  {C_MID}{'─' * inner}{RESET}\n")
+            for tid, data in active_subagents:
+                role = data.get("role", "subagent")
+                action = data.get("action", "Working...")
+                elapsed = int(time.time() - data.get("start_time", time.time()))
+                elapsed_str = f"{elapsed}s" if elapsed < 60 else f"{elapsed//60}m {elapsed%60}s"
+                sys.stdout.write(f"   {C_YELLOW}•{RESET} {BOLD}{C_WHITE}Agent({role}){RESET}  {C_LAVENDER}{truncate_for_display(action, 45)}{RESET}  {C_MID}· {elapsed_str}{RESET}\n")
+            sys.stdout.write(f"  {C_MID}{'─' * inner}{RESET}\n\n")
+            sys.stdout.flush()
+
+    # 2. Lazy-initialize or reuse PromptSession
+    history_path = os.path.join(os.path.expanduser("~"), ".rays_history")
+    if _SESSION_PROMPT_INSTANCE is None:
+        style = Style.from_dict({
+            'bottom-toolbar': 'bg:#232336 #a6a6b8',
+            'bottom-toolbar.text': 'bg:#232336 #a6a6b8',
+            'completion-menu': 'bg:#1e142e #f0e6ff',
+            'completion-menu.completion': 'bg:#1e142e #f0e6ff',
+            'completion-menu.completion.current': 'bg:#9333ea #ffffff bold',
+            'completion-menu.meta': 'bg:#2a1b40 #d8b4fe',
+            'completion-menu.meta.current': 'bg:#9333ea #ffffff bold',
+            'completion-menu.meta.completion': 'bg:#2a1b40 #d8b4fe',
+            'completion-menu.meta.completion.current': 'bg:#9333ea #ffffff bold',
+            'completion-menu.multi-column-meta': 'bg:#2a1b40 #d8b4fe',
+            'completion-menu.completion fuzzymatch.outside': '#d4c2fc',
+            'completion-menu.completion fuzzymatch.inside': '#ffffff bold',
+            'completion-menu.completion fuzzymatch.inside.character': '#ff80df underline',
+            'completion-menu.completion.current fuzzymatch.outside': '#ffffff',
+            'completion-menu.completion.current fuzzymatch.inside': '#ffffff bold',
+            'completion-toolbar': 'bg:#1e142e #f0e6ff',
+            'completion-toolbar.completion': 'bg:#1e142e #f0e6ff',
+            'completion-toolbar.completion.current': 'bg:#9333ea #ffffff bold',
+            'completion': 'bg:#1e142e #f0e6ff',
+            'completion.current': 'bg:#9333ea #ffffff bold',
+            'current-name': 'bg:#9333ea #ffffff bold',
+            'selected-name': 'bg:#9333ea #ffffff bold',
+            'scrollbar.background': 'bg:#1e142e',
+            'scrollbar.button': 'bg:#9333ea',
+        })
+        kb = KeyBindings()
+        
+        @kb.add('c-c')
+        def _(event):
+            event.app.exit(result=None)
+            
+        _SESSION_PROMPT_INSTANCE = PromptSession(
+            history=FileHistory(history_path),
+            completer=SlashCommandCompleter(),
+            complete_while_typing=True,
+            color_depth=ColorDepth.TRUE_COLOR,
+            style=style,
+            key_bindings=kb,
+            bottom_toolbar=_build_status_bar_text,
+            reserve_space_for_menu=6,
+        )
+
+    prompt_prefix = ANSI(f"  \x1b[38;5;205m❯\x1b[0m ")
     try:
-        app.run()
-    except EOFError:
-        result[0] = None
-    finally:
-        _PT_APP_REF = None
-        input_buffer.on_text_changed -= on_text_changed
-        
-    if result[0] is None:
+        raw_text = _SESSION_PROMPT_INSTANCE.prompt(prompt_prefix)
+    except (KeyboardInterrupt, EOFError):
         return None
-        
-    if not result[0].strip():
-        return ""
-        
-    return result[0].strip()
+    except Exception:
+        # Fallback to standard input if terminal mode was disrupted
+        try:
+            raw_text = input("  ❯ ")
+        except (KeyboardInterrupt, EOFError):
+            return None
+
+    if raw_text is None:
+        return None
+
+    # Handle Paste Squashing for multi-line pasted blocks (>5 lines)
+    if raw_text.count('\n') >= 5 and not raw_text.strip().startswith('/'):
+        _PASTE_COUNTER += 1
+        paste_dir = os.path.join(os.path.expanduser("~"), ".rays_pastes")
+        os.makedirs(paste_dir, exist_ok=True)
+        filename = f"paste_{_PASTE_COUNTER}_{int(time.time())}.txt"
+        filepath = os.path.join(paste_dir, filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(raw_text)
+        line_count = raw_text.count('\n') + 1
+        return f"[Pasted text #{_PASTE_COUNTER}: {line_count} lines → {filepath}]"
+
+    return raw_text.strip()
 
 def expand_pasted_text(user_input: str) -> str:
     """

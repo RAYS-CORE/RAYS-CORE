@@ -267,6 +267,7 @@ class TerminalEngine:
                 command,
                 shell=True,
                 cwd=target_cwd,
+                stdin=subprocess.DEVNULL,
                 stdout=outfile,
                 stderr=subprocess.STDOUT
             )
@@ -311,6 +312,7 @@ class TerminalEngine:
                 command,
                 shell=True,
                 cwd=target_cwd,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

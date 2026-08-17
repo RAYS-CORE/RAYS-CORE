@@ -31,6 +31,22 @@ def format_prior_executions(
 
 def _format_entry(index: int, entry: Dict[str, Any], user_prompt: str) -> str:
     etype = entry.get("type", "unknown")
+    if etype == "turn_summary":
+        lines = [
+            f"=== Previous Conversation Turn #{index} ===",
+            f"User Prompt: {entry.get('user_prompt', '')}",
+            f"Outcome / Summary: {entry.get('summary', '')}",
+            f"Completed: {entry.get('complete', False)}",
+        ]
+        history = entry.get("history", [])
+        if history:
+            lines.append("Actions taken in that turn:")
+            for sub_entry in history:
+                sub_actions = sub_entry.get("actions", [])
+                for a in sub_actions:
+                    lines.extend(_format_action(a))
+        return "\n".join(lines)
+
     lines = [
         f"=== Prior sub-agent #{index} ({etype}) ===",
         f"Original user prompt: {user_prompt}",

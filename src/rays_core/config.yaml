@@ -548,7 +548,7 @@ llm:
   api_key: ''
   model: ornith:35b
   num_ctx: 131072
-  ollama_endpoint: http://localhost:11434
+  ollama_endpoint: http://127.0.0.1:11434
   provider: ollama
 mcp_backend_failure_max_turns: 10
 mcp_connection_error_limit: 2
@@ -842,27 +842,48 @@ skills_orchestrator_prompts:
     \ requires run_shell_command or write_file evidence in the skill transcript.\n\
     \n**RESPOND WITH JSON:**\n{{\n  \"is_complete\": <true|false>,\n  \"reasoning\"\
     : \"Explanation of whether all requirements are met.\"\n}}\n"
-  execute_skill_step: "You are a dynamic skill sub-agent for skill \"{skill_name}\"\
-    .\n\n**ORIGINAL USER PROMPT:**\n\"{user_prompt}\"\n\n**WHY YOU WERE SPAWNED:**\n\
-    {spawn_reason}\n\n**OVERALL PLAN (orchestrator):**\n{overall_plan}\n\n**WORKSPACE\
+  execute_skill_step: "You are an autonomous coding and execution agent for skill\
+    \ \"{skill_name}\".\n\n**ORIGINAL USER PROMPT:**\n\"{user_prompt}\"\n\n**WHY YOU\
+    \ WERE SPAWNED:**\n{spawn_reason}\n\n**OVERALL PLAN:**\n{overall_plan}\n\n**WORKSPACE\
     \ ROOT:** \"{workspace_root}\"\n**SKILL ROOT:** \"{skill_root}\"\n\n**SKILL DEFINITION\
-    \ (SKILL.md):**\n{skill_md}\n\n**PRIOR SUB-AGENT RUNS (full transcripts):**\n\
-    {prior_executions}\n\n**YOUR SESSION SO FAR (turn {turn_number}):**\n{session_actions}\n\
-    \n**AVAILABLE TOOLS:**\n1. run_shell_command(command) \u2014 CWD is workspace\
-    \ root\n2. write_file(path, content)\n3. patch_file(path, search, replace)\n4.\
-    \ read_file(path)\n5. list_directory(path)\n\n**RULES:**\n- Do NOT cd; tools use\
-    \ workspace root automatically.\n- Use skill resources via absolute path under\
-    \ skill root when needed.\n- SKILL.md may say \"bash tool\" \u2014 that means\
-    \ run_shell_command here.\n- IGNORE prior MCP sub-agents saying documentation\
-    \ is outside their capabilities; YOU produce files with this skill's tools.\n\
-    - You MUST call at least one tool before status \"completed\". Never complete\
-    \ with only thoughts.\n- For docx/pptx: write markdown content first (write_file),\
-    \ then run_shell_command (pandoc, python, node, etc. per SKILL.md) to emit the\
-    \ binary file in the workspace.\n- Loop until spawn objective is met: status \"\
-    running\" + tool_call, or status \"completed\" + exit_message after successful\
-    \ tool work.\n\n**RESPOND WITH JSON:**\n{{\n  \"status\": \"running|completed\"\
-    ,\n  \"thought\": \"brief\",\n  \"tool_call\": {{\"name\": \"<tool>\", \"arguments\"\
-    : {{}}}},\n  \"exit_message\": \"when completed\"\n}}\n"
+    \ (SKILL.md):**\n{skill_md}\n\n**ACTIVE BACKGROUND SERVICES & PROCESSES (live\
+    \ state & logs):**\n{active_processes}\n\n**PREVIOUS TURNS & SUB-AGENT RUNS (full\
+    \ transcripts):**\n{prior_executions}\n\n**YOUR SESSION SO FAR (turn {turn_number}):**\n\
+    {session_actions}\n\n**AVAILABLE TOOLS:**\n1. web_search(query, limit=5) \u2014\
+    \ Search the live internet for documentation, tutorials, latest library APIs,\
+    \ or design patterns.\n2. web_fetch(url, max_chars=12000) \u2014 Fetch and convert\
+    \ web pages or online documentation into clean Markdown/text.\n3. delegate_subagent(goal=null,\
+    \ role=\"researcher|coder|reviewer|general\", tasks=null, chain=null, parallel=true)\
+    \ \u2014 Delegate complex sub-tasks, codebase searches, file exploration, or code\
+    \ modifications to isolated sub-agents running concurrently. Keeps context clean\
+    \ and fast.\n4. run_shell_command(command, is_background=false, timeout=30) \u2014\
+    \ Run shell commands. For servers, watchers, or training scripts (e.g. npm run\
+    \ dev, vite, python -m http.server), set is_background=true. Long commands auto-detach\
+    \ to background.\n5. check_process(task_id=null, lines=100) \u2014 Inspect live\
+    \ stdout/stderr of a running or completed background process.\n6. wait_process(task_id,\
+    \ timeout=60) \u2014 Wait for a background process to finish or progress, returning\
+    \ latest logs.\n7. sleep(seconds=5) \u2014 Pause execution for N seconds to allow\
+    \ background processes or builds to make progress.\n8. kill_process(task_id) \u2014\
+    \ Terminate a running background process.\n9. list_processes() \u2014 List all\
+    \ active background tasks with their PIDs, commands, and runtimes.\n10. report_progress(message)\
+    \ \u2014 Emit a progress milestone / intermediate summary to the user without\
+    \ stopping work.\n11. write_file(path, content) \u2014 Write or overwrite a file\
+    \ with live visual diff display.\n12. patch_file(path, search, replace) \u2014\
+    \ Replace an exact block in a file with live visual diff display.\n13. read_file(path,\
+    \ start_line=null, end_line=null) \u2014 Read file contents with optional line\
+    \ range.\n14. list_directory(path) \u2014 List files and directories.\n\n**AUTONOMOUS\
+    \ EXECUTION RULES:**\n- You are a proactive, long-running agent. You can execute\
+    \ multiple turns: run commands, inspect outputs, debug errors, wait for processes,\
+    \ report progress, edit files, and verify results.\n- Always output a clear, insightful\
+    \ \"thought\" explaining what you are analyzing, testing, or doing next.\n- If\
+    \ a background process or web server has errors in its logs, inspect the error\
+    \ trace and fix the relevant files.\n- Use report_progress to give the user milestones\
+    \ while you continue working.\n- Only return status \"completed\" when the user's\
+    \ objective is fully accomplished and verified.\n\n**RESPOND WITH JSON:**\n{{\n\
+    \  \"status\": \"running|completed\",\n  \"thought\": \"Clear explanation of current\
+    \ analysis or next action\",\n  \"tool_call\": {{\"name\": \"<tool>\", \"arguments\"\
+    : {{}}}},\n  \"exit_message\": \"Summary of accomplished work when status is completed\"\
+    \n}}\n"
   generate_execution_plan: "You are a skills execution planner. Your task is to create\
     \ a sequential, multi-step plan to fulfill the user's prompt.\n\n**USER PROMPT:**\n\
     \"{user_prompt}\"\n\n**SELECTED SKILLS:**\n{required_skills}\n\n**PREVIOUS EXECUTION\
