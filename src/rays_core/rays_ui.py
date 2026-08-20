@@ -1072,8 +1072,8 @@ def display_banner(skills: List[str] = None, mcp_servers: List[str] = None, mode
         f"{C_LILAC}subagents:{RESET}   {C_WHITE}delegate_subagent{RESET}",
         f"",
         f"{BOLD}{C_LAVENDER}Available Skills{RESET}",
-        f"{C_MID}deckforge:{RESET}   {C_LILAC}AI presentation engine{RESET}",
         f"{C_MID}docx, pptx:{RESET}  {C_LILAC}Office document editors{RESET}",
+        f"{C_MID}rayspy:{RESET}      {C_LILAC}Python analysis & REPL{RESET}",
         f"{C_MID}workspace:{RESET}   {C_LILAC}Codebase indexing & AST{RESET}",
     ]
     
@@ -1513,17 +1513,25 @@ def print_mcp_tool_done(
 
 
 def print_mcp_server_status(name: str, status: str, detail: str = "") -> None:
-    """Print a clean per-server MCP connection status line."""
+    """Print a clean per-server MCP connection status line framed inside the box."""
+    inner = max(40, _safe_inner_width(margin=8, minimum=40))
     if status == 'connected':
         icon = f"{C_GREEN}✓{RESET}"
         name_color = C_WHITE
         detail_color = C_LAVENDER
+    elif status == 'warning':
+        icon = f"{C_YELLOW}⚠{RESET}"
+        name_color = C_WHITE
+        detail_color = C_YELLOW
     else:
-        icon = f"{C_MID}✗{RESET}"
+        icon = f"{C_RED}✗{RESET}"
         name_color = C_MID
         detail_color = C_MID
     detail_str = f"  {C_MID}·{RESET}  {detail_color}{detail}{RESET}" if detail else ""
-    sys.stdout.write(f"     {icon}  {name_color}{name}{RESET}{detail_str}\n")
+    row_content = f"     {icon}  {name_color}{name}{RESET}{detail_str}"
+    row_vis = _vis_len(row_content)
+    pad = max(0, inner - row_vis)
+    print(f"  {C_PURPLE}│{RESET}{row_content}{' ' * pad}{C_PURPLE}│{RESET}")
     sys.stdout.flush()
 
 
@@ -1548,11 +1556,12 @@ def print_mcp_connect_summary(sessions: dict) -> None:
     failed = [n for n, s in sessions.items() if getattr(s, 'status', '') != 'connected']
     total_tools = sum(len(getattr(s, 'tools', [])) for s in sessions.values() if getattr(s, 'status', '') == 'connected')
     ok_str = f"{C_GREEN}{len(connected)} connected{RESET}"
-    fail_str = f"{C_MID}{len(failed)} failed{RESET}"
+    fail_str = f"{C_MID}{len(failed)} failed{RESET}" if not failed else f"{C_RED}{len(failed)} failed{RESET}"
     tools_str = f"{C_LAVENDER}{total_tools} tool{'s' if total_tools != 1 else ''} available{RESET}"
     content_styled = f"  {ok_str}  {C_MID}·{RESET}  {fail_str}  {C_MID}·{RESET}  {tools_str}  "
     content_vis = _vis_len(content_styled)
     pad = max(0, inner - content_vis)
+    print(f"  {C_PURPLE}├{'─' * inner}┤{RESET}")
     print(f"  {C_PURPLE}│{RESET}{content_styled}{' ' * pad}{C_PURPLE}│{RESET}")
     print(f"  {C_PURPLE}╰{'─' * inner}╯{RESET}\n")
 

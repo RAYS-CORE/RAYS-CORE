@@ -246,19 +246,42 @@ class GUIBridgeRuntime:
         original_print_final_run_summary = safe_wrap(rays_ui.print_final_run_summary)
 
         def wrapped_print_diff(file_path: str, search_block: str, replace_block: str, reason: str = ""):
+            import difflib
+            old_lines = (search_block or "").splitlines()
+            new_lines = (replace_block or "").splitlines()
+            diff_gen = list(difflib.unified_diff(old_lines, new_lines, lineterm=""))
             lines = []
-            for line in replace_block.splitlines()[:80]:
-                lines.append({"content": line, "type": "add"})
-            for line in search_block.splitlines()[:80]:
-                lines.append({"content": line, "type": "remove"})
+            added_cnt = 0
+            removed_cnt = 0
+            # Extract unified diff lines, skipping header lines
+            body_lines = diff_gen[2:] if len(diff_gen) > 2 else diff_gen
+            for l in body_lines:
+                if l.startswith("+"):
+                    added_cnt += 1
+                    lines.append({"content": l[1:], "type": "add"})
+                elif l.startswith("-"):
+                    removed_cnt += 1
+                    lines.append({"content": l[1:], "type": "remove"})
+                elif l.startswith("@"):
+                    lines.append({"content": l, "type": "context"})
+                else:
+                    lines.append({"content": l.lstrip(" "), "type": "context"})
+            if not lines:
+                for line in old_lines[:100]:
+                    lines.append({"content": line, "type": "remove"})
+                for line in new_lines[:100]:
+                    lines.append({"content": line, "type": "add"})
+                added_cnt = len(new_lines)
+                removed_cnt = len(old_lines)
+
             self.bus.emit(
                 "diff_chunk",
                 {
                     "filePath": file_path,
-                    "reason": reason,
-                    "added": len(replace_block.splitlines()),
-                    "removed": len(search_block.splitlines()),
-                    "lines": lines,
+                    "reason": reason or "Edited file",
+                    "added": added_cnt,
+                    "removed": removed_cnt,
+                    "lines": lines[:400],
                 },
             )
             return original_print_diff(file_path, search_block, replace_block, reason)
@@ -316,14 +339,16 @@ class GUIBridgeRuntime:
             return original_print_error(message)
 
         def wrapped_print_file_created(file_path: str, content: str):
+            c_lines = (content or "").splitlines()
             self.bus.emit(
                 "diff_chunk",
                 {
                     "filePath": file_path,
                     "reason": "Created file",
-                    "added": len(content.splitlines()),
+                    "added": len(c_lines),
                     "removed": 0,
-                    "lines": [{"content": line, "type": "add"} for line in content.splitlines()[:120]],
+                    "fullContent": content or "",
+                    "lines": [{"content": line, "type": "add"} for line in c_lines[:400]],
                 },
             )
             return original_print_file_created(file_path, content)

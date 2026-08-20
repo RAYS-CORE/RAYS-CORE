@@ -16,14 +16,16 @@ pathex = [
     str(studio_root / "bridge" / "src"),
 ]
 
-rayspy_path = monorepo_root / "examples" / "skills" / "rayspy"
+rayspy_path = monorepo_root / "src" / "rays_core" / "skills" / "rayspy"
 node_path = monorepo_root / "node"
 
 datas = [
     (str(config_yaml), "rays_core"),
-    (str(rayspy_path), "examples/skills/rayspy"),
-    (str(node_path), "node")
 ]
+if rayspy_path.exists():
+    datas.append((str(rayspy_path), "rays_core/skills/rayspy"))
+if node_path.exists():
+    datas.append((str(node_path), "node"))
 binaries = []
 hiddenimports = [
     "rays_core",

@@ -352,21 +352,56 @@ class AgentOrchestrator:
         self, user_prompt: str, result: Dict[str, Any]
     ) -> str:
         template = self.prompts.get("generate_session_summary", "")
-        if not template:
-            return ""
         history = result.get("history") or []
         complete = result.get("complete", False)
-        try:
-            prompt = template.format(
-                user_prompt=user_prompt,
-                execution_history=format_prior_executions(history, user_prompt),
-                is_complete="yes" if complete else "no",
-                plan_summary=result.get("summary") or "",
-            )
-            return (self.ai_client.generate_text(prompt) or "").strip()
-        except Exception:
-            logger.exception("Failed to generate orchestration session summary")
-            return ""
+        summary_text = ""
+        if template:
+            try:
+                prompt = template.format(
+                    user_prompt=user_prompt,
+                    execution_history=format_prior_executions(history, user_prompt),
+                    is_complete="yes" if complete else "no",
+                    plan_summary=result.get("summary") or "",
+                )
+                summary_text = (self.ai_client.generate_text(prompt) or "").strip()
+            except Exception:
+                logger.exception("Failed to generate orchestration session summary")
+
+        if not summary_text:
+            # Construct a clear bulleted fallback summary from actions taken
+            actions_list = []
+            files_edited = set()
+            files_written = set()
+            commands_run = []
+            for h in history:
+                for a in h.get("actions", []):
+                    tool = a.get("tool")
+                    args = a.get("arguments") or {}
+                    if tool == "write_file" and args.get("path"):
+                        files_written.add(args.get("path"))
+                    elif tool == "patch_file" and args.get("path"):
+                        files_edited.add(args.get("path"))
+                    elif tool == "run_shell_command" and args.get("command"):
+                        commands_run.append(args.get("command")[:60])
+                    elif a.get("thought"):
+                        actions_list.append(a.get("thought")[:120])
+
+            lines = [f"**Execution Summary**: {result.get('summary', 'Tasks completed successfully.')}"]
+            if files_written:
+                lines.append("\n**Created Files**:")
+                for f in sorted(files_written):
+                    lines.append(f"- `{f}`")
+            if files_edited:
+                lines.append("\n**Modified Files**:")
+                for f in sorted(files_edited):
+                    lines.append(f"- `{f}`")
+            if commands_run:
+                lines.append("\n**Executed Commands**:")
+                for c in commands_run[:5]:
+                    lines.append(f"- `$ {c}`")
+            summary_text = "\n".join(lines)
+
+        return summary_text
 
     def _evaluate_completion(
         self, user_prompt: str, history: List[Dict[str, Any]]

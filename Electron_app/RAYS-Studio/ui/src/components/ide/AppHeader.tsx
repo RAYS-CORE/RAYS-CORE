@@ -36,9 +36,6 @@ export function AppHeader({ onOpenSettings, onOpenSkills, onOpenMcp }: AppHeader
           <NavLink to="/rayspy" className={linkClass}>
             Rayspy
           </NavLink>
-          <NavLink to="/app-extension" className={linkClass}>
-            Extension
-          </NavLink>
         </nav>
       </div>
       <div className="flex items-center gap-1">

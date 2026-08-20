@@ -97,6 +97,32 @@ class _ServerConnection:
         self.stack = stack
 
 
+class _SuppressStderr:
+    """Redirect C-level stderr file descriptor to /dev/null to isolate subprocess and library warning noise."""
+    def __enter__(self):
+        try:
+            self.null_fd = os.open(os.devnull, os.O_RDWR)
+            self.save_fd = os.dup(2)
+            os.dup2(self.null_fd, 2)
+        except Exception:
+            self.null_fd = None
+            self.save_fd = None
+        return self
+
+    def __exit__(self, *args):
+        if self.save_fd is not None:
+            try:
+                os.dup2(self.save_fd, 2)
+                os.close(self.save_fd)
+            except Exception:
+                pass
+        if self.null_fd is not None:
+            try:
+                os.close(self.null_fd)
+            except Exception:
+                pass
+
+
 class MCPManager:
     MAX_RESULT_CHARS = 12000
 
@@ -204,11 +230,15 @@ class MCPManager:
         if not wanted:
             return
 
-        # Silence asyncio 'Task exception was never retrieved' noise during connect
+        import warnings
         import logging as _logging
-        _asyncio_logger = _logging.getLogger('asyncio')
-        _prev_level = _asyncio_logger.level
-        _asyncio_logger.setLevel(_logging.CRITICAL)
+        _prev_filters = warnings.filters[:]
+        warnings.filterwarnings("ignore")
+
+        _loggers = [_logging.getLogger(name) for name in ('', 'asyncio', 'mcp', 'pydantic', 'pydantic_settings', 'blender', 'urllib3')]
+        _prev_levels = [l.level for l in _loggers]
+        for l in _loggers:
+            l.setLevel(_logging.CRITICAL)
 
         try:
             for entry in self._server_configs:
@@ -234,12 +264,21 @@ class MCPManager:
                 try:
                     await self._connect_stdio_server(name, entry)
                 except Exception as exc:
+                    err_msg = str(exc).strip()
+                    if "Connection refused" in err_msg or "Errno 61" in err_msg:
+                        clean_err = "host app not reachable"
+                    elif "No such file" in err_msg:
+                        clean_err = "executable not found"
+                    else:
+                        clean_err = err_msg[:60]
                     self._sessions[name] = MCPServerSession(
-                        name=name, status="error", error=str(exc)
+                        name=name, status="error", error=err_msg
                     )
-                    rays_ui.print_mcp_server_status(name, 'error', str(exc)[:100])
+                    rays_ui.print_mcp_server_status(name, 'error', clean_err)
         finally:
-            _asyncio_logger.setLevel(_prev_level)
+            warnings.filters = _prev_filters
+            for l, lvl in zip(_loggers, _prev_levels):
+                l.setLevel(lvl)
 
     async def _connect_stdio_server(self, name: str, entry: Dict[str, Any]) -> None:
         from mcp import ClientSession, StdioServerParameters
@@ -266,36 +305,35 @@ class MCPManager:
             env=merged_env,
         )
 
-        quiet = entry.get("quiet", self.config.get("mcp_quiet_stderr", True))
-        errlog = open(os.devnull, "w") if quiet else sys.stderr
-
-        stack = AsyncExitStack()
-        stdio_transport = await stack.enter_async_context(
-            stdio_client(params, errlog=errlog)
-        )
-        read_stream, write_stream = stdio_transport
-        session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
-        await session.initialize()
-
-        list_result = await session.list_tools()
-        tools: List[ToolDescriptor] = []
-        for tool in list_result.tools:
-            schema: Dict[str, Any] = {}
-            if tool.inputSchema is not None:
-                if hasattr(tool.inputSchema, "model_dump"):
-                    schema = tool.inputSchema.model_dump()
-                elif isinstance(tool.inputSchema, dict):
-                    schema = tool.inputSchema
-                else:
-                    schema = dict(tool.inputSchema)
-            descriptor = ToolDescriptor(
-                server=name,
-                name=tool.name,
-                description=tool.description or "",
-                input_schema=schema,
+        with _SuppressStderr():
+            stack = AsyncExitStack()
+            errlog = open(os.devnull, "w")
+            stdio_transport = await stack.enter_async_context(
+                stdio_client(params, errlog=errlog)
             )
-            tools.append(descriptor)
-            self.registry.register(descriptor)
+            read_stream, write_stream = stdio_transport
+            session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
+            await session.initialize()
+
+            list_result = await session.list_tools()
+            tools: List[ToolDescriptor] = []
+            for tool in list_result.tools:
+                schema: Dict[str, Any] = {}
+                if tool.inputSchema is not None:
+                    if hasattr(tool.inputSchema, "model_dump"):
+                        schema = tool.inputSchema.model_dump()
+                    elif isinstance(tool.inputSchema, dict):
+                        schema = tool.inputSchema
+                    else:
+                        schema = dict(tool.inputSchema)
+                descriptor = ToolDescriptor(
+                    server=name,
+                    name=tool.name,
+                    description=tool.description or "",
+                    input_schema=schema,
+                )
+                tools.append(descriptor)
+                self.registry.register(descriptor)
 
         self._connections[name] = _ServerConnection(name, session, stack)
         self._sessions[name] = MCPServerSession(

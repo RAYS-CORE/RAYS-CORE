@@ -1,34 +1,60 @@
+import { useMemo } from "react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import type { AgentTurn, ActivityItem } from "@/services/agentActivity";
 import { formatDuration } from "@/services/agentActivity";
 import { ThinkingDisclosure } from "./ThinkingDisclosure";
 import { ActivityItemView } from "./ActivityRows";
-import { Download } from "lucide-react";
 
 function UserPromptBox({ text }: { text: string }) {
   return (
-    <div
-      className="rounded-lg border border-border/50 bg-card/30 px-4 py-3 text-sm leading-relaxed text-foreground/90"
-      data-slot="user-prompt"
-    >
-      <span className="whitespace-pre-wrap break-words">{text}</span>
+    <div className="flex justify-end mb-6 w-full" data-slot="user-prompt">
+      <div className="max-w-[85%] rounded-2xl border border-white/10 bg-[#1c1c20] px-4 py-2.5 text-[13.5px] leading-relaxed text-foreground/90 shadow-sm">
+        <span className="whitespace-pre-wrap break-words">{text}</span>
+      </div>
     </div>
   );
 }
 
 function FinalSummaryBlock({ content }: { content: string }) {
+  const html = useMemo(() => {
+    try {
+      return DOMPurify.sanitize(marked.parse(content, { async: false }) as string);
+    } catch {
+      return "";
+    }
+  }, [content]);
+
+  if (!html) {
+    return (
+      <div
+        className="my-3 text-[13.5px] leading-relaxed text-foreground/90 whitespace-pre-wrap font-normal"
+        data-slot="final-summary"
+      >
+        {content}
+      </div>
+    );
+  }
+
   return (
-    <div className="mt-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap" data-slot="final-summary">
-      {content}
-    </div>
+    <div
+      className="my-3 text-[13.5px] leading-relaxed text-foreground/90 font-normal prose prose-invert max-w-none prose-p:my-2 prose-headings:text-foreground prose-headings:my-2 prose-code:text-amber-300 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-[#131316] prose-pre:border prose-pre:border-white/10"
+      data-slot="final-summary"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
 function TurnActivityItems({ items }: { items: ActivityItem[] }) {
   const thinkingItems = items.filter((i): i is Extract<ActivityItem, { kind: "thinking" }> => i.kind === "thinking");
-  const otherItems = items.filter((i) => i.kind !== "thinking");
+  const planItems = items.filter((i): i is Extract<ActivityItem, { kind: "plan" }> => i.kind === "plan");
+  const otherItems = items.filter((i) => i.kind !== "thinking" && i.kind !== "plan");
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-2 space-y-1 w-full">
+      {otherItems.map((item) => (
+        <ActivityItemView key={item.id} item={item} />
+      ))}
       {thinkingItems.map((item) => (
         <ThinkingDisclosure
           key={item.id}
@@ -38,7 +64,7 @@ function TurnActivityItems({ items }: { items: ActivityItem[] }) {
           timerKey={item.id}
         />
       ))}
-      {otherItems.map((item) => (
+      {planItems.map((item) => (
         <ActivityItemView key={item.id} item={item} />
       ))}
     </div>
@@ -53,11 +79,11 @@ function AgentTurnBlock({ turn, isLatest }: { turn: AgentTurn; isLatest: boolean
     !turn.finalSummary;
 
   return (
-    <div className="agent-turn py-6 border-b border-border/30 last:border-b-0">
+    <div className="agent-turn py-5 border-b border-white/[0.06] last:border-b-0 w-full">
       <UserPromptBox text={turn.userPrompt} />
       <TurnActivityItems items={turn.items} />
       {showLiveThinking && (
-        <div className="mt-3">
+        <div className="mt-2">
           <ThinkingDisclosure
             text=""
             pending
@@ -65,58 +91,15 @@ function AgentTurnBlock({ turn, isLatest }: { turn: AgentTurn; isLatest: boolean
           />
         </div>
       )}
-      {turn.finalSummary && <FinalSummaryBlock content={turn.finalSummary} />}
-      {turn.items.some(i => i.kind === "tool" && i.title.toLowerCase().includes("rayspy") && i.status === "done") && (
-        <div className="mt-3 flex items-center justify-start">
-          <button
-            type="button"
-            onClick={() => window.open('http://localhost:5176/rayspy-mcp/report?investigationId=latest&format=html', '_blank')}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm"
-          >
-            <Download size={14} /> Download HTML Report
-          </button>
+      {turn.finalSummary && (
+        <div className="mt-4 pt-3 border-t border-white/[0.06]">
+          <FinalSummaryBlock content={turn.finalSummary} />
         </div>
       )}
-      {(() => {
-        const appTool = turn.items.find(i => {
-          if (i.kind === "tool" && i.status === "done" && i.detail) {
-            try {
-              const p = JSON.parse(i.detail);
-              return p && p.__OPEN_APP === true;
-            } catch {
-              return false;
-            }
-          }
-          return false;
-        });
-        if (appTool && appTool.kind === "tool") {
-          let appData: any = null;
-          try {
-            appData = JSON.parse(appTool.detail);
-          } catch {}
-          if (appData) {
-            return (
-              <div className="mt-3 flex items-center justify-start">
-                <button
-                  type="button"
-                  onClick={() => {
-                    (window as any).__OPEN_APP = { url: appData.url, title: appData.title };
-                    window.location.hash = "#/app-extension";
-                  }}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm"
-                >
-                  Open {appData.title || "App"}
-                </button>
-              </div>
-            );
-          }
-        }
-        return null;
-      })()}
       {turn.status === "done" && turn.endedAt && (
-        <div className="mt-3 flex items-center gap-1.5 text-[0.625rem] text-muted-foreground/40 tabular-nums">
-          <span className="inline-block size-3 rounded-sm bg-muted-foreground/20" aria-hidden />
-          {formatDuration(turn.endedAt - turn.startedAt)}
+        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground/40 font-mono tabular-nums">
+          <span className="inline-block size-1.5 rounded-full bg-emerald-500/50" aria-hidden />
+          <span>Completed in {formatDuration(turn.endedAt - turn.startedAt)}</span>
         </div>
       )}
     </div>

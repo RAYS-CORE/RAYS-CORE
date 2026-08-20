@@ -7,7 +7,6 @@ import {
   markOnboardingCompleteThisSession,
 } from "@/services/onboardingStorage";
 import { RayspyIframe } from "@/components/agent/RayspyIframe";
-import { DynamicAppIframe } from "@/components/agent/DynamicAppIframe";
 
 export function AppShell() {
   const [showOnboarding, setShowOnboarding] = useState(
@@ -27,7 +26,6 @@ export function AppShell() {
         <>
           <Outlet />
           <RayspyIframe />
-          <DynamicAppIframe />
         </>
       )}
     </>

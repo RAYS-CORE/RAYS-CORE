@@ -225,6 +225,13 @@ class RAYSSessionStore {
             durationMs: Date.now() - item.startedAt,
           };
         }
+        if (item.kind === "plan") {
+          return {
+            ...item,
+            status: "done" as const,
+            todos: item.todos.map((t) => ({ ...t, status: "completed" as const })),
+          };
+        }
         if (item.kind === "action" && item.status === "running") {
           return {
             ...item,
@@ -517,6 +524,37 @@ class RAYSSessionStore {
           lines: payload.lines || [],
         };
         this.setState({ diffChunks: [...this.state.diffChunks, chunk] });
+
+        const isCreated =
+          payload.reason === "Created file" ||
+          (chunk.removed === 0 && chunk.added > 0 && !chunk.lines.some((l) => l.type === "remove"));
+
+        if (isCreated) {
+          const content = String(payload.fullContent || chunk.lines.map((l) => l.content).join("\n"));
+          this.appendActivityItem({
+            kind: "write",
+            id: chunk.id,
+            filePath: chunk.filePath,
+            content,
+            lineCount: chunk.added || chunk.lines.length || 1,
+            status: "done",
+            startedAt: Date.now(),
+          });
+        } else {
+          this.appendActivityItem({
+            kind: "edit",
+            id: chunk.id,
+            filePath: chunk.filePath,
+            added: chunk.added,
+            removed: chunk.removed,
+            diffLines: chunk.lines.map((l) => ({
+              type: (l.type === "add" ? "add" : l.type === "remove" ? "remove" : "context") as "add" | "remove" | "context",
+              content: l.content,
+            })),
+            status: "done",
+            startedAt: Date.now(),
+          });
+        }
         return;
       }
 
@@ -582,20 +620,20 @@ class RAYSSessionStore {
         this.setState({
           terminalLines: [
             ...this.state.terminalLines,
-            { id: crypto.randomUUID(), kind: "output", content: payload.line || "" },
-          ].slice(-500),
+            { id: crypto.randomUUID(), kind: "output", content: String(payload.line || "") },
+          ],
         });
         return;
       }
 
       if (eventType === "error") {
-        const message = String(payload.message || "Unknown error");
-        this.setState({ error: message });
+        const msg = String(payload.message || "Unknown error");
         this.appendChatMessage({
-          role: "system",
-          title: payload.level === "fatal" ? "Backend error" : "Notice",
-          content: message,
+          role: "agent",
+          title: "Error",
+          content: msg,
         });
+        return;
       }
     };
   }
@@ -603,21 +641,18 @@ class RAYSSessionStore {
   private handleOrchestrationEvent(eventType: string, payload: Record<string, unknown>) {
     if (eventType === "orchestration_session") {
       this.setState({
-        tokenCount: 0,
-        hudPhase: "Planning",
-        hudDetail: "",
-        thinkingPhase: "active",
-        thinkingText: "",
+        hudPhase: "Starting",
+        hudDetail: String(payload.prompt || ""),
       });
-      this.upsertThinking("");
+      return;
+    }
+    if (eventType === "orchestration_section") {
+      this.setState({ hudPhase: String(payload.title || "Orchestrating") });
       return;
     }
     if (eventType === "orchestration_thinking") {
-      const thought = String(payload.thought || "").trim();
-      if (!thought) return;
-      const nextText = this.state.thinkingText
-        ? `${this.state.thinkingText}\n\n${thought}`
-        : thought;
+      const thought = String(payload.thought || "");
+      const nextText = this.state.thinkingText ? `${this.state.thinkingText}\n\n${thought}` : thought;
       this.setState({
         thinkingText: nextText,
         thinkingPhase: this.state.thinkingPhase === "hidden" ? "active" : this.state.thinkingPhase,
@@ -629,6 +664,34 @@ class RAYSSessionStore {
       this.finalizeRunningThinking();
       const label = String(payload.label || payload.title || "Step");
       const spawnReason = String(payload.spawnReason || "");
+      this.setState({ hudPhase: "Running", hudDetail: `${label} — ${spawnReason}` });
+
+      // Update active plan todo: mark previous in-progress item as completed, and advance next pending
+      this.patchActiveTurn((turn) => {
+        const items = [...turn.items];
+        const planIdx = items.findIndex((i) => i.kind === "plan");
+        if (planIdx >= 0) {
+          const planItem = items[planIdx] as Extract<ActivityItem, { kind: "plan" }>;
+          const todos = [...planItem.todos];
+          const currInProgressIdx = todos.findIndex((t) => t.status === "in_progress");
+
+          if (currInProgressIdx >= 0) {
+            todos[currInProgressIdx] = { ...todos[currInProgressIdx], status: "completed" };
+            const nextPendingIdx = todos.findIndex((t, idx) => idx > currInProgressIdx && t.status === "pending");
+            if (nextPendingIdx >= 0) {
+              todos[nextPendingIdx] = { ...todos[nextPendingIdx], status: "in_progress" };
+            }
+          } else {
+            const firstPendingIdx = todos.findIndex((t) => t.status === "pending");
+            if (firstPendingIdx >= 0) {
+              todos[firstPendingIdx] = { ...todos[firstPendingIdx], status: "in_progress" };
+            }
+          }
+          items[planIdx] = { ...planItem, todos };
+        }
+        return { ...turn, items };
+      });
+
       if (label.startsWith("mcp/")) {
         const server = label.replace(/^mcp\//, "");
         this.appendActivityItem({
@@ -642,26 +705,54 @@ class RAYSSessionStore {
           status: "running",
           startedAt: Date.now(),
         });
-      } else {
-        this.appendActivityItem({
-          kind: "action",
-          id: crypto.randomUUID(),
-          verb: label.startsWith("skill/") ? `Running ${label}` : label,
-          detail: spawnReason,
-          ok: true,
-          status: "running",
-          startedAt: Date.now(),
-        });
       }
       return;
     }
     if (eventType === "orchestration_action") {
       const verb = String(payload.verb || "Action");
-      if (["Listed", "Ran", "Read", "Wrote", "Edited", "Called"].includes(verb)) {
-        return;
-      }
       const detail = String(payload.detail || "");
       const ok = payload.ok !== false;
+
+      if (verb === "Read" || verb === "Listed" || verb === "Searched" || verb === "Explored") {
+        this.patchActiveTurn((turn) => {
+          const items = [...turn.items];
+          const lastExploredIdx = items.findLastIndex((i) => i.kind === "explored");
+          const target = detail || verb;
+          const type = verb === "Read" ? "read" : verb === "Searched" ? "search" : "list";
+          if (lastExploredIdx >= 0) {
+            const existing = items[lastExploredIdx] as Extract<ActivityItem, { kind: "explored" }>;
+            const nextDetails = [...(existing.details || []), { type: type as "read" | "search" | "list", target }];
+            const reads = nextDetails.filter((d) => d.type === "read").length;
+            const searches = nextDetails.filter((d) => d.type === "search").length;
+            const lists = nextDetails.filter((d) => d.type === "list").length;
+            const parts: string[] = [];
+            if (reads) parts.push(`${reads} read${reads > 1 ? "s" : ""}`);
+            if (searches) parts.push(`${searches} search${searches > 1 ? "es" : ""}`);
+            if (lists) parts.push(`${lists} list${lists > 1 ? "s" : ""}`);
+            items[lastExploredIdx] = {
+              ...existing,
+              summary: parts.join(", ") || `${nextDetails.length} items`,
+              details: nextDetails,
+            };
+          } else {
+            items.push({
+              kind: "explored",
+              id: crypto.randomUUID(),
+              summary: `1 ${type}`,
+              details: [{ type: type as "read" | "search" | "list", target }],
+              status: "done",
+              startedAt: Date.now(),
+            });
+          }
+          return { ...turn, items };
+        });
+        return;
+      }
+
+      if (["Wrote", "Edited", "Ran", "Called"].includes(verb)) {
+        return;
+      }
+
       this.appendActivityItem({
         kind: "action",
         id: crypto.randomUUID(),
@@ -677,15 +768,46 @@ class RAYSSessionStore {
     if (eventType === "orchestration_plan") {
       const plan = (payload.plan || []) as Array<Record<string, unknown>>;
       if (plan.length === 0) return;
-      this.appendActivityItem({
-        kind: "action",
-        id: crypto.randomUUID(),
-        verb: "Planned steps",
-        detail: `${plan.length} step${plan.length === 1 ? "" : "s"}`,
-        ok: true,
-        status: "done",
-        startedAt: Date.now(),
-        durationMs: 0,
+      const todos = plan.map((p, idx) => {
+        const rawText =
+          (typeof p.reason === "string" && p.reason.trim()) ||
+          (typeof p.spawn_reason === "string" && p.spawn_reason.trim()) ||
+          (typeof p.intent === "string" && p.intent.trim()) ||
+          (typeof p.description === "string" && p.description.trim()) ||
+          (typeof p.action === "string" && p.action.trim()) ||
+          (typeof p.summary === "string" && p.summary.trim()) ||
+          (typeof p.name === "string" && p.name.trim()) ||
+          "";
+
+        let text = rawText;
+        if (!text || /^\d+[\s.:-]*$/.test(text)) {
+          const target = String(p.skill || p.server || p.service_name || "task").replace(/^(mcp|skill)\//, "");
+          text = `Execute ${target}`;
+        }
+
+        return {
+          id: crypto.randomUUID(),
+          text,
+          status: (idx === 0 ? "in_progress" : "pending") as "completed" | "in_progress" | "pending",
+        };
+      });
+
+      this.patchActiveTurn((turn) => {
+        const items = [...turn.items];
+        const existingPlanIdx = items.findIndex((i) => i.kind === "plan");
+        const planItem: ActivityItem = {
+          kind: "plan",
+          id: crypto.randomUUID(),
+          todos,
+          status: "running",
+          startedAt: Date.now(),
+        };
+        if (existingPlanIdx >= 0) {
+          items[existingPlanIdx] = planItem;
+        } else {
+          items.push(planItem);
+        }
+        return { ...turn, items };
       });
       return;
     }

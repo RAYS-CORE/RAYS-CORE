@@ -1,10 +1,76 @@
 export type ActivityItemStatus = "running" | "done" | "error";
 
+export type DiffLine = {
+  type: "add" | "remove" | "context";
+  content: string;
+  lineNo?: number;
+};
+
+export type TodoItem = {
+  id: string;
+  text: string;
+  status: "completed" | "in_progress" | "pending";
+};
+
+export type ExploredDetail = {
+  type: "read" | "search" | "list";
+  target: string;
+  snippet?: string;
+};
+
 export type ActivityItem =
   | {
       kind: "thinking";
       id: string;
       text: string;
+      status: ActivityItemStatus;
+      startedAt: number;
+      durationMs?: number;
+    }
+  | {
+      kind: "edit";
+      id: string;
+      filePath: string;
+      added: number;
+      removed: number;
+      diffLines?: DiffLine[];
+      status: ActivityItemStatus;
+      startedAt: number;
+      durationMs?: number;
+    }
+  | {
+      kind: "write";
+      id: string;
+      filePath: string;
+      content: string;
+      lineCount: number;
+      status: ActivityItemStatus;
+      startedAt: number;
+      durationMs?: number;
+    }
+  | {
+      kind: "command";
+      id: string;
+      command: string;
+      status: ActivityItemStatus;
+      startedAt: number;
+      durationMs?: number;
+      output?: string;
+    }
+  | {
+      kind: "explored";
+      id: string;
+      verb?: string;
+      summary: string;
+      details?: ExploredDetail[];
+      status: ActivityItemStatus;
+      startedAt: number;
+      durationMs?: number;
+    }
+  | {
+      kind: "plan";
+      id: string;
+      todos: TodoItem[];
       status: ActivityItemStatus;
       startedAt: number;
       durationMs?: number;
@@ -32,15 +98,6 @@ export type ActivityItem =
       durationMs?: number;
     }
   | {
-      kind: "command";
-      id: string;
-      command: string;
-      status: ActivityItemStatus;
-      startedAt: number;
-      durationMs?: number;
-      output?: string;
-    }
-  | {
       kind: "question";
       id: string;
       question: string;
@@ -52,6 +109,18 @@ export type ActivityItem =
       level: "info" | "warn" | "error";
       message: string;
     };
+
+export function splitFilePath(fullPath: string): { dir: string; file: string } {
+  const normalized = fullPath.replace(/\\/g, "/");
+  const lastSlash = normalized.lastIndexOf("/");
+  if (lastSlash === -1) {
+    return { dir: "", file: normalized };
+  }
+  return {
+    dir: normalized.slice(0, lastSlash),
+    file: normalized.slice(lastSlash + 1),
+  };
+}
 
 export type AgentTurn = {
   id: string;

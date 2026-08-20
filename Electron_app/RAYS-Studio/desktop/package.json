@@ -57,7 +57,7 @@
         ]
       },
       {
-        "from": "../../../examples/skills/rayspy",
+        "from": "../../../src/rays_core/skills/rayspy",
         "to": "rayspy",
         "filter": [
           "**/*"

@@ -1,8 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Sparkles, Square, Plus, Image, File, Folder, Link2 } from "lucide-react";
+import {
+  Send,
+  Sparkles,
+  Square,
+  Plus,
+  Image,
+  File,
+  Folder,
+  Link2,
+  ChevronDown,
+  CheckSquare2,
+  CircleDot,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AgentTurnFeed } from "@/components/agent/hermes/AgentTurnFeed";
 import { ApprovalPanel } from "@/components/agent/hermes/ApprovalPanel";
-import type { AgentTurn } from "@/services/agentActivity";
+import type { AgentTurn, ActivityItem } from "@/services/agentActivity";
 import type { PromptMode } from "@/services/raysSession";
 
 type AgentChatProps = {
@@ -35,8 +48,19 @@ export function AgentChat({
   onStop,
 }: AgentChatProps) {
   const [input, setInput] = useState("");
+  const [planOpen, setPlanOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Active plan from the latest turn
+  const activePlan = useMemo(() => {
+    const latestTurn = turns[turns.length - 1];
+    if (!latestTurn) return null;
+    const plan = latestTurn.items.find(
+      (i): i is Extract<ActivityItem, { kind: "plan" }> => i.kind === "plan"
+    );
+    return plan || null;
+  }, [turns]);
 
   // Attachment states
   const [showAttachments, setShowAttachments] = useState(false);
@@ -261,139 +285,236 @@ export function AgentChat({
           </div>
         )}
 
-        <div
-          className="mx-auto max-w-3xl flex items-end gap-2 rounded-xl border bg-card/40 px-3 py-2 relative"
-          style={{ borderColor: "rgba(255,255,255,0.08)" }}
-        >
-          {/* Custom Attachments Menu Button */}
-          <div className="relative shrink-0 flex items-center h-6">
-            <button
-              type="button"
-              onClick={() => setShowAttachments(!showAttachments)}
-              className="p-1 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-              title="Add attachments"
-            >
-              <Plus size={16} />
-            </button>
-
-            {showAttachments && !urlInputVisible && (
-              <div className="absolute bottom-9 left-0 z-30 w-44 bg-card border border-border shadow-modal rounded-lg py-1 flex flex-col">
-                <button
-                  onClick={() => {
-                    fileInputRef.current?.click();
-                    setShowAttachments(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-secondary text-foreground/80 hover:text-foreground"
-                >
-                  <File size={12} className="text-rays-pink" />
-                  <span>Attach File</span>
-                </button>
-                <button
-                  onClick={() => {
-                    imageInputRef.current?.click();
-                    setShowAttachments(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-secondary text-foreground/80 hover:text-foreground"
-                >
-                  <Image size={12} className="text-rays-lavender" />
-                  <span>Attach Image/Photo</span>
-                </button>
-                <button
-                  onClick={() => {
-                    folderInputRef.current?.click();
-                    setShowAttachments(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-secondary text-foreground/80 hover:text-foreground"
-                >
-                  <Folder size={12} className="text-rays-mid" />
-                  <span>Attach Directory</span>
-                </button>
-                <button
-                  onClick={() => {
-                    handleAttachUrl();
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-secondary text-foreground/80 hover:text-foreground"
-                >
-                  <Link2 size={12} className="text-rays-pink" />
-                  <span>Attach URL</span>
-                </button>
-              </div>
-            )}
-
-            {showAttachments && urlInputVisible && (
-              <div className="absolute bottom-9 left-0 z-30 w-64 bg-card border border-border shadow-modal rounded-lg p-2 flex flex-col gap-2">
-                <input 
-                  autoFocus
-                  type="url" 
-                  placeholder="Enter URL..." 
-                  className="w-full bg-background border border-border rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-rays-pink"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                       if (urlInput.trim()) {
-                         setAttachments((prev) => [...prev, { type: "url", name: urlInput.trim(), path: urlInput.trim() }]);
-                       }
-                       setUrlInputVisible(false);
-                       setShowAttachments(false);
-                       setUrlInput("");
-                    } else if (e.key === 'Escape') {
-                       setUrlInputVisible(false);
-                       setShowAttachments(false);
-                    }
-                  }}
+        <div className="mx-auto max-w-3xl flex flex-col shadow-2xl relative">
+          {/* Planning Phase Todos Checklist (Attached right above prompt) */}
+          {activePlan && activePlan.todos.length > 0 && (
+            <div className="rounded-t-2xl border-t border-x border-white/10 bg-[#161619]/95 backdrop-blur-md px-4 py-3 shadow-xl -mb-px transition-all">
+              <div
+                onClick={() => setPlanOpen(!planOpen)}
+                className="flex items-center justify-between cursor-pointer select-none pb-1"
+              >
+                <span className="text-xs font-semibold text-muted-foreground/80">
+                  {activePlan.todos.filter((t) => t.status === "completed").length} of {activePlan.todos.length} todos completed
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={cn(
+                    "text-muted-foreground/50 transition-transform duration-200",
+                    planOpen && "rotate-180"
+                  )}
                 />
-                <div className="flex justify-end gap-1 mt-1">
-                  <button type="button" onClick={() => setUrlInputVisible(false)} className="text-xs px-2 py-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
-                  <button type="button" onClick={() => {
-                       if (urlInput.trim()) {
-                         setAttachments((prev) => [...prev, { type: "url", name: urlInput.trim(), path: urlInput.trim() }]);
-                       }
-                       setUrlInputVisible(false);
-                       setShowAttachments(false);
-                       setUrlInput("");
-                  }} className="text-xs px-3 py-1 bg-rays-pink text-background font-medium rounded hover:bg-rays-pink/90 transition-colors">Add</button>
-                </div>
               </div>
-            )}
-          </div>
-
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="What's next?… (/code, /chat, /mcp)"
-            rows={1}
-            className="flex-1 bg-transparent resize-none text-sm outline-none placeholder:text-muted-foreground max-h-40 py-0.5"
-            disabled={!connected || loading}
-          />
-          {running ? (
-            <button
-              type="button"
-              onClick={onStop}
-              className="p-1.5 rounded-full bg-red-500/80 hover:bg-red-500 text-white transition-colors shrink-0 animate-pulse"
-              title="Stop agent"
-            >
-              <Square size={14} fill="currentColor" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!canSend}
-              className="p-1.5 rounded-full bg-rays-violet text-accent-foreground disabled:opacity-40 transition-opacity shrink-0"
-            >
-              <Send size={14} />
-            </button>
+              {planOpen && (
+                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                  {activePlan.todos.map((todo) => {
+                    const isCompleted = todo.status === "completed";
+                    const isInProgress = todo.status === "in_progress";
+                    return (
+                      <div key={todo.id} className="flex items-start gap-2.5 text-xs leading-relaxed">
+                        {isCompleted ? (
+                          <CheckSquare2 size={14} className="text-muted-foreground/40 shrink-0 mt-0.5" />
+                        ) : isInProgress ? (
+                          <div className="relative shrink-0 mt-0.5 flex items-center justify-center size-3.5">
+                            <span className="absolute size-2.5 rounded-full bg-amber-400/30 animate-ping" />
+                            <CircleDot size={14} className="text-amber-400 relative z-10" />
+                          </div>
+                        ) : (
+                          <Square size={14} className="text-muted-foreground/30 shrink-0 mt-0.5" />
+                        )}
+                        <span
+                          className={cn(
+                            isCompleted && "text-muted-foreground/40 line-through select-none",
+                            isInProgress && "text-foreground font-medium",
+                            !isCompleted && !isInProgress && "text-muted-foreground/65"
+                          )}
+                        >
+                          {todo.text}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
+
+          {/* Main Prompt Card */}
+          <div
+            className={cn(
+              "flex flex-col border border-white/10 bg-[#161619] p-3 shadow-2xl relative transition-all focus-within:border-white/20",
+              activePlan && activePlan.todos.length > 0 ? "rounded-b-2xl border-t-0" : "rounded-2xl"
+            )}
+          >
+            {/* Main Textarea */}
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Ask anything, / for commands, @ for context…"
+              rows={1}
+              className="w-full bg-transparent resize-none text-[13.5px] leading-relaxed outline-none placeholder:text-muted-foreground/60 max-h-40 min-h-[32px] py-1 text-foreground"
+              disabled={!connected || loading}
+            />
+
+          {/* Bottom Action Bar */}
+          <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/[0.04]">
+            <div className="flex items-center gap-1.5">
+              {/* Attachments Menu Button */}
+              <div className="relative flex items-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAttachments(!showAttachments)}
+                  className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted-foreground/70 hover:text-foreground transition-colors"
+                  title="Add attachments"
+                >
+                  <Plus size={15} />
+                </button>
+
+                {showAttachments && !urlInputVisible && (
+                  <div className="absolute bottom-9 left-0 z-30 w-44 bg-[#1c1c20] border border-white/10 shadow-2xl rounded-xl py-1.5 flex flex-col">
+                    <button
+                      onClick={() => {
+                        fileInputRef.current?.click();
+                        setShowAttachments(false);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-white/[0.06] text-foreground/80 hover:text-foreground"
+                    >
+                      <File size={13} className="text-sky-400" />
+                      <span>Attach File</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        imageInputRef.current?.click();
+                        setShowAttachments(false);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-white/[0.06] text-foreground/80 hover:text-foreground"
+                    >
+                      <Image size={13} className="text-purple-400" />
+                      <span>Attach Image</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        folderInputRef.current?.click();
+                        setShowAttachments(false);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-white/[0.06] text-foreground/80 hover:text-foreground"
+                    >
+                      <Folder size={13} className="text-amber-400" />
+                      <span>Attach Directory</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleAttachUrl();
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-white/[0.06] text-foreground/80 hover:text-foreground"
+                    >
+                      <Link2 size={13} className="text-pink-400" />
+                      <span>Attach URL</span>
+                    </button>
+                  </div>
+                )}
+
+                {showAttachments && urlInputVisible && (
+                  <div className="absolute bottom-9 left-0 z-30 w-64 bg-[#1c1c20] border border-white/10 shadow-2xl rounded-xl p-2.5 flex flex-col gap-2">
+                    <input
+                      autoFocus
+                      type="url"
+                      placeholder="Enter URL..."
+                      className="w-full bg-background/50 border border-white/10 rounded-lg px-2.5 py-1 text-xs outline-none focus:ring-1 focus:ring-rays-pink"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (urlInput.trim()) {
+                            setAttachments((prev) => [
+                              ...prev,
+                              { type: "url", name: urlInput.trim(), path: urlInput.trim() },
+                            ]);
+                          }
+                          setUrlInputVisible(false);
+                          setShowAttachments(false);
+                          setUrlInput("");
+                        } else if (e.key === "Escape") {
+                          setUrlInputVisible(false);
+                          setShowAttachments(false);
+                        }
+                      }}
+                    />
+                    <div className="flex justify-end gap-1.5 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setUrlInputVisible(false)}
+                        className="text-xs px-2 py-1 hover:bg-white/[0.05] rounded text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (urlInput.trim()) {
+                            setAttachments((prev) => [
+                              ...prev,
+                              { type: "url", name: urlInput.trim(), path: urlInput.trim() },
+                            ]);
+                          }
+                          setUrlInputVisible(false);
+                          setShowAttachments(false);
+                          setUrlInput("");
+                        }}
+                        className="text-xs px-3 py-1 bg-rays-pink text-background font-semibold rounded hover:bg-rays-pink/90 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mode indicator pill */}
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.04] text-muted-foreground/80 hover:text-foreground hover:bg-white/[0.07] transition-colors text-xs font-medium cursor-pointer select-none">
+                <span>{defaultMode === "code" ? "Build" : defaultMode === "chat" ? "Chat" : "Agent"}</span>
+              </div>
+
+              {/* Engine indicator pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] text-muted-foreground/80 hover:text-foreground hover:bg-white/[0.07] transition-colors text-xs font-medium cursor-pointer select-none">
+                <Sparkles size={11} className="text-rays-lilac" />
+                <span>RAYS Core</span>
+              </div>
+            </div>
+
+            {/* Right button: Stop or Send */}
+            <div>
+              {running ? (
+                <button
+                  type="button"
+                  onClick={onStop}
+                  className="size-7 rounded-lg bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center transition-all shadow-sm animate-pulse"
+                  title="Stop agent"
+                >
+                  <Square size={11} fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  className="size-7 rounded-lg bg-white/10 hover:bg-white/20 text-foreground disabled:opacity-30 flex items-center justify-center transition-all shadow-sm"
+                  title="Send prompt"
+                >
+                  <Send size={12} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
+  </div>
   );
 }

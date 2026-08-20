@@ -58,7 +58,6 @@ cd Electron_app/RAYS-Studio/desktop && npm install && npm run dev
 
 - `node_modules/`, `ui/dist/`, `desktop/release/`, `*.dmg`
 - `desktop/resources/backend/` (PyInstaller output)
-- `RAYS-CORE-GUI/` (local duplicate copy — ignored)
 
 ## Fresh install behavior
 

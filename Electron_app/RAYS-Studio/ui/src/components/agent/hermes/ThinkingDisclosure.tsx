@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/services/agentActivity";
-import { DisclosureRow } from "./DisclosureRow";
 import { useElapsedSeconds } from "./useElapsedSeconds";
 
 type ThinkingDisclosureProps = {
@@ -27,10 +27,7 @@ export function ThinkingDisclosure({ text, pending, durationMs, timerKey }: Thin
       return;
     }
 
-    const full =
-      text.trim() ||
-      "Planning and reasoning about your request…";
-
+    const full = text.trim() || "Analyzing context and planning next steps…";
     let index = 0;
     setDisplayText("");
 
@@ -72,33 +69,47 @@ export function ThinkingDisclosure({ text, pending, durationMs, timerKey }: Thin
       : undefined;
 
   return (
-    <div className="agent-scaffolding text-[0.6875rem] leading-relaxed" data-slot="thinking-disclosure">
-      <DisclosureRow onToggle={() => setUserOpen(!open)} open={open} trailing={!open ? timerLabel : undefined}>
-        <span className="flex min-w-0 items-baseline gap-1.5">
+    <div className="w-full my-1.5" data-slot="thinking-disclosure">
+      {/* Single line interactive row */}
+      <div
+        onClick={() => setUserOpen(!open)}
+        className="group flex items-center justify-between cursor-pointer py-1 px-1 rounded-md hover:bg-white/[0.04] transition-all select-none"
+      >
+        <div className="flex items-center gap-2 font-mono text-[13px]">
           <span
             className={cn(
-              "text-[0.6875rem] font-medium leading-[1.35rem] text-muted-foreground",
-              pending && "hermes-shimmer text-foreground/70"
+              "font-bold text-muted-foreground transition-colors",
+              pending && "text-foreground hermes-shimmer"
             )}
           >
             Thinking
           </span>
-          {pending && timerLabel && (
-            <span className="text-[0.625rem] tabular-nums text-muted-foreground/70">{timerLabel}</span>
+          {timerLabel && (
+            <span className="text-[11px] font-mono text-muted-foreground/60 tabular-nums">{timerLabel}</span>
           )}
-        </span>
-      </DisclosureRow>
+          {pending && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse ml-0.5" />}
+        </div>
+        <ChevronDown
+          size={14}
+          className={cn(
+            "text-muted-foreground/40 group-hover:text-muted-foreground/80 transition-transform duration-200 shrink-0",
+            open && "rotate-180"
+          )}
+        />
+      </div>
+
+      {/* Expanded Thought Frame */}
       {open && displayText && (
         <div
           ref={scrollRef}
           className={cn(
-            "mt-0.5 w-full min-w-0 max-w-full overflow-hidden wrap-anywhere pb-1 text-muted-foreground/80",
-            isPreview && "thinking-preview max-h-40 overflow-y-auto"
+            "mt-1.5 mb-2.5 rounded-lg border border-white/10 bg-[#131316] p-3 text-xs leading-relaxed text-muted-foreground/90 font-mono shadow-lg transition-all custom-scrollbar",
+            isPreview ? "max-h-44 overflow-y-auto" : "max-h-80 overflow-y-auto"
           )}
         >
-          <div ref={contentRef} className="whitespace-pre-wrap text-[0.6875rem] leading-relaxed">
+          <div ref={contentRef} className="whitespace-pre-wrap">
             {displayText}
-            {pending && <span className="thinking-cursor">▍</span>}
+            {pending && <span className="inline-block w-1.5 h-3 bg-amber-400 ml-1 animate-pulse" />}
           </div>
         </div>
       )}

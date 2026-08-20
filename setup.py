@@ -27,9 +27,8 @@ def _copy_skills():
         shutil.copytree(source_extensions, target_extensions)
         print(f"Successfully copied extensions to {target_extensions}")
         
-    # Auto-inject RAYS_DeckForge into mcp.json
+    # Clean up obsolete deckforge entry in mcp.json if present
     mcp_json_path = target_rays_dir / "mcp.json"
-    mcp_data = {"mcp_servers": []}
     if mcp_json_path.exists():
         import json
         try:
@@ -39,28 +38,14 @@ def _copy_skills():
                     mcp_data = json.loads(content)
                     if isinstance(mcp_data, list):
                         mcp_data = {"mcp_servers": mcp_data}
-        except Exception as e:
-            print(f"Warning: could not read existing mcp.json: {e}")
-            
-    deckforge_config = {
-        "name": "rays_deckforge",
-        "command": "python",
-        "args": [
-            str(target_extensions / "RAYS_DeckForge" / "servers" / "fastapi" / "rays_mcp.py")
-        ],
-        "enabled": True
-    }
-    
-    servers = mcp_data.get("mcp_servers", [])
-    # Remove existing deckforge config if present to update it
-    servers = [s for s in servers if s.get("name") != "rays_deckforge"]
-    servers.append(deckforge_config)
-    mcp_data["mcp_servers"] = servers
-    
-    with open(mcp_json_path, "w") as f:
-        import json
-        json.dump(mcp_data, f, indent=2)
-    print(f"Successfully configured RAYS_DeckForge in {mcp_json_path}")
+                    servers = mcp_data.get("mcp_servers", [])
+                    filtered = [s for s in servers if s.get("name") != "rays_deckforge"]
+                    if len(filtered) != len(servers):
+                        mcp_data["mcp_servers"] = filtered
+                        with open(mcp_json_path, "w") as wf:
+                            json.dump(mcp_data, wf, indent=2)
+        except Exception:
+            pass
 
 class PostInstallCommand(install):
     """Post-installation for installation mode."""

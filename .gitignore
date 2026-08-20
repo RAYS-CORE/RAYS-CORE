@@ -46,7 +46,6 @@ History.md
 **/*History*.md
 
 # Electron GUI — ship source for build-from-source; exclude binaries and deps
-Electron_app/RAYS-CORE-GUI/
 Electron_app/**/node_modules/
 Electron_app/**/dist/
 Electron_app/**/release/
