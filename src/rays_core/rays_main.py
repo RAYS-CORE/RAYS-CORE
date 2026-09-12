@@ -1346,6 +1346,52 @@ def main():
                         _save_results(results, cmd_arg.strip(), rays_dir)
                         continue
                     
+                    elif cmd in ('/general_conversation_start', '/gc_start', '/gc'):
+                        from rays_core.general_conversation import get_gc_manager
+                        gc_mgr = get_gc_manager(str(codebase_path))
+                        sessions = gc_mgr.start_mode()
+                        rays_ui.print_gc_mode_banner(sessions)
+                        continue
+
+                    elif cmd in ('/general_conversation_exit', '/gc_exit'):
+                        from rays_core.general_conversation import get_gc_manager
+                        gc_mgr = get_gc_manager(str(codebase_path))
+                        gc_mgr.exit_mode()
+                        rays_ui.print_gc_mode_exit()
+                        continue
+
+                    elif cmd == '/gc_list':
+                        from rays_core.general_conversation import get_gc_manager
+                        gc_mgr = get_gc_manager(str(codebase_path))
+                        sessions = gc_mgr.refresh_sessions()
+                        rays_ui.print_gc_mode_banner(sessions)
+                        continue
+
+                    elif cmd in ('/gc_connect', '/general_conversation_connect', '/gc_add'):
+                        from rays_core.general_conversation import get_gc_manager
+                        gc_mgr = get_gc_manager(str(codebase_path))
+                        target = cmd_arg.strip()
+                        if not target or target.startswith("<") or target in ("<target>", "<id>"):
+                            available = gc_mgr.session_detector.detect_all_sessions()
+                            target = rays_ui.prompt_gc_connect_interactive(available)
+                        if target:
+                            ok, detail, sess = gc_mgr.connect_session(target)
+                            rays_ui.print_gc_connect_result(ok, detail, sess)
+                            if ok:
+                                rays_ui.print_gc_mode_banner(gc_mgr.get_all_sessions())
+                        continue
+
+                    elif cmd in ('/gc_disconnect', '/general_conversation_disconnect', '/gc_remove'):
+                        from rays_core.general_conversation import get_gc_manager
+                        gc_mgr = get_gc_manager(str(codebase_path))
+                        target = cmd_arg.strip()
+                        if not target:
+                            rays_ui.print_warning("Usage: /gc_disconnect <session_id or target>")
+                        else:
+                            ok, detail = gc_mgr.disconnect_session(target)
+                            rays_ui.print_gc_connect_result(ok, detail, None)
+                        continue
+                    
                     elif cmd == '/git':
                         summarizer = GitStatusSummarizer(rays.codebase_root, rays.ai_client, rays.config)
                         summary = summarizer.summarize()
@@ -1361,6 +1407,37 @@ def main():
                         rays_ui.print_warning(f"Unknown command: {cmd}. Type /help for available commands.")
                         continue
                 
+                # ── General Conversation Mode (Universal Semantic Router & Observer) ──
+                from rays_core.general_conversation import get_gc_manager
+                gc_mgr = get_gc_manager(str(codebase_path))
+                if gc_mgr.active:
+                    rays_ui.status_set_agent_running(True)
+                    try:
+                        active_target_holder = [None]
+                        def _interim_callback(interim_obs):
+                            sess = active_target_holder[0]
+                            if sess:
+                                rays_ui.print_gc_observation_result(interim_obs, sess, is_interim=True, round_num=getattr(interim_obs, "stage", 1))
+
+                        with rays_ui.orchestration_hud():
+                            rays_ui.hud_set_status("General Conversation", "Routing prompt...")
+                            res = gc_mgr.process_prompt(user_input, rays.ai_client, on_interim_summary=_interim_callback)
+                        if not res.get("ok"):
+                            rays_ui.print_warning(res.get("error", "Failed to route prompt."))
+                        else:
+                            target_sess = res["target_session"]
+                            active_target_holder[0] = target_sess
+                            decision = res["decision"]
+                            resolved_prompt = res["resolved_prompt"]
+                            cited_files = res.get("cited_files", [])
+                            obs = res.get("observation")
+                            rays_ui.print_gc_route_dispatched(decision, target_sess, resolved_prompt, cited_files)
+                            if obs:
+                                rays_ui.print_gc_observation_result(obs, target_sess, is_interim=False)
+                    finally:
+                        rays_ui.status_set_agent_running(False)
+                    continue
+
                 # ── Agent orchestrator (skills + MCP); use /code for coding pipeline ──
                 rays_ui.status_set_agent_running(True)
                 try:

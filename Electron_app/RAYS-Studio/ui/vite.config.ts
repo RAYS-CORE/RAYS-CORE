@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import os from "node:os";
 import { spawn, ChildProcessWithoutNullStreams, execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
@@ -382,6 +383,132 @@ export default defineConfig(({ mode }) => ({
             res.statusCode = 500;
             res.end(JSON.stringify({ error: "Folder selection failed or was cancelled." }));
           }
+        });
+
+        server.middlewares.use("/api/voice/transcribe", (req, res) => {
+          if (req.method !== "POST") {
+            res.statusCode = 405;
+            res.end("Method not allowed");
+            return;
+          }
+
+          let body = "";
+          req.on("data", (chunk) => {
+            body += chunk;
+          });
+
+          req.on("end", async () => {
+            try {
+              const { audioBase64, mimeType } = JSON.parse(body || "{}");
+              const isWin = process.platform === "win32";
+              const pythonCandidates = [
+                process.env.PYTHON,
+                "/opt/anaconda3/bin/python3",
+                "/opt/homebrew/bin/python3",
+                "/usr/local/bin/python3",
+                "python3",
+                "python",
+              ].filter(Boolean);
+
+              let selectedPython = isWin ? "python" : "python3";
+              for (const c of pythonCandidates) {
+                if (c && (await fs.stat(c).then(() => true).catch(() => false))) {
+                  selectedPython = c;
+                  break;
+                }
+              }
+
+              const srcPath = path.join(cliRoot, "src");
+              const pythonScript = `
+import sys, json, os
+
+sys.path.insert(0, ${JSON.stringify(srcPath)})
+
+try:
+    raw = sys.stdin.buffer.read()
+    data = raw.decode("utf-8", errors="ignore").strip()
+    with open("debug_audio_base64.txt", "w") as dbgf:
+        dbgf.write(data)
+    m_type = sys.argv[1] if len(sys.argv) > 1 else "audio/webm"
+    from rays_core.voice_transcriber import transcribe_audio_base64
+    res = transcribe_audio_base64(data, m_type)
+except Exception as e:
+    res = {"success": False, "transcript": "", "error": str(e)}
+
+print("JSON_START" + json.dumps(res) + "JSON_END")
+`;
+
+              const proc = spawn(selectedPython, ["-c", pythonScript, mimeType || "audio/webm"], {
+                env: {
+                  ...process.env,
+                  PATH: `/opt/anaconda3/bin:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH || ""}`,
+                  PYTHONPATH: `${srcPath}:${process.env.PYTHONPATH || ""}`,
+                },
+                cwd: os.homedir(),
+              });
+
+              let output = "";
+              proc.stdout.on("data", (d) => {
+                output += d.toString("utf8");
+              });
+              proc.stderr.on("data", (d) => {
+                console.warn("[Vite STT stderr]", d.toString("utf8"));
+              });
+
+              let closed = false;
+              const timer = setTimeout(() => {
+                if (!closed) {
+                  closed = true;
+                  try { proc.kill("SIGKILL"); } catch {}
+                  if (!res.writableEnded) {
+                    res.setHeader("content-type", "application/json");
+                    res.end(JSON.stringify({ success: false, transcript: "", error: "Transcription timeout" }));
+                  }
+                }
+              }, 15000);
+
+              proc.stdin.on("error", () => {});
+              proc.on("error", (err) => {
+                if (closed) return;
+                closed = true;
+                clearTimeout(timer);
+                if (!res.writableEnded) {
+                  res.setHeader("content-type", "application/json");
+                  res.end(JSON.stringify({ success: false, transcript: "", error: String(err) }));
+                }
+              });
+
+              proc.on("close", () => {
+                if (closed) return;
+                closed = true;
+                clearTimeout(timer);
+                const match = output.match(/JSON_START([\s\S]*?)JSON_END/);
+                res.setHeader("content-type", "application/json");
+                if (match) {
+                  try {
+                    res.end(match[1]);
+                    return;
+                  } catch {
+                    // fall through
+                  }
+                }
+                res.end(JSON.stringify({ success: false, transcript: "", error: output || "Transcription failed" }));
+              });
+
+              try {
+                proc.stdin.write(audioBase64 || "");
+                proc.stdin.end();
+              } catch {
+                // ignore EPIPE
+              }
+            } catch (err: any) {
+              if (!res.writableEnded) {
+                res.statusCode = 500;
+                res.setHeader("content-type", "application/json");
+                res.end(JSON.stringify({ success: false, transcript: "", error: err.message }));
+              }
+            }
+          });
         });
       },
     },

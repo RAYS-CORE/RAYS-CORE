@@ -61,23 +61,23 @@ export function EditActivityRow({ item }: { item: Extract<ActivityItem, { kind: 
   };
 
   return (
-    <div className="w-full my-1.5" data-slot="edit-activity">
+    <div className="w-full my-1" data-slot="edit-activity">
       {/* Single line interactive row */}
       <div
         onClick={() => setOpen(!open)}
-        className="group flex items-center justify-between cursor-pointer py-1 px-1 rounded-md hover:bg-white/[0.04] transition-all select-none"
+        className="group flex items-center justify-between cursor-pointer py-0.5 px-1 rounded hover:bg-white/[0.04] transition-all select-none"
       >
-        <div className="flex items-center gap-2 font-mono text-[13px] overflow-hidden truncate">
-          <span className="font-bold text-foreground tracking-tight">Edit</span>
+        <div className="flex items-center gap-1.5 font-mono text-[11px] overflow-hidden truncate">
+          <span className="font-semibold text-foreground tracking-tight">Edit</span>
           <span className="text-foreground/95 font-medium">{file}</span>
-          {dirDisplay && <span className="text-muted-foreground/60 text-xs truncate">{dirDisplay}</span>}
-          <div className="flex items-center gap-1.5 text-xs font-semibold ml-1">
+          {dirDisplay && <span className="text-muted-foreground/60 text-[10px] truncate">{dirDisplay}</span>}
+          <div className="flex items-center gap-1 text-[10px] font-semibold ml-1">
             {item.added > 0 && <span className="text-emerald-400">+{item.added}</span>}
             {item.removed > 0 && <span className="text-rose-400">-{item.removed}</span>}
           </div>
         </div>
         <ChevronDown
-          size={14}
+          size={13}
           className={cn(
             "text-muted-foreground/40 group-hover:text-muted-foreground/80 transition-transform duration-200 shrink-0",
             open && "rotate-180"
@@ -87,16 +87,16 @@ export function EditActivityRow({ item }: { item: Extract<ActivityItem, { kind: 
 
       {/* Expanded Diff Viewer Frame */}
       {open && (
-        <div className="mt-2 mb-3 rounded-lg border border-white/10 bg-[#131316] overflow-hidden shadow-2xl transition-all duration-200">
+        <div className="mt-1.5 mb-2 rounded-lg border border-white/10 bg-[#131316] overflow-hidden shadow-2xl transition-all duration-200">
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-3.5 py-2 border-b border-white/[0.08] bg-white/[0.02]">
-            <div className="flex items-center gap-2 text-xs font-mono truncate mr-2">
-              <FileTypeIcon fileName={file} size={14} />
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/[0.08] bg-white/[0.02]">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-mono truncate mr-2">
+              <FileTypeIcon fileName={file} size={13} />
               <span className="text-muted-foreground/60">{dir ? `/${dir}/` : ""}</span>
               <span className="text-foreground font-semibold">{file}</span>
             </div>
-            <div className="flex items-center gap-3 text-xs shrink-0">
-              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <div className="flex items-center gap-2.5 text-[10px] shrink-0">
+              <div className="flex items-center gap-1 font-mono text-[10px]">
                 {item.added > 0 && <span className="text-emerald-400 font-semibold">+{item.added}</span>}
                 {item.removed > 0 && <span className="text-rose-400 font-semibold">-{item.removed}</span>}
               </div>
@@ -104,25 +104,25 @@ export function EditActivityRow({ item }: { item: Extract<ActivityItem, { kind: 
                 type="button"
                 onClick={handleCopy}
                 title="Copy diff"
-                className="p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
+                className="p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
               >
-                {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 title="Collapse"
-                className="p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
+                className="p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
               >
-                <ChevronsUpDown size={13} />
+                <ChevronsUpDown size={12} />
               </button>
             </div>
           </div>
 
           {/* Diff Content */}
-          <div className="max-h-[380px] overflow-y-auto font-mono text-[12.5px] leading-relaxed py-1 custom-scrollbar">
+          <div className="max-h-[340px] overflow-y-auto font-mono text-[10.5px] leading-relaxed py-1 custom-scrollbar">
             {lines.length === 0 ? (
-              <div className="px-4 py-3 text-xs text-muted-foreground/50 italic">No diff lines to display</div>
+              <div className="px-3 py-2 text-[10px] text-muted-foreground/50 italic">No diff lines to display</div>
             ) : (
               lines.map((line, idx) => {
                 const isAdd = line.type === "add";
@@ -131,13 +131,13 @@ export function EditActivityRow({ item }: { item: Extract<ActivityItem, { kind: 
                   <div
                     key={idx}
                     className={cn(
-                      "flex items-stretch px-3 py-[2px] transition-colors",
+                      "flex items-stretch px-2.5 py-[1px] transition-colors",
                       isRemove && "bg-rose-500/10 text-rose-200 border-l-2 border-rose-500/70",
                       isAdd && "bg-emerald-500/10 text-emerald-200 border-l-2 border-emerald-500/70",
                       !isAdd && !isRemove && "text-muted-foreground/80 hover:bg-white/[0.02]"
                     )}
                   >
-                    <span className="w-9 text-right pr-3 select-none text-muted-foreground/30 text-[11px] shrink-0 font-mono">
+                    <span className="w-8 text-right pr-2 select-none text-muted-foreground/30 text-[10px] shrink-0 font-mono">
                       {line.lineNo !== undefined ? line.lineNo : idx + 1}
                     </span>
                     <span className="whitespace-pre overflow-x-auto">{line.content}</span>
@@ -168,19 +168,19 @@ export function WriteActivityRow({ item }: { item: Extract<ActivityItem, { kind:
   };
 
   return (
-    <div className="w-full my-1.5" data-slot="write-activity">
+    <div className="w-full my-1" data-slot="write-activity">
       {/* Single line interactive row */}
       <div
         onClick={() => setOpen(!open)}
-        className="group flex items-center justify-between cursor-pointer py-1 px-1 rounded-md hover:bg-white/[0.04] transition-all select-none"
+        className="group flex items-center justify-between cursor-pointer py-0.5 px-1 rounded hover:bg-white/[0.04] transition-all select-none"
       >
-        <div className="flex items-center gap-2 font-mono text-[13px] overflow-hidden truncate">
-          <span className="font-bold text-foreground tracking-tight">Write</span>
+        <div className="flex items-center gap-1.5 font-mono text-[11px] overflow-hidden truncate">
+          <span className="font-semibold text-foreground tracking-tight">Write</span>
           <span className="text-foreground/95 font-medium">{file}</span>
-          {dirDisplay && <span className="text-muted-foreground/60 text-xs truncate">{dirDisplay}</span>}
+          {dirDisplay && <span className="text-muted-foreground/60 text-[10px] truncate">{dirDisplay}</span>}
         </div>
         <ChevronDown
-          size={14}
+          size={13}
           className={cn(
             "text-muted-foreground/40 group-hover:text-muted-foreground/80 transition-transform duration-200 shrink-0",
             open && "rotate-180"
@@ -190,43 +190,43 @@ export function WriteActivityRow({ item }: { item: Extract<ActivityItem, { kind:
 
       {/* Expanded File Viewer Frame */}
       {open && (
-        <div className="mt-2 mb-3 rounded-lg border border-white/10 bg-[#131316] overflow-hidden shadow-2xl transition-all duration-200">
+        <div className="mt-1.5 mb-2 rounded-lg border border-white/10 bg-[#131316] overflow-hidden shadow-2xl transition-all duration-200">
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-3.5 py-2 border-b border-white/[0.08] bg-white/[0.02]">
-            <div className="flex items-center gap-2 text-xs font-mono truncate mr-2">
-              <FileTypeIcon fileName={file} size={14} />
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/[0.08] bg-white/[0.02]">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-mono truncate mr-2">
+              <FileTypeIcon fileName={file} size={13} />
               <span className="text-muted-foreground/60">{dir ? `/${dir}/` : ""}</span>
               <span className="text-foreground font-semibold">{file}</span>
             </div>
-            <div className="flex items-center gap-3 text-xs shrink-0">
-              <span className="text-muted-foreground/50 text-[11px] font-mono">{lineCount} lines</span>
+            <div className="flex items-center gap-2.5 text-[10px] shrink-0">
+              <span className="text-muted-foreground/50 text-[10px] font-mono">{lineCount} lines</span>
               <button
                 type="button"
                 onClick={handleCopy}
                 title="Copy content"
-                className="p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
+                className="p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
               >
-                {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 title="Collapse"
-                className="p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
+                className="p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-colors"
               >
-                <ChevronsUpDown size={13} />
+                <ChevronsUpDown size={12} />
               </button>
             </div>
           </div>
 
           {/* File Content with Line Numbers */}
-          <div className="max-h-[380px] overflow-y-auto font-mono text-[12.5px] leading-relaxed py-1 custom-scrollbar">
+          <div className="max-h-[340px] overflow-y-auto font-mono text-[10.5px] leading-relaxed py-1 custom-scrollbar">
             {lines.length === 0 ? (
-              <div className="px-4 py-3 text-xs text-muted-foreground/50 italic">Empty file created</div>
+              <div className="px-3 py-2 text-[10px] text-muted-foreground/50 italic">Empty file created</div>
             ) : (
               lines.map((line, idx) => (
-                <div key={idx} className="flex items-stretch px-3 py-[2px] hover:bg-white/[0.02] transition-colors">
-                  <span className="w-9 text-right pr-3 select-none text-muted-foreground/30 text-[11px] shrink-0 font-mono">
+                <div key={idx} className="flex items-stretch px-2.5 py-[1px] hover:bg-white/[0.02] transition-colors">
+                  <span className="w-8 text-right pr-2 select-none text-muted-foreground/30 text-[10px] shrink-0 font-mono">
                     {idx + 1}
                   </span>
                   <span className="whitespace-pre overflow-x-auto text-foreground/90">{line}</span>

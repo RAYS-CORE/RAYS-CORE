@@ -613,6 +613,57 @@ class RAYSTui(App):
             if cmd == "/help":
                 self._show_help(chat)
                 return
+            if cmd in ("/gc_start", "/general_conversation_start"):
+                from rays_core.general_conversation import get_gc_manager
+                gc_mgr = get_gc_manager()
+                sessions = gc_mgr.start_mode()
+                chat.write("[bold #c77dff]✺ General Conversation Mode Active[/]")
+                if not sessions:
+                    chat.write("[dim]No external terminal sessions found. (Open a tmux pane or Kitty window)[/]")
+                else:
+                    chat.write(f"[#9d4edd]Connected Sessions ({len(sessions)} active):[/]")
+                    for idx, s in enumerate(sessions, 1):
+                        chat.write(f"  [{idx}] [green]{s.display_label}[/]")
+                chat.write("[dim]Type your prompt. Citations like @file resolve from ANY directory.[/]")
+                chat.write("[dim]Type /gc_exit to return to normal mode.[/]")
+                return
+            if cmd in ("/gc_exit", "/general_conversation_exit"):
+                from rays_core.general_conversation import get_gc_manager
+                gc_mgr = get_gc_manager()
+                gc_mgr.exit_mode()
+                chat.write("[dim]← Exited General Conversation Mode.[/]")
+                return
+            if cmd == "/gc_list":
+                from rays_core.general_conversation import get_gc_manager
+                gc_mgr = get_gc_manager()
+                sessions = gc_mgr.refresh_sessions()
+                chat.write(f"[#9d4edd]Connected Sessions ({len(sessions)} active):[/]")
+                for idx, s in enumerate(sessions, 1):
+                    chat.write(f"  [{idx}] [green]{s.display_label}[/]")
+                return
+            if cmd in ("/gc_connect", "/general_conversation_connect", "/gc_add"):
+                from rays_core.general_conversation import get_gc_manager
+                gc_mgr = get_gc_manager()
+                arg = parts[1].strip() if len(parts) > 1 else ""
+                if not arg:
+                    chat.write("[#d7af00]Usage: /gc_connect <PID | tmux_pane (%0) | session_name | TTY>[/]")
+                else:
+                    ok, detail, sess = gc_mgr.connect_session(arg)
+                    if ok and sess:
+                        chat.write(f"[bold green]✓ Connected to session:[/] {sess.display_label}")
+                    else:
+                        chat.write(f"[#d7af00]⚠ Connection error:[/] {detail}")
+                return
+            if cmd in ("/gc_disconnect", "/general_conversation_disconnect", "/gc_remove"):
+                from rays_core.general_conversation import get_gc_manager
+                gc_mgr = get_gc_manager()
+                arg = parts[1].strip() if len(parts) > 1 else ""
+                if not arg:
+                    chat.write("[#d7af00]Usage: /gc_disconnect <session_id | target>[/]")
+                else:
+                    ok, detail = gc_mgr.disconnect_session(arg)
+                    chat.write(f"[{'green' if ok else '#d7af00'}]{detail}[/]")
+                return
 
         # Agent turn header
         chat.write("[bold #560bad]── RAYS[/]")
@@ -640,6 +691,33 @@ class RAYSTui(App):
             )
             return
         try:
+            from rays_core.general_conversation import get_gc_manager
+            gc_mgr = get_gc_manager()
+            if gc_mgr.active:
+                self.call_from_thread(chat.write, "[#c77dff]Routing prompt across terminal sessions...[/]")
+                res = gc_mgr.process_prompt(user_input, self.rays_engine.ai_client)
+                if not res.get("ok"):
+                    self.call_from_thread(chat.write, f"[bold #c77dff]Routing error:[/] {res.get('error')}")
+                else:
+                    target_sess = res["target_session"]
+                    decision = res["decision"]
+                    obs = res.get("observation")
+                    self.call_from_thread(
+                        chat.write,
+                        f"[bold green]⚡ Routed to {target_sess.agent_name} ({target_sess.session_id})[/]\n[dim]Reason: {decision.reasoning}[/]"
+                    )
+                    if obs and getattr(obs, "status", "") == "completed":
+                        self.call_from_thread(
+                            chat.write,
+                            f"[bold #ffffff]{target_sess.agent_name} Finished Response:[/]\n{obs.full_output}"
+                        )
+                    elif obs:
+                        self.call_from_thread(
+                            chat.write,
+                            f"[#d7af00]⊙ {target_sess.agent_name} (In Progress):[/]\n{obs.summary or 'Executing tools in background...'}"
+                        )
+                return
+
             t0 = time.time()
             if user_input.lower().startswith("/code "):
                 self.rays_engine.run(user_input[6:].strip())

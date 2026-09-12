@@ -60,6 +60,8 @@ Electron_app/**/__pycache__/
 
 # System codebase context documentation
 /RAYS-CODEBASE-EXPLANATION.md
+/MULTI_SESSION_ROUTER_ARCHITECTURE.md
+/PLASMA_GLOBE_AND_GENERAL_CONVERSATION_SPEC.md
 pi/
 hermes-agent/
 opencode/

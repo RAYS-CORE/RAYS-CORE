@@ -75,22 +75,22 @@ export function ThinkingDisclosure({ text, pending, durationMs, timerKey }: Thin
         onClick={() => setUserOpen(!open)}
         className="group flex items-center justify-between cursor-pointer py-1 px-1 rounded-md hover:bg-white/[0.04] transition-all select-none"
       >
-        <div className="flex items-center gap-2 font-mono text-[13px]">
+        <div className="flex items-center gap-1.5 font-mono text-[11px]">
           <span
             className={cn(
-              "font-bold text-muted-foreground transition-colors",
+              "font-semibold text-muted-foreground transition-colors",
               pending && "text-foreground hermes-shimmer"
             )}
           >
             Thinking
           </span>
           {timerLabel && (
-            <span className="text-[11px] font-mono text-muted-foreground/60 tabular-nums">{timerLabel}</span>
+            <span className="text-[9.5px] font-mono text-muted-foreground/60 tabular-nums">{timerLabel}</span>
           )}
           {pending && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse ml-0.5" />}
         </div>
         <ChevronDown
-          size={14}
+          size={13}
           className={cn(
             "text-muted-foreground/40 group-hover:text-muted-foreground/80 transition-transform duration-200 shrink-0",
             open && "rotate-180"
@@ -103,13 +103,13 @@ export function ThinkingDisclosure({ text, pending, durationMs, timerKey }: Thin
         <div
           ref={scrollRef}
           className={cn(
-            "mt-1.5 mb-2.5 rounded-lg border border-white/10 bg-[#131316] p-3 text-xs leading-relaxed text-muted-foreground/90 font-mono shadow-lg transition-all custom-scrollbar",
-            isPreview ? "max-h-44 overflow-y-auto" : "max-h-80 overflow-y-auto"
+            "mt-1 mb-2 rounded-lg border border-white/10 bg-[#131316] p-2.5 text-[10.5px] leading-relaxed text-muted-foreground/90 font-mono shadow-lg transition-all custom-scrollbar",
+            isPreview ? "max-h-40 overflow-y-auto" : "max-h-72 overflow-y-auto"
           )}
         >
           <div ref={contentRef} className="whitespace-pre-wrap">
             {displayText}
-            {pending && <span className="inline-block w-1.5 h-3 bg-amber-400 ml-1 animate-pulse" />}
+            {pending && <span className="inline-block w-1 h-2.5 bg-amber-400 ml-1 animate-pulse" />}
           </div>
         </div>
       )}

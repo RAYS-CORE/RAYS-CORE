@@ -22,9 +22,14 @@ contextBridge.exposeInMainWorld("raysDesktop", {
   selectSkillFolder: () => ipcRenderer.invoke("rays:select-skill-folder"),
   installSkill: (scope, workspaceRoot, sourceDir) =>
     ipcRenderer.invoke("rays:install-skill", { scope, workspaceRoot, sourceDir }),
-  listSkills: (workspaceRoot) => ipcRenderer.invoke("rays:list-skills", { workspaceRoot }),
   openSkillsDirectory: (scope, workspaceRoot) =>
     ipcRenderer.invoke("rays:open-skills-directory", { scope, workspaceRoot }),
+  routeGeneralPrompt: (prompt, workspaceRoot) =>
+    ipcRenderer.invoke("rays:route-general-prompt", { prompt, workspaceRoot }),
+  listConnectedAgents: (workspaceRoot) =>
+    ipcRenderer.invoke("rays:list-connected-agents", { workspaceRoot }),
+  transcribeAudio: (audioBase64, mimeType) =>
+    ipcRenderer.invoke("rays:transcribe-audio", { audioBase64, mimeType }),
   onMenuAction: (callback) => {
     const listener = (_event, payload) => callback(payload?.action, payload);
     ipcRenderer.on("rays:menu-action", listener);

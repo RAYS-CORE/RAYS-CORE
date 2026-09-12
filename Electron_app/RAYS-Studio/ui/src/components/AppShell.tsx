@@ -7,6 +7,7 @@ import {
   markOnboardingCompleteThisSession,
 } from "@/services/onboardingStorage";
 import { RayspyIframe } from "@/components/agent/RayspyIframe";
+import { GlobalVoiceIsland } from "@/components/agent/GlobalVoiceIsland";
 
 export function AppShell() {
   const [showOnboarding, setShowOnboarding] = useState(
@@ -24,6 +25,7 @@ export function AppShell() {
       {showOnboarding && <OnboardingScreen onComplete={handleOnboardingComplete} />}
       {!showOnboarding && (
         <>
+          <GlobalVoiceIsland />
           <Outlet />
           <RayspyIframe />
         </>

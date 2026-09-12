@@ -21,9 +21,12 @@ from typing import Any, Dict, List, Optional
 from rays_core.config_locator import resolve_config_path
 
 try:
+    import websockets
+    import websockets.exceptions
     from websockets.asyncio.server import serve
 except ImportError:  # pragma: no cover - older websockets
     try:
+        import websockets
         from websockets.server import serve  # type: ignore
     except ImportError as exc:
         raise RuntimeError(
@@ -916,6 +919,10 @@ async def run_server(
                     runtime.list_skills()
                 elif command == "cancel_current_task":
                     runtime.cancel_current_task()
+        except (websockets.exceptions.ConnectionClosed, websockets.exceptions.ConnectionClosedError, websockets.exceptions.ConnectionClosedOK):
+            pass
+        except Exception:
+            traceback.print_exc()
         finally:
             bus.clients.discard(websocket)
 

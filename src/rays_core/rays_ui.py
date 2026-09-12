@@ -262,20 +262,29 @@ def _build_status_bar_ansi_string(
     if phase:
         right_parts.append(f"{C_PINK}{phase}{RESET}")
     if detail:
-        right_parts.append(f"{C_GRAY}· {truncate_for_display(detail, 28)}{RESET}")
+        right_parts.append(f"{C_GRAY}· {truncate_for_display(detail, 32)}{RESET}")
     if tokens > 0:
         right_parts.append(f"{C_DIM_GRAY}tokens {tokens:,}{RESET}")
     elif _SESSION_AGENT_RUNNING:
         right_parts.append(f"{C_DIM_GRAY}msg=interrupt · ^C cancel{RESET}")
     
-    right = " ".join(right_parts)
+    right_str = (" | " + " ".join(right_parts)) if right_parts else ""
+    full_bar = f"{left}{right_str}"
     
-    width = _term_width()
-    left_vis = _vis_len(left)
-    right_vis = _vis_len(right)
-    gap = max(2, width - left_vis - right_vis - 1)
+    term_w = _term_width()
+    max_allowed = max(30, term_w - 6)
+    if _vis_len(full_bar) > max_allowed:
+        if right_parts and detail:
+            right_parts = []
+            if phase:
+                right_parts.append(f"{C_PINK}{phase}{RESET}")
+            right_parts.append(f"{C_GRAY}· {truncate_for_display(detail, 16)}{RESET}")
+            if tokens > 0:
+                right_parts.append(f"{C_DIM_GRAY}tokens {tokens:,}{RESET}")
+            right_str = (" | " + " ".join(right_parts)) if right_parts else ""
+            full_bar = f"{left}{right_str}"
     
-    return f"{left}{' ' * gap}{right} "
+    return full_bar
 
 
 class OrchestrationHUD:
@@ -311,9 +320,10 @@ class OrchestrationHUD:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=1.0)
-        sys.stdout.write(f"\r\033[K")
+        sys.stdout.write(f"\r\033[2K")
         sys.stdout.write(f"{_build_status_bar_ansi_string(phase='Done', detail='', tokens=self.tokens, s1='', s2='')}\n")
         sys.stdout.flush()
+        self._rule_drawn = False
 
     def set_status(self, phase: str, detail: str = "") -> None:
         self.phase = phase
@@ -332,7 +342,7 @@ class OrchestrationHUD:
         with self._lock:
             self._pause_print = True
             time.sleep(0.02)
-            sys.stdout.write(f"\r\033[K")
+            sys.stdout.write(f"\r\033[2K")
             sys.stdout.write(text if text.endswith("\n") else text + "\n")
             # Immediately restore status line at the bottom
             status_line = _build_status_bar_ansi_string(
@@ -342,7 +352,7 @@ class OrchestrationHUD:
                 s1="▲",
                 s2="⬟"
             )
-            sys.stdout.write(f"\r{status_line}")
+            sys.stdout.write(f"\r\033[2K{status_line}")
             sys.stdout.flush()
             self._pause_print = False
 
@@ -370,7 +380,7 @@ class OrchestrationHUD:
                 
                 with self._lock:
                     if not self._pause_print:
-                        sys.stdout.write(f"\r{status_line}")
+                        sys.stdout.write(f"\r\033[2K{status_line}")
                         sys.stdout.flush()
                 self._shape_idx += 1
                 if self._shape_idx % len(SHAPE_SEQUENCE) == 0:
@@ -1578,7 +1588,7 @@ def print_box(
     max_lines: int = 15,
     content_color: str = C_CREAM,
     *,
-    force: bool = False,
+    force: bool = True,
 ):
     """Print a styled box with precision alignment."""
     lines = content.split('\n')
@@ -2037,9 +2047,144 @@ SLASH_COMMANDS = [
     ("/git",           "Summarize current git diff / changes"),
     ("/clear",         "Clear the screen"),
     ("/tui",           "Launch full-screen TUI mode (beta)"),
+    ("/general_conversation_start", "Start Universal Cross-Terminal routing mode"),
+    ("/gc_start",                   "Alias for /general_conversation_start"),
+    ("/general_conversation_exit",  "Exit Universal Cross-Terminal routing mode"),
+    ("/gc_exit",                    "Alias for /general_conversation_exit"),
+    ("/gc_list",                    "List all connected terminal sessions"),
+    ("/gc_connect <target>",        "Connect a terminal session by PID, pane ID, or interactively"),
+    ("/gc_disconnect <target>",     "Disconnect a terminal session"),
     ("/skills",        "List discovered skills and capabilities"),
     ("/bg",            "List background tasks and their status"),
 ]
+
+
+def prompt_gc_connect_interactive(available_sessions: list) -> Optional[str]:
+    """Interactive CLI menu to connect a terminal session by number or custom PID/pane/TTY."""
+    inner = max(66, _safe_inner_width(margin=8, minimum=60))
+    print(f"\n  {C_PURPLE}╭{'─' * inner}╮{RESET}")
+    print(f"  {C_PURPLE}│{RESET}  {BOLD}{C_PINK}Connect Terminal Agent Session{RESET}{' ' * max(0, inner - 32)}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}├{'─' * inner}┤{RESET}")
+    
+    if available_sessions:
+        hdr = "Discovered Terminal Sessions on System:"
+        print(f"  {C_PURPLE}│{RESET}  {C_LAVENDER}{hdr}{RESET}{' ' * max(0, inner - len(hdr) - 2)}{C_PURPLE}│{RESET}")
+        for idx, sess in enumerate(available_sessions, 1):
+            lbl = getattr(sess, "display_label", str(sess))
+            line_str = f"  [{idx}] {C_WHITE}{lbl}{RESET}"
+            pad = max(0, inner - _vis_len(line_str) - 2)
+            print(f"  {C_PURPLE}│{RESET}  {line_str}{' ' * pad}{C_PURPLE}│{RESET}")
+        print(f"  {C_PURPLE}├{'─' * inner}┤{RESET}")
+
+    hint = "Enter selection number (1..N) or type PID, tmux pane (%0), session name, or TTY:"
+    print(f"  {C_PURPLE}│{RESET}  {C_MID}{hint[:inner-4]}{RESET}{' ' * max(0, inner - len(hint[:inner-4]) - 2)}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}╰{'─' * inner}╯{RESET}")
+    
+    try:
+        choice = input(f"  {C_PINK}Connect target > {RESET}").strip()
+        if not choice:
+            return None
+        if choice.isdigit() and available_sessions:
+            idx = int(choice) - 1
+            if 0 <= idx < len(available_sessions):
+                return available_sessions[idx].session_id
+        return choice
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return None
+
+
+def print_gc_connect_result(success: bool, detail: str, session: Optional[Any] = None) -> None:
+    """Print connection result feedback."""
+    if success and session:
+        print(f"\n  {C_GREEN}✓ Connected to session:{RESET} {BOLD}{C_WHITE}{session.display_label}{RESET}\n")
+    else:
+        print(f"\n  {C_YELLOW}⚠ Connection note:{RESET} {C_GRAY}{detail}{RESET}\n")
+
+
+def print_gc_mode_banner(sessions: list) -> None:
+    """Print the General Conversation mode activation banner with connected sessions."""
+    inner = max(66, _safe_inner_width(margin=8, minimum=60))
+    print(f"\n  {C_PURPLE}╭{'─' * inner}╮{RESET}")
+    print(f"  {C_PURPLE}│{RESET}  {BOLD}{C_PINK}✺ General Conversation Mode Active{RESET}{' ' * (inner - 36)}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}│{RESET}  {C_GRAY}Universal Semantic Cross-Terminal Agent Router & Observer{RESET}{' ' * max(0, inner - 61)}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}├{'─' * inner}┤{RESET}")
+    
+    if not sessions:
+        msg = "No external terminal sessions found. (Open a tmux pane or Kitty window)"
+        print(f"  {C_PURPLE}│{RESET}  {C_YELLOW}⚠ {msg}{RESET}{' ' * max(0, inner - len(msg) - 4)}{C_PURPLE}│{RESET}")
+    else:
+        hdr = f"Connected Terminal Sessions ({len(sessions)} active):"
+        print(f"  {C_PURPLE}│{RESET}  {C_LAVENDER}{hdr}{RESET}{' ' * max(0, inner - len(hdr) - 2)}{C_PURPLE}│{RESET}")
+        for idx, sess in enumerate(sessions, 1):
+            lbl = getattr(sess, "display_label", str(sess))
+            status_color = C_GREEN if getattr(sess, "is_agent_running", False) else C_GRAY
+            line_str = f"  [{idx}] {status_color}{lbl}{RESET}"
+            pad = max(0, inner - _vis_len(line_str) - 2)
+            print(f"  {C_PURPLE}│{RESET}  {line_str}{' ' * pad}{C_PURPLE}│{RESET}")
+
+    print(f"  {C_PURPLE}├{'─' * inner}┤{RESET}")
+    hint1 = "Type your prompt. Citations like @file will resolve from ANY directory."
+    hint2 = "Type /gc_exit or /general_conversation_exit to return to normal mode."
+    print(f"  {C_PURPLE}│{RESET}  {C_MID}{hint1}{RESET}{' ' * max(0, inner - len(hint1) - 2)}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}│{RESET}  {C_GRAY}{hint2}{RESET}{' ' * max(0, inner - len(hint2) - 2)}{C_PURPLE}│{RESET}")
+    print(f"  {C_PURPLE}╰{'─' * inner}╯{RESET}\n")
+
+
+def print_gc_route_dispatched(decision: Any, target_session: Any, resolved_prompt: str, cited_files: list) -> None:
+    """Print the prompt dispatch card with semantic routing details."""
+    inner = max(66, _safe_inner_width(margin=8, minimum=60))
+    agent_name = getattr(target_session, "agent_name", "Target Agent")
+    sess_id = getattr(target_session, "session_id", "session")
+    reasoning = getattr(decision, "reasoning", "")
+    
+    print(f"  {C_PURPLE}╭{'─' * inner}╮{RESET}")
+    hdr = f"⚡ Routed to {BOLD}{C_PINK}{agent_name}{RESET} {C_LAVENDER}[{sess_id}]{RESET}"
+    print(f"  {C_PURPLE}│{RESET}  {hdr}{' ' * max(0, inner - _vis_len(hdr) - 2)}{C_PURPLE}│{RESET}")
+    
+    if reasoning:
+        r_line = f"Reason: {reasoning}"
+        if len(r_line) > inner - 4:
+            r_line = r_line[:inner - 7] + "..."
+        print(f"  {C_PURPLE}│{RESET}  {C_GRAY}{r_line}{RESET}{' ' * max(0, inner - len(r_line) - 2)}{C_PURPLE}│{RESET}")
+
+    if cited_files:
+        c_line = f"Citations ({len(cited_files)}): " + ", ".join(f"@{f.get('file_name')}" for f in cited_files[:3])
+        print(f"  {C_PURPLE}│{RESET}  {C_MID}{c_line}{RESET}{' ' * max(0, inner - len(c_line) - 2)}{C_PURPLE}│{RESET}")
+
+    print(f"  {C_PURPLE}╰{'─' * inner}╯{RESET}")
+
+
+def print_gc_observation_result(obs_result: Any, target_session: Any, is_interim: bool = False, round_num: int = 1) -> None:
+    """Print the completed agent response or in-progress progress summary in RAYS signature purple/violet theme."""
+    inner = max(66, _safe_inner_width(margin=8, minimum=60))
+    agent_name = getattr(target_session, "agent_name", "Agent")
+    sess_id = getattr(target_session, "session_id", "session")
+    status = getattr(obs_result, "status", "completed")
+    
+    if status == "completed":
+        out = getattr(obs_result, "full_output", "").strip()
+        print(f"\n  {C_PINK}✓{RESET} {BOLD}{C_WHITE}{agent_name}{RESET} {C_LAVENDER}[{sess_id}]{RESET} {C_LILAC}Finished Output:{RESET}\n")
+        if out:
+            print_box(f"{agent_name} Response", out, C_PURPLE, max_lines=5000)
+        else:
+            print(f"  {C_GRAY}(Agent completed turn without additional text output){RESET}\n")
+    elif status == "interrupted":
+        print(f"\n  {C_LILAC}⊙ Observation paused — {agent_name} continues running in `{sess_id}`.{RESET}\n")
+    else:
+        # In progress
+        summary = getattr(obs_result, "summary", "")
+        stage_label = f"Check #{round_num}" if round_num > 0 else "Active"
+        print(f"\n  {C_LILAC}⊙{RESET} {BOLD}{C_WHITE}{agent_name}{RESET} {C_LAVENDER}(Executing In Background · {stage_label}){RESET}\n")
+        if summary:
+            print_box(f"{agent_name} Progress Summary", summary, C_PURPLE, max_lines=5000)
+        else:
+            print(f"  {C_GRAY}Agent is currently performing tasks in `{sess_id}`...{RESET}\n")
+
+
+def print_gc_mode_exit() -> None:
+    """Print notice when exiting General Conversation Mode."""
+    print(f"\n  {C_MID}← Exited General Conversation Mode. Returned to standard RAYS agent.{RESET}\n")
 
 
 def print_help():
@@ -2047,7 +2192,7 @@ def print_help():
     prefix = get_shape_prefix()
     print(f"\n  {prefix} {BOLD}{C_WHITE}Available Commands{RESET}\n")
     for cmd, desc in SLASH_COMMANDS:
-        print(f"    {C_LILAC}{cmd:<22}{RESET} {C_GRAY}{desc}{RESET}")
+        print(f"    {C_LILAC}{cmd:<28}{RESET} {C_GRAY}{desc}{RESET}")
     print()
 
 
@@ -2260,9 +2405,13 @@ class SlashCommandCompleter(Completer):
         if text.startswith('/'):
             query = text.lower()
             for cmd, desc in SLASH_COMMANDS:
-                if cmd.lower().startswith(query) or query == '/':
+                cmd_parts = cmd.split()
+                cmd_name = cmd_parts[0]
+                has_args = len(cmd_parts) > 1
+                insert_text = f"{cmd_name} " if has_args else cmd_name
+                if cmd.lower().startswith(query) or cmd_name.lower().startswith(query) or query == '/':
                     yield Completion(
-                        cmd,
+                        insert_text,
                         start_position=-len(text),
                         display=cmd,
                         display_meta=desc

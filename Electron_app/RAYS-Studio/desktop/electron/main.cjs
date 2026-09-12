@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, nativeImage, shell, session } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, Menu, nativeImage, shell, session, systemPreferences } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
@@ -9,6 +9,13 @@ const { pathToFileURL } = require("node:url");
 
 const isDev = !app.isPackaged;
 const STUDIO_DEV_URL = process.env.RAYS_STUDIO_URL || "http://127.0.0.1:8080";
+
+process.on("uncaughtException", (err) => {
+  console.warn("[Electron main uncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.warn("[Electron main unhandledRejection]", reason);
+});
 
 function readBundledInstallEpoch() {
   try {
@@ -472,6 +479,7 @@ function createWindow(options = {}) {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      autoplayPolicy: "no-user-gesture-required",
       webSecurity: false,
     },
   });
@@ -507,33 +515,74 @@ function createWindow(options = {}) {
 let proxyServerProcess = null;
 
 app.whenReady().then(async () => {
+  // Request microphone permissions on macOS
+  if (process.platform === "darwin" && systemPreferences.askForMediaAccess) {
+    try {
+      await systemPreferences.askForMediaAccess("microphone");
+    } catch (err) {
+      console.warn("Could not request microphone access:", err);
+    }
+  }
+
+  // Allow audio and media permissions automatically
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    if (
+      permission === "media" ||
+      permission === "audioCapture" ||
+      (details && details.mediaTypes && details.mediaTypes.includes("audio"))
+    ) {
+      return callback(true);
+    }
+    callback(true);
+  });
+
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    return permission === "media" || permission === "audioCapture";
+  });
+
   const installEpoch = readBundledInstallEpoch();
   await ensureFreshUserData(installEpoch);
   buildApplicationMenu();
   createWindow();
   
-  // Auto-start rayspy proxy server
+  // Auto-start rayspy proxy server (optional)
   try {
     const isWin = process.platform === "win32";
     const nodeBinary = isWin ? "node.exe" : "node";
-    const nodePath = app.isPackaged
-      ? path.join(process.resourcesPath, "node", nodeBinary)
-      : nodeBinary;
+    let nodePath = nodeBinary;
+    if (app.isPackaged) {
+      const bundledNode = path.join(process.resourcesPath, "node", nodeBinary);
+      if (fs.existsSync(bundledNode)) {
+        nodePath = bundledNode;
+      } else {
+        nodePath = resolveExecutable(nodeBinary) || "node";
+      }
+    } else {
+      nodePath = resolveExecutable(nodeBinary) || "node";
+    }
+
     const rayspyDir = app.isPackaged
       ? path.join(process.resourcesPath, "rayspy")
       : path.join(repoRoot(), "examples/skills/rayspy");
       
     const proxyScript = path.join(rayspyDir, "proxy-server.mjs");
-    if (fs.existsSync(proxyScript)) {
-      proxyServerProcess = spawn(nodePath, [proxyScript], {
-        cwd: rayspyDir,
-        env: process.env,
-        stdio: "ignore",
-        windowsHide: true
-      });
+    if (fs.existsSync(proxyScript) && nodePath) {
+      try {
+        proxyServerProcess = spawn(nodePath, [proxyScript], {
+          cwd: rayspyDir,
+          env: { ...process.env, PATH: shellPathEnv() },
+          stdio: "ignore",
+          windowsHide: true
+        });
+        proxyServerProcess.on("error", (err) => {
+          console.warn("Rayspy proxy server error (non-fatal):", err.message);
+        });
+      } catch (spawnErr) {
+        console.warn("Could not spawn rayspy proxy server:", spawnErr.message);
+      }
     }
   } catch (err) {
-    console.error("Failed to start rayspy proxy:", err);
+    console.warn("Failed to start rayspy proxy:", err.message);
   }
 
   app.on("activate", () => {
@@ -793,6 +842,10 @@ ipcMain.handle("rays:daemon-start", async () => {
       cwd: os.homedir(),
       env: { ...process.env, PATH: shellPathEnv() }
     });
+    daemonProcess.on("error", (err) => {
+      console.warn("Daemon process spawn error:", err.message);
+      daemonProcess = null;
+    });
     daemonProcess.on("exit", () => {
       daemonProcess = null;
     });
@@ -901,4 +954,223 @@ ipcMain.handle("rays:install-skill", async (_event, { scope, workspaceRoot, sour
 
 ipcMain.handle("rays:list-skills", async (_event, { workspaceRoot }) => {
   return listSkillsForWorkspace(workspaceRoot || null);
+});
+
+ipcMain.handle("rays:route-general-prompt", async (_event, { prompt, workspaceRoot }) => {
+  const pythonScript = `
+import sys, json, os
+workspace = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else os.getcwd()
+prompt_text = sys.argv[2] if len(sys.argv) > 2 else ""
+
+try:
+    from rays_core.general_conversation import get_gc_manager
+    mgr = get_gc_manager(workspace)
+    res = mgr.process_prompt(prompt_text, ai_client=None)
+    out = {
+        "ok": res.get("ok", False),
+        "target_session": res.get("target_session").session_id if res.get("target_session") else "None",
+        "agent_name": res.get("target_session").session_name if res.get("target_session") else "Agent",
+        "answer": res.get("observation").full_output if res.get("observation") else "",
+        "error": res.get("error", "")
+    }
+except Exception as e:
+    out = {
+        "ok": False,
+        "target_session": "None",
+        "agent_name": "Agent",
+        "answer": "",
+        "error": str(e)
+    }
+print("JSON_START" + json.dumps(out) + "JSON_END")
+`;
+
+  return await new Promise((resolve) => {
+    const launch = resolveBridgeLaunch(workspaceRoot || os.homedir());
+    const isWin = process.platform === "win32";
+    const pythonPath = app.isPackaged
+      ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
+      : (isWin ? "python" : "python3");
+
+    const env = { ...process.env, ...launch.env };
+    const proc = spawn(pythonPath, ["-c", pythonScript, workspaceRoot || os.homedir(), prompt || ""], {
+      env,
+      cwd: workspaceRoot || os.homedir()
+    });
+
+    let output = "";
+    proc.stdout.on("data", (d) => {
+      output += d.toString("utf8");
+    });
+    proc.stderr.on("data", (d) => {
+      console.warn("[GC route stderr]", d.toString("utf8"));
+    });
+
+    proc.on("close", (code) => {
+      const match = output.match(/JSON_START([\s\S]*?)JSON_END/);
+      if (match) {
+        try {
+          resolve(JSON.parse(match[1]));
+          return;
+        } catch {
+          // fall through
+        }
+      }
+      resolve({
+        ok: false,
+        error: output || `Process exited with code ${code}`,
+        answer: ""
+      });
+    });
+  });
+});
+
+ipcMain.handle("rays:list-connected-agents", async (_event, { workspaceRoot }) => {
+  const pythonScript = `
+import sys, json, os
+workspace = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else os.getcwd()
+
+try:
+    from rays_core.general_conversation import get_gc_manager
+    mgr = get_gc_manager(workspace)
+    sessions = mgr.list_sessions()
+    out = [
+        {
+            "id": s.session_id,
+            "name": s.session_name,
+            "cwd": s.working_dir,
+            "terminal": s.terminal_type,
+            "last_activity": s.last_activity
+        }
+        for s in sessions
+    ]
+except Exception as e:
+    out = []
+print("JSON_START" + json.dumps(out) + "JSON_END")
+`;
+
+  return await new Promise((resolve) => {
+    const launch = resolveBridgeLaunch(workspaceRoot || os.homedir());
+    const isWin = process.platform === "win32";
+    const pythonPath = app.isPackaged
+      ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
+      : (isWin ? "python" : "python3");
+
+    const env = { ...process.env, ...launch.env };
+    const proc = spawn(pythonPath, ["-c", pythonScript, workspaceRoot || os.homedir()], {
+      env,
+      cwd: workspaceRoot || os.homedir()
+    });
+
+    let output = "";
+    proc.stdout.on("data", (d) => {
+      output += d.toString("utf8");
+    });
+
+    proc.on("close", () => {
+      const match = output.match(/JSON_START([\s\S]*?)JSON_END/);
+      if (match) {
+        try {
+          resolve(JSON.parse(match[1]));
+          return;
+        } catch {
+          // fall through
+        }
+      }
+      resolve([]);
+    });
+  });
+});
+
+function getPythonRuntime(workspaceRoot = null) {
+  const isWin = process.platform === "win32";
+  const pythonCandidates = [
+    process.env.PYTHON,
+    "/opt/anaconda3/bin/python3",
+    "/opt/homebrew/bin/python3",
+    "/usr/local/bin/python3",
+    "python3",
+    "python",
+  ].filter(Boolean);
+
+  let selectedPython = isWin ? "python" : "python3";
+  for (const c of pythonCandidates) {
+    if (fs.existsSync(c)) {
+      selectedPython = c;
+      break;
+    }
+  }
+
+  if (app.isPackaged) {
+    const bundleVenv = path.join(
+      process.resourcesPath,
+      "bundle-venv",
+      isWin ? "Scripts" : "bin",
+      isWin ? "python.exe" : "python"
+    );
+    if (fs.existsSync(bundleVenv)) {
+      selectedPython = bundleVenv;
+    }
+  }
+
+  const projectRoot = path.resolve(__dirname, "../../..");
+  const srcPath = path.join(projectRoot, "src");
+
+  const env = {
+    ...process.env,
+    PATH: `/opt/anaconda3/bin:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH || ""}`,
+    PYTHONPATH: `${srcPath}:${workspaceRoot || ""}:${process.env.PYTHONPATH || ""}`,
+  };
+
+  return { pythonPath: selectedPython, env, projectRoot, srcPath };
+}
+
+ipcMain.handle("rays:transcribe-audio", async (_event, { audioBase64, mimeType }) => {
+  const { pythonPath, env, srcPath } = getPythonRuntime();
+
+  const pythonScript = `
+import sys, json, os
+
+sys.path.insert(0, ${JSON.stringify(srcPath)})
+
+try:
+    data = sys.stdin.read().strip()
+    m_type = sys.argv[1] if len(sys.argv) > 1 else "audio/webm"
+    from rays_core.voice_transcriber import transcribe_audio_base64
+    res = transcribe_audio_base64(data, m_type)
+except Exception as e:
+    res = {"success": False, "transcript": "", "error": str(e)}
+
+print("JSON_START" + json.dumps(res) + "JSON_END")
+`;
+
+  return await new Promise((resolve) => {
+    const proc = spawn(pythonPath, ["-c", pythonScript, mimeType || "audio/webm"], {
+      env,
+      cwd: os.homedir(),
+    });
+
+    let output = "";
+    proc.stdout.on("data", (d) => {
+      output += d.toString("utf8");
+    });
+    proc.stderr.on("data", (d) => {
+      console.warn("Python STT stderr:", d.toString("utf8"));
+    });
+
+    proc.on("close", () => {
+      const match = output.match(/JSON_START([\s\S]*?)JSON_END/);
+      if (match) {
+        try {
+          resolve(JSON.parse(match[1]));
+          return;
+        } catch {
+          // fall through
+        }
+      }
+      resolve({ success: false, transcript: "", error: output || "Failed to transcribe audio" });
+    });
+
+    proc.stdin.write(audioBase64 || "");
+    proc.stdin.end();
+  });
 });

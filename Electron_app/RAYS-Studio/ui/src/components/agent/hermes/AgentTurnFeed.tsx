@@ -8,8 +8,8 @@ import { ActivityItemView } from "./ActivityRows";
 
 function UserPromptBox({ text }: { text: string }) {
   return (
-    <div className="flex justify-end mb-6 w-full" data-slot="user-prompt">
-      <div className="max-w-[85%] rounded-2xl border border-white/10 bg-[#1c1c20] px-4 py-2.5 text-[13.5px] leading-relaxed text-foreground/90 shadow-sm">
+    <div className="flex justify-end mb-4 w-full" data-slot="user-prompt">
+      <div className="max-w-[85%] rounded-xl border border-white/10 bg-[#1c1c20] px-3 py-1.5 text-[11.5px] leading-relaxed text-foreground/90 shadow-sm">
         <span className="whitespace-pre-wrap break-words">{text}</span>
       </div>
     </div>
@@ -28,7 +28,7 @@ function FinalSummaryBlock({ content }: { content: string }) {
   if (!html) {
     return (
       <div
-        className="my-3 text-[13.5px] leading-relaxed text-foreground/90 whitespace-pre-wrap font-normal"
+        className="my-2 text-[11.5px] leading-relaxed text-foreground/90 whitespace-pre-wrap font-normal"
         data-slot="final-summary"
       >
         {content}
@@ -38,7 +38,7 @@ function FinalSummaryBlock({ content }: { content: string }) {
 
   return (
     <div
-      className="my-3 text-[13.5px] leading-relaxed text-foreground/90 font-normal prose prose-invert max-w-none prose-p:my-2 prose-headings:text-foreground prose-headings:my-2 prose-code:text-amber-300 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-[#131316] prose-pre:border prose-pre:border-white/10"
+      className="my-2 text-[11.5px] leading-relaxed text-foreground/90 font-normal prose prose-invert max-w-none prose-p:my-1 prose-headings:text-foreground prose-headings:my-1 prose-code:text-amber-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-[#131316] prose-pre:border prose-pre:border-white/10"
       data-slot="final-summary"
       dangerouslySetInnerHTML={{ __html: html }}
     />
