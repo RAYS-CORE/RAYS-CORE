@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Simple Google Earth clone using CesiumJS",
   "scripts": {
-    "dev": "npm run copy-cesium && node proxy-server.mjs & vite",
+    "dev": "npm run copy-cesium && vite",
+    "start": "npm run copy-cesium && node proxy-server.mjs",
     "build": "npm run copy-cesium && vite build",
     "preview": "vite preview",
     "copy-cesium": "node scripts/copy-cesium.js",
@@ -14,10 +15,15 @@
     "mcp:test": "node mcp/test/smoke.mjs"
   },
   "dependencies": {
+    "@mapbox/vector-tile": "^3.0.0",
     "cesium": "^1.141.0",
-    "satellite.js": "^4.1.4",
+    "egm96-universal": "^1.1.1",
     "https-proxy-agent": "^9.0.0",
-    "undici": "^8.7.0"
+    "mgrs": "^2.2.0",
+    "pbf": "^5.1.2",
+    "satellite.js": "^4.1.4",
+    "undici": "^8.7.0",
+    "vite-plugin-cesium": "^1.2.23"
   },
   "devDependencies": {
     "playwright": "^1.61.1",

@@ -65,3 +65,12 @@ Electron_app/**/__pycache__/
 pi/
 hermes-agent/
 opencode/
+gods-eye-view/
+**/gods-eye-view/
+**/skills/**/node_modules/
+**/skills/**/dist/
+src_legacy_backup/
+.gev-cache/
+**/.gev-cache/
+.gev-logs/
+**/.gev-logs/
