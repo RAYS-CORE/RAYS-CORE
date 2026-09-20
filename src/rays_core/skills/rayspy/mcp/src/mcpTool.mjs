@@ -46,10 +46,7 @@ export const inputSchema = {
 export const description =
   'Runs (or resumes) a multi-agent OSINT investigation. Single action-routed tool: ' +
   'start a new investigation, supply guidance to an investigation that is awaiting_guidance, ' +
-  'check status/logs, or abort. ' +
-  'CRITICAL: If the user provides an image URL in the prompt, DO NOT use run_command or curl to download it yourself! ' +
-  'Pass the URL directly to this tool via the `referenceImage` parameter! ' +
-  'The pipeline runs rounds automatically until it completes, ' +
+  'check status/logs, or abort. The pipeline runs rounds automatically until it completes, ' +
   'aborts, or needs guidance - the host agent never has to step rounds manually.';
 
 function summarize(session) {
@@ -116,7 +113,7 @@ async function runPipelineInBackground(session, args) {
   try {
     const query = (args.query || '').trim();
     const targetName = query.toLowerCase().replace(/\s+/g, '_');
-    const invScript = path.resolve(SCRIPTS_DIR, '..', 'run_investigation.py');
+    const invScript = path.join(SCRIPTS_DIR, 'run_investigation.py');
 
     log(session, LogSource.HOST_BOUNDARY, 'pipeline_start', {
       pipeline: 'osint_investigation',
@@ -128,13 +125,8 @@ async function runPipelineInBackground(session, args) {
       throw new Error(`Investigation script not found: ${invScript}`);
     }
 
-    // Spawn run_investigation.py <targetName> <optional: --ref referenceImage>
-    const spawnArgs = [invScript, query];
-    if (args.referenceImage) {
-      spawnArgs.push('--ref', args.referenceImage);
-    }
-
-    const child = spawn(PYTHON_BIN, spawnArgs, {
+    // Spawn run_investigation.py <targetName>
+    const child = spawn(PYTHON_BIN, [invScript, query], {
       cwd: SCRIPTS_DIR,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONUNBUFFERED: '1' },
@@ -175,8 +167,7 @@ async function runPipelineInBackground(session, args) {
     }
 
     // Read the saved JSON result
-    const workspaceDir = path.resolve(SCRIPTS_DIR, '..', `workspace_${targetName}`);
-    const jsonPath = path.resolve(workspaceDir, 'report.json');
+    const jsonPath = path.resolve(SCRIPTS_DIR, '..', `${targetName}_investigation_raw.json`);
     if (!fs.existsSync(jsonPath)) {
       throw new Error(`Pipeline result not found at ${jsonPath}. stdout (last 500 chars): ${stdoutAccum.slice(-500)}`);
     }
@@ -191,40 +182,27 @@ async function runPipelineInBackground(session, args) {
     // Store full result
     session.pipelineResult = parsed;
 
-    // Check for V4 report.html or legacy V3 report.txt
-    try {
-      const htmlPath = path.join(workspaceDir, 'report.html');
-      const txtPath = path.join(workspaceDir, 'report.txt');
-      if (fs.existsSync(htmlPath)) {
-        session.report = true; // Signal UI that report is ready
-      } else if (fs.existsSync(txtPath)) {
-        session.report = fs.readFileSync(txtPath, 'utf-8');
-      }
-    } catch (e) {
-      console.error(`Failed to load report for ${targetName}`, e);
+    // Read the TXT report
+    const reportPath = path.resolve(SCRIPTS_DIR, '..', `${targetName}_investigation_report.txt`);
+    if (fs.existsSync(reportPath)) {
+      session.report = fs.readFileSync(reportPath, 'utf-8');
     }
 
-    // Extract fields for entity/hypothesis display (supporting both V3 and V4 schemas)
-    const pipelineResult = parsed.pipeline_result || parsed || {};
-    const disc = pipelineResult.identity_discovery || {};
-    const decision = pipelineResult.decision || {};
-    // Only use identity_candidates to avoid spamming UI with hundreds of raw leads in V4
-    const candidates = disc.identity_candidates || [];
-
-    const evSum = pipelineResult.evidence_summary || parsed.evidence_chain || {};
+    // Extract fields for entity/hypothesis display
+    const disc = parsed.identity_discovery || {};
+    const decision = parsed.decision || {};
+    const candidates = disc.identity_candidates || parsed.candidates || [];
 
     log(session, LogSource.EVIDENCE_GRAPH, 'discovery_complete', {
-      leads: evSum.leads ?? 0,
-      validated: evSum.validated ?? evSum.profile_validated ?? 0,
+      leads: parsed.evidence_summary?.leads ?? 0,
+      validated: parsed.evidence_summary?.validated ?? 0,
       platforms: (disc.platforms || []).join(', '),
       cross_verification_cycles: disc.cross_verification_cycles,
       converged: disc.converged,
     });
 
     for (const c of candidates) {
-      const candidateName = c.name || c.name_hypothesis || c.handles?.[0] || 'unknown';
-      const cPlatforms = c.platforms || (c.linked_profiles || []).map(p => p.platform);
-      
+      const candidateName = c.name_hypothesis || c.handles?.[0] || 'unknown';
       session.entities.push({
         id: `entity_${c.candidate_id || Date.now()}`,
         target: candidateName,
@@ -237,14 +215,14 @@ async function runPipelineInBackground(session, args) {
         label: candidateName,
         confidence: c.confidence,
         confidence_label: c.confidence_label,
-        platforms: cPlatforms,
-        face_verified: c.face_verified || (c.face_verification_status === 'VERIFIED'),
+        platforms: c.platforms,
+        face_verified: c.face_verified,
       });
       log(session, LogSource.FINAL_STAGE, 'identity_candidate', {
         name: candidateName,
         confidence: c.confidence,
         confidence_label: c.confidence_label,
-        platforms: cPlatforms.join(', '),
+        platforms: (c.platforms || []).join(', '),
       });
     }
 
