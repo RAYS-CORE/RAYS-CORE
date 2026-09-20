@@ -34,18 +34,11 @@ from core.pipeline import InvestigationPipeline
 
 def main():
     target = sys.argv[1] if len(sys.argv) > 1 else "samreedh"
-    
-    ref_image = None
-    if "--ref" in sys.argv:
-        ref_idx = sys.argv.index("--ref")
-        if ref_idx + 1 < len(sys.argv):
-            ref_image = sys.argv[ref_idx + 1]
 
     t0 = time_module.time()
 
     # Run the new workspace-driven pipeline
     pipeline = InvestigationPipeline(base_dir=BASE_DIR, target_name=target)
-    pipeline.reference_image = ref_image
     result = pipeline.run()
 
     t1 = time_module.time()
