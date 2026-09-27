@@ -250,15 +250,10 @@ def _fetch_bytes(url: str, timeout: int = 20) -> bytes | None:
 
 
 def _download(url: str) -> Path | None:
-    if url.startswith("data:"):
-        return None
     if not url.startswith(("http://", "https://", "file://")):
-        try:
-            p = Path(url)
-            if p.exists():
-                return p
-        except OSError:
-            return None
+        p = Path(url)
+        if p.exists():
+            return p
     data = _fetch_bytes(url)
     if not data:
         return None
@@ -346,19 +341,115 @@ def _hamming_distance(h1: int, h2: int) -> int:
     return bin(h1 ^ h2).count("1")
 
 
+# ── InsightFace model availability ──
+_INSIGHTFACE_AVAILABLE: Optional[bool] = None  # None = unchecked, True/False after first check
+
+def _check_insightface_model() -> bool:
+    """Check if buffalo_l model is cached locally; if not, attempt download with visible progress.
+    
+    Returns True if model is available (cached or freshly downloaded), False if unavailable.
+    On first call this may print download progress to stderr; subsequent calls are instant.
+    """
+    global _INSIGHTFACE_AVAILABLE
+    if _INSIGHTFACE_AVAILABLE is not None:
+        return _INSIGHTFACE_AVAILABLE
+
+    # Check the standard insightface model cache directory
+    import os as _os
+    model_dir = _os.path.expanduser("~/.insightface/models/buffalo_l")
+    has_model = _os.path.isdir(model_dir) and any(
+        f.endswith(".onnx") or f.endswith(".param") or f.endswith(".bin")
+        for f in _os.listdir(model_dir)
+    )
+
+    if has_model:
+        _INSIGHTFACE_AVAILABLE = True
+        return True
+
+    # Model not cached — attempt download with visible progress to stderr
+    print("\n[INFO] InsightFace buffalo_l model not found locally.", flush=True)
+    print("[INFO] Attempting download from deepinsight/insightface model zoo...", flush=True)
+    print("[INFO] Download progress visible below (may take 1-2 minutes):", flush=True)
+    import sys as _sys
+    try:
+        # Use insightface's own download mechanism but with visible output
+        import urllib.request as _urllib
+        import zipfile as _zipfile
+        import tempfile as _tempfile
+        import shutil as _shutil
+
+        model_url = "https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip"
+        _os.makedirs(model_dir, exist_ok=True)
+
+        # Download with progress to stderr
+        tmp_zip = _os.path.join(_tempfile.mkdtemp(), "buffalo_l.zip")
+        try:
+            req = _urllib.Request(model_url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            })
+            with _urllib.request.urlopen(req, timeout=120) as resp:
+                total = int(resp.headers.get("Content-Length", 0))
+                downloaded = 0
+                chunk_size = 8192
+                with open(tmp_zip, "wb") as f:
+                    while True:
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            pct = int(downloaded * 100 / total)
+                            print(f"\r  Downloading buffalo_l.zip ... {pct}% ({downloaded//1024}KB/{total//1024}KB)", end="", file=_sys.stderr, flush=True)
+                        else:
+                            print(f"\r  Downloading buffalo_l.zip ... {downloaded//1024}KB", end="", file=_sys.stderr, flush=True)
+            print(file=_sys.stderr, flush=True)
+
+            # Extract
+            print("  Extracting model files ...", file=_sys.stderr, flush=True)
+            with _zipfile.ZipFile(tmp_zip, "r") as zf:
+                zf.extractall(model_dir)
+            print("  Model extracted to", model_dir, file=_sys.stderr, flush=True)
+            _INSIGHTFACE_AVAILABLE = True
+            return True
+        finally:
+            try:
+                _os.unlink(tmp_zip)
+            except Exception:
+                pass
+    except Exception as exc:
+        print(f"\n[WARN] Could not download buffalo_l model: {exc}", file=_sys.stderr, flush=True)
+        print("[WARN] Face verification will be skipped. Model can be manually downloaded from:", file=_sys.stderr, flush=True)
+        print(f"[WARN]   https://github.com/deepinsight/insightface/releases/tag/v0.7", file=_sys.stderr, flush=True)
+        print(f"[WARN] Extract to: {model_dir}", file=_sys.stderr, flush=True)
+        _INSIGHTFACE_AVAILABLE = False
+        return False
+
+
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  FaceEngine — InsightFace wrapper                                    ║
 # ╚══════════════════════════════════════════════════════════════════════╝
 
 class FaceEngine:
     def __init__(self):
-        with contextlib.redirect_stdout(io.StringIO()):
-            with contextlib.redirect_stderr(io.StringIO()):
-                from insightface.app import FaceAnalysis
-                self.app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
-                self.app.prepare(ctx_id=0, det_size=(640, 640))
+        self.available = False
+        self.app = None
+        if not _check_insightface_model():
+            return
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    from insightface.app import FaceAnalysis
+                    self.app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+                    self.app.prepare(ctx_id=0, det_size=(640, 640))
+                    self.available = True
+        except Exception as exc:
+            print(f"[WARN] FaceEngine init failed: {exc}", flush=True)
+            self.available = False
 
     def get_faces(self, image_path: Path) -> list[dict]:
+        if not self.available or self.app is None:
+            return []
         img = cv2.imread(str(image_path))
         if img is None:
             return []
@@ -1997,7 +2088,7 @@ def run_enhanced_pipeline(
     enable_memory: bool = True,
     enable_bayesian: bool = True,
     enable_browser_ctrl: bool = False,
-    enable_auto_reference: bool = True,
+    enable_auto_reference: bool = False,
     metadata: Optional[dict] = None,
     sherlock_leads: Optional[list[dict]] = None,
 ) -> dict:
@@ -2063,6 +2154,8 @@ def run_enhanced_pipeline(
     # ── Phase 2: Collection (via search + optional browser controller) ──
     t0 = time.time()
     profiles = stage2_collect(query_plan, pre_collected_profiles, enable_name_search)
+    _initial_profile_count = len(profiles)
+    _initial_profile_platforms = list(set(p.get("platform", "web") for p in profiles))
     times["2_collection"] = (time.time() - t0) * 1000
 
     # ── Phase A1: Candidate Generator (Lead → CandidateProfile) ──
@@ -2177,8 +2270,9 @@ def run_enhanced_pipeline(
     rejected_count_a3 = sum(1 for c in all_candidates if c.state == "REJECTED")
     error_count_a3 = sum(1 for c in all_candidates if getattr(c, "validation", None) and c.validation.status == "ERROR")
     print(f"[STAGE:A3]  VALIDATED:{validated_count_a3}  REJECTED:{rejected_count_a3}  ERROR:{error_count_a3}", flush=True)
-    _stage_assert(validated_count_a3 > 0 or rejected_count_a3 > 0,
-                  "Validator produced no output - all candidates skipped")
+    if all_candidates:
+        _stage_assert(validated_count_a3 > 0 or rejected_count_a3 > 0,
+                      "Validator produced no output - all candidates skipped")
 
     # ── Phase A3b: Evidence Harvester — extract identifiers from validated DOMs ──
     t0 = time.time()
@@ -2236,8 +2330,9 @@ def run_enhanced_pipeline(
     avg_quality = (sum(c.quality_score for c in all_candidates if c.state == "VALIDATED") /
                    max(validated_count_a4, 1))
     print(f"[STAGE:A4]  VALIDATED:{validated_count_a4}  HIGH_QUALITY(>={VALIDATED_PROFILE_THRESHOLD}):{high_quality_count_a4}  AVG_QUALITY:{avg_quality:.1f}", flush=True)
-    _stage_assert(validated_count_a4 > 0 or high_quality_count_a4 == 0,
-                  "All validated profiles have quality < 30")
+    if validated_count_a4 > 0:
+        _stage_assert(high_quality_count_a4 > 0 or validated_count_a4 == 0,
+                      "All validated profiles have quality < 30")
 
     # ── Phase 3: Normalization ──
     t0 = time.time()
@@ -2395,6 +2490,118 @@ def run_enhanced_pipeline(
                     registry.add(c)
                     registry.transition(c.id, "DISCOVERED", "Cross-verification discovery")
     times["10_cross_verification"] = (time.time() - t0) * 1000
+
+    # ── Process cross-verification-discovered candidates through A2-A4 ──
+    # Cross-verification may have created new candidates in DISCOVERED state
+    # that were never processed by Phase A2 (browser load), A3 (validator),
+    # A3b (evidence harvest), or A4 (quality scorer). Process them now.
+    if registry is not None:
+        cv_new = [c for c in registry.all() if c.state == "DISCOVERED"]
+        if cv_new:
+            print(f"[STAGE:A2b]  Browser-loading {len(cv_new)} cross-verification candidates", flush=True)
+            # Browser load (Phase A2 equivalent)
+            for c in cv_new:
+                try:
+                    fetch_result = _http_fetch_page(c.url)
+                    c.dom = fetch_result.get("html", "")
+                    c.final_url = fetch_result.get("final_url", c.url)
+                    c.http_status = fetch_result.get("http_status", 0)
+                    registry.transition(c.id, "PAGE_LOADED", f"HTTP: {c.http_status}")
+                except Exception as exc:
+                    c.http_status = 0
+                    registry.transition(c.id, "PAGE_LOADED", f"Fetch error: {exc}")
+
+            # Validate (Phase A3 equivalent)
+            if _validate_profile is not None and _has_models:
+                for c in cv_new:
+                    if c.state not in ("DISCOVERED", "PAGE_LOADED"):
+                        continue
+                    try:
+                        p_dict = {"url": c.url, "platform": c.platform, "handle": c.username,
+                                  "name": c.display_name, "image_url": c.image_url, "bio": c.bio}
+                        vr = _validate_profile(c.url, c.dom or "", profile=p_dict, platform=c.platform)
+                        validation = ValidationResult(
+                            exists=vr["validation"]["exists"],
+                            accessible=vr["validation"]["accessible"],
+                            status=vr["validation"]["status"],
+                            confidence=vr["validation"]["confidence"],
+                            reason=vr["validation"]["reason"],
+                            signals=vr["validation"].get("signals", []),
+                            warnings=vr["validation"].get("warnings", []),
+                        )
+                        c.validation = validation
+                        c.http_status = vr.get("http_status", 200 if validation.exists else 0)
+                        if should_continue_from_state(validation.status):
+                            registry.transition(c.id, "VALIDATED",
+                                                f"Validation: {validation.status} - {validation.reason}")
+                        else:
+                            registry.transition(c.id, "REJECTED",
+                                                f"Validation: {validation.status} - {validation.reason}")
+                    except Exception as e:
+                        c.validation = ValidationResult(
+                            exists=False, accessible=False, status="ERROR", confidence=0.0,
+                            reason=f"Validator exception: {e}",
+                        )
+                        registry.transition(c.id, "REJECTED", "Validator error")
+
+            # Evidence harvest (Phase A3b equivalent)
+            if _eh is not None and _has_models:
+                for c in cv_new:
+                    if c.state not in ("VALIDATED", "PAGE_LOADED"):
+                        continue
+                    if not c.dom:
+                        continue
+                    try:
+                        harvested = _eh.harvest_from_candidate(
+                            url=c.url, html=c.dom,
+                            platform=c.platform or "web",
+                            handle=c.username or "",
+                        )
+                        if harvested.get("display_name") and not c.display_name:
+                            c.display_name = harvested["display_name"]
+                        if harvested.get("bio") and not c.bio:
+                            c.bio = harvested["bio"][:500]
+                        if harvested.get("image_url") and not c.image_url:
+                            c.image_url = harvested["image_url"]
+                        c.extracted_evidence = {
+                            "emails": harvested.get("emails", []),
+                            "phones": harvested.get("phones", []),
+                            "websites": harvested.get("websites", []),
+                            "organizations": harvested.get("organizations", []),
+                            "usernames": harvested.get("usernames", {}),
+                        }
+                    except Exception:
+                        pass
+
+            # Quality score (Phase A4 equivalent)
+            for c in cv_new:
+                if c.state in ("VALIDATED", "REJECTED"):
+                    c.quality_score = compute_quality_score(c)
+
+            cv_validated = sum(1 for c in cv_new if c.state == "VALIDATED")
+            cv_rejected = sum(1 for c in cv_new if c.state == "REJECTED")
+            print(f"[STAGE:A2b]  Cross-verification processed: {cv_validated} VALIDATED, {cv_rejected} REJECTED", flush=True)
+
+            # Add cross-verification candidates to all_candidates for downstream reporting
+            all_candidates.extend(cv_new)
+
+            # Update discovery identifiers from cross-verification validated candidates
+            for c in cv_new:
+                if c.state != "VALIDATED":
+                    continue
+                ev = getattr(c, "extracted_evidence", {}) or {}
+                discovered_identifiers.setdefault("emails", [])
+                discovered_identifiers.setdefault("websites", [])
+                discovered_identifiers.setdefault("phones", [])
+                for email in ev.get("emails", []):
+                    if email not in discovered_identifiers["emails"]:
+                        discovered_identifiers["emails"].append(email)
+                for site in ev.get("websites", []):
+                    if site not in discovered_identifiers["websites"]:
+                        discovered_identifiers["websites"].append(site)
+                for phone in ev.get("phones", []):
+                    if phone not in discovered_identifiers["phones"]:
+                        discovered_identifiers["phones"].append(phone)
 
     # ── Phase A Decision: Build Identity Candidates from non-face evidence ──
     if _has_models and registry is not None:
@@ -2872,18 +3079,18 @@ def run_enhanced_pipeline(
 
     # ── Build report with stage-by-stage evidence chain ──
     ev = registry.evidence_chain() if registry else {}
-    leads_count = ev.get("leads", len(profiles) + len(sherlock_leads if sherlock_leads else []))
+    leads_count = _initial_profile_count + len(sherlock_leads or [])
     candidates_count = ev.get("candidates", 0)
     browser_loaded_count = ev.get("browser_loaded", 0)
     validated_count = ev.get("validated", 0)
     rejected_count = ev.get("rejected", 0)
     high_quality_count = ev.get("high_quality", 0)
-    identity_candidates_count = ev.get("identity_candidates", len(identity_candidates))
+    identity_candidates_count = len(identity_candidates)
     _harvested_names_count = sum(1 for c in all_candidates
                                  if c.state == "VALIDATED" and c.display_name)
     _harvested_emails_count = sum(1 for c in all_candidates
                                   if getattr(c, "extracted_evidence", None) and c.extracted_evidence.get("emails"))
-    verified_identities_count = ev.get("verified", sum(1 for c in identity_candidates if isinstance(c, IdentityCandidate) and c.face_verification_status == FaceVerificationState.VERIFIED))
+    verified_identities_count = sum(1 for c in identity_candidates if isinstance(c, IdentityCandidate) and c.face_verification_status == FaceVerificationState.VERIFIED)
 
     top_confidence = max((c.confidence for c in identity_candidates), default=0.0) if identity_candidates and isinstance(identity_candidates[0] if identity_candidates else None, IdentityCandidate) else (
         max((c.get("confidence", 0) for c in identity_candidates), default=0.0) if identity_candidates else 0.0
@@ -2934,8 +3141,8 @@ def run_enhanced_pipeline(
                 "search_queries": query_plan["search_queries"],
             },
             "2_collection": {
-                "profiles_found": len(profiles),
-                "platforms": list(set(p["platform"] for p in profiles)),
+                "profiles_found": _initial_profile_count,
+                "platforms": _initial_profile_platforms,
             },
             "3_normalization": {
                 "unique_profiles": len(profiles),

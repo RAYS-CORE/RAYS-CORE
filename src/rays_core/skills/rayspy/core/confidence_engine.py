@@ -57,6 +57,13 @@ class ConfidenceEngine:
         )
         return min(raw, 1.0)
 
+    def score_by_type(self, evidence_list: list[dict], evidence_type: str) -> float:
+        items = [e for e in evidence_list if e.get("type", e.get("evidence_type")) == evidence_type]
+        if not items:
+            return 0.0
+        w = self.weights.get(evidence_type, 0.1)
+        return min(sum((e.get("weight", e.get("confidence", 0))) * w for e in items), 1.0)
+
     def detailed(self, evidence_list: list[dict]) -> dict:
         breakdown = {}
         total = 0.0
