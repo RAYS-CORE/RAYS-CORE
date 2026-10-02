@@ -481,11 +481,24 @@ class SkillsOrchestrator:
 
         rays_ui.print_step(f"Executing: {command}")
         try:
+            # Intercept python script execution to bypass Windows PATH/Store alias issues
+            import sys as _sys
+            cmd_strip = command.strip()
+            if cmd_strip.startswith("python "):
+                command = f'"{_sys.executable}" {cmd_strip[7:]}'
+            elif cmd_strip.startswith("python3 "):
+                command = f'"{_sys.executable}" {cmd_strip[8:]}'
+
+            # Propagate UTF-8 mode so skill scripts never crash on Windows with non-ASCII output
+            child_env = os.environ.copy()
+            child_env["PYTHONUTF8"] = "1"
+            child_env["PYTHONIOENCODING"] = "utf-8"
+
             log_dir = Path(os.path.expanduser(self.config.get("rays_dir", "~/.rays"))) / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file = log_dir / f"cmd_{int(time.time())}.log"
 
-            with open(log_file, "w") as outfile:
+            with open(log_file, "w", encoding="utf-8") as outfile:
                 process = subprocess.Popen(
                     command,
                     shell=True,
@@ -493,7 +506,10 @@ class SkillsOrchestrator:
                     stdin=subprocess.DEVNULL,
                     stdout=outfile,
                     stderr=subprocess.STDOUT,
-                    text=True
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    env=child_env,
                 )
 
                 start_time = time.time()

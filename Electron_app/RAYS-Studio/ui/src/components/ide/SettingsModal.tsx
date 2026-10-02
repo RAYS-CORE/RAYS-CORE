@@ -11,7 +11,9 @@ import {
   type AppearanceSettings,
 } from "@/services/workspaceStorage";
 
-const categories = ["AI Providers", "API Keys", "MCP Config", "Appearance"];
+import { VoiceSettingsPanel } from "@/components/ide/VoiceSettingsPanel";
+
+const categories = ["AI Providers", "API Keys", "MCP Config", "Appearance", "Voice"];
 
 const providers: { id: StoredProviderSettings["provider"]; label: string }[] = [
   { id: "ollama", label: "Ollama (Local)" },
@@ -360,6 +362,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                     </div>
                   </div>
                 </div>
+              )}
+
+              {activeCategory === "Voice" && (
+                <VoiceSettingsPanel />
               )}
             </div>
           </motion.div>

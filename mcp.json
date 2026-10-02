@@ -1,0 +1,12 @@
+{
+  "mcp_servers": [
+    {
+      "name": "my-server",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ]
+    }
+  ]
+}

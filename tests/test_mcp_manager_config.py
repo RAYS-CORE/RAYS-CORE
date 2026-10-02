@@ -16,6 +16,7 @@ def test_expand_env_value():
 def test_load_mcp_server_configs_from_config(tmp_path, monkeypatch):
     """Isolated from developer ~/.rays/mcp.json on the machine running CI."""
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     project = tmp_path / "project"
     project.mkdir()
     config = {

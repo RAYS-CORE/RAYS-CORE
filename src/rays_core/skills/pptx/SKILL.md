@@ -13,7 +13,7 @@ Tools: `run_shell_command`, `write_file`, `read_file`, `list_directory`, `patch_
 1. `write_file` — outline in `slides.md` (title + bullet slides) or a small Python script.
 2. `run_shell_command` — build the deck, e.g. with python-pptx:
    ```bash
-   python3 -c "from pptx import Presentation; ..."
+   python -c "from pptx import Presentation; ..."
    ```
    or pandoc if available:
    ```bash
@@ -25,3 +25,4 @@ Tools: `run_shell_command`, `write_file`, `read_file`, `list_directory`, `patch_
 
 - Output `.pptx` must land in the workspace root (or path named in spawn_reason).
 - Never mark completed without at least one successful tool call.
+

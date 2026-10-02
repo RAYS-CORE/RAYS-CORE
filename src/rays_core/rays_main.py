@@ -681,8 +681,18 @@ def main():
     Always interactive — slash commands for in-session control.
     """
     import sys
+    import os
     import argparse
     from pathlib import Path
+
+    # Force UTF-8 I/O globally so skill scripts printing non-ASCII content
+    # (e.g. author names, emoji, foreign characters) never crash on Windows.
+    os.environ.setdefault("PYTHONUTF8", "1")
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     
     parser = argparse.ArgumentParser(
         description="RAYS — AI-Powered Development Assistant",

@@ -1,0 +1,37 @@
+# RAYS-CORE Git Attributes
+# Normalize line endings: LF in repo, auto-convert on checkout
+
+* text=auto eol=lf
+
+# Force LF for code files (works on all OS)
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.sh text eol=lf
+*.txt text eol=lf
+
+# Binary files - no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.gz binary
+*.pyc binary
+*.pyd binary
+*.so binary
+*.dll binary
+*.exe binary

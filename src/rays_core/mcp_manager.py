@@ -293,7 +293,10 @@ class MCPManager:
         merged_env = {**os.environ, **{k: str(v) for k, v in env.items()}}
 
         command = str(command)
-        if os.name == "nt" and not __import__("pathlib").Path(command).is_absolute():
+        if command in ("python", "python3"):
+            import sys
+            command = sys.executable
+        elif os.name == "nt" and not __import__("pathlib").Path(command).is_absolute():
             import shutil
             resolved_cmd = shutil.which(command)
             if resolved_cmd:

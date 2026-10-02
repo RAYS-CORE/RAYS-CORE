@@ -966,10 +966,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     # Force stdout/stderr to UTF-8 to prevent charmap encoding errors on Windows
+    os.environ.setdefault("PYTHONUTF8", "1")
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             try:
-                stream.reconfigure(encoding="utf-8")
+                stream.reconfigure(encoding="utf-8", errors="replace")
             except Exception:
                 pass
 
