@@ -17,31 +17,24 @@ if (process.env.OSINT_MOCK === undefined) process.env.OSINT_MOCK = '0';
 //   export HTTPS_PROXY=http://proxy:port   (Linux/macOS)
 //   $env:HTTPS_PROXY='http://proxy:port'   (PowerShell)
 
-// Point spiderfoot.mjs at the cloned SpiderFoot checkout.
-// Use 'python' on Windows (python3 is not available).
-const SF_PY = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\spiderfoot\\sf.py';
-if (!process.env.SPIDERFOOT_SF_PY) {
-  process.env.SPIDERFOOT_SF_PY = SF_PY;
-}
+const pythonBin = process.platform === 'win32' ? 'python' : 'python3';
+
 if (!process.env.SPIDERFOOT_PYTHON) {
-  process.env.SPIDERFOOT_PYTHON = 'python';
+  process.env.SPIDERFOOT_PYTHON = pythonBin;
 }
 
-// Point insightface.mjs at the Python face-detection sidecar.
-const INSIGHTFACE_SCRIPT_PATH = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\scripts\\insightface_sidecar.py';
-if (!process.env.INSIGHTFACE_SCRIPT) {
+const INSIGHTFACE_SCRIPT_PATH = path.join(__dirname, 'scripts', 'insightface_sidecar.py');
+if (!process.env.INSIGHTFACE_SCRIPT && fs.existsSync(INSIGHTFACE_SCRIPT_PATH)) {
   process.env.INSIGHTFACE_SCRIPT = INSIGHTFACE_SCRIPT_PATH;
 }
 
-// Point personMatcher.mjs at the Python person search + face cross-match sidecar.
-const PERSON_MATCHER_SCRIPT_PATH = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\scripts\\person_matcher_sidecar.py';
-if (!process.env.PERSON_MATCHER_SCRIPT) {
+const PERSON_MATCHER_SCRIPT_PATH = path.join(__dirname, 'scripts', 'person_matcher_sidecar.py');
+if (!process.env.PERSON_MATCHER_SCRIPT && fs.existsSync(PERSON_MATCHER_SCRIPT_PATH)) {
   process.env.PERSON_MATCHER_SCRIPT = PERSON_MATCHER_SCRIPT_PATH;
 }
 
-// Point at the full 14-stage face search pipeline (replaces person_matcher for new flows).
-const FACE_SEARCH_PIPELINE_SCRIPT_PATH = 'C:\\Users\\KIIT\\Documents\\rayspy_with_mcp\\scripts\\face_search_pipeline.py';
-if (!process.env.FACE_SEARCH_PIPELINE_SCRIPT) {
+const FACE_SEARCH_PIPELINE_SCRIPT_PATH = path.join(__dirname, 'scripts', 'face_search_pipeline.py');
+if (!process.env.FACE_SEARCH_PIPELINE_SCRIPT && fs.existsSync(FACE_SEARCH_PIPELINE_SCRIPT_PATH)) {
   process.env.FACE_SEARCH_PIPELINE_SCRIPT = FACE_SEARCH_PIPELINE_SCRIPT_PATH;
 }
 

@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => ({
             proxyProcess = spawn(nodeBinary, [proxyScript], {
               cwd: rayspyDir,
               env: process.env,
-              stdio: "ignore",
+              stdio: "inherit",
             });
             console.log("[rays-session-manager] Auto-started rayspy proxy server from:", proxyScript);
           } catch (err: any) {
