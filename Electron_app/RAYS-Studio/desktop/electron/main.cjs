@@ -372,6 +372,38 @@ function bundledBridgeBinary() {
   return path.join(process.resourcesPath, "backend", name);
 }
 
+/**
+ * Resolve the best Python executable for dev mode.
+ * Priority:
+ *   1. RAYS_VENV_PYTHON env var (explicit override)
+ *   2. .venv inside the repo root (created by pip install -e .)
+ *   3. System python3 / python as last resort
+ */
+function devPythonPath() {
+  // Explicit override
+  if (process.env.RAYS_VENV_PYTHON && fs.existsSync(process.env.RAYS_VENV_PYTHON)) {
+    return process.env.RAYS_VENV_PYTHON;
+  }
+  const root = repoRoot();
+  const isWin = process.platform === "win32";
+  // Walk up from desktop/../.. (= RAYS-Studio) to find the repo .venv
+  const candidates = [
+    // RAYS-Studio/../../.venv  →  RAYS/.venv
+    path.join(root, "..", "..", ".venv", isWin ? "Scripts/python.exe" : "bin/python"),
+    // RAYS-Studio/.venv
+    path.join(root, ".venv", isWin ? "Scripts/python.exe" : "bin/python"),
+    // pipx / system fallbacks
+    isWin ? "python" : "python3",
+    "python",
+  ];
+  for (const c of candidates) {
+    if (path.isAbsolute(c) ? fs.existsSync(c) : true) {
+      return c;
+    }
+  }
+  return isWin ? "python" : "python3";
+}
+
 function bridgeLaunchConfig() {
   // Packaged app: self-contained backend (PyInstaller), no pipx / system Python required.
   if (app.isPackaged) {
@@ -395,10 +427,11 @@ function bridgeLaunchConfig() {
     };
   }
 
-  // Development: use repo source + local Python
+  // Development: use repo source + venv Python
   const root = repoRoot();
+  const raysRoot = path.resolve(root, "..", "..");
   return {
-    command: pythonCommand(),
+    command: devPythonPath(),
     argsPrefix: ["-m", "rays_bridge.ws_bridge"],
     cwd: root,
     env: {
@@ -408,10 +441,10 @@ function bridgeLaunchConfig() {
       PYTHONIOENCODING: "utf-8",
       PYTHONUTF8: "1",
       PYTHONPATH: [
+        path.join(raysRoot, "src"),
+        path.join(root, "bridge/src"),
         path.join(root, "src"),
         path.resolve(root, "../../src"),
-        path.resolve(root, "../.."),
-        path.join(root, "bridge/src"),
         process.env.PYTHONPATH || "",
       ]
         .filter(Boolean)
@@ -419,6 +452,7 @@ function bridgeLaunchConfig() {
     },
   };
 }
+
 
 function resolvePackagedStudioIndex() {
   const candidates = [

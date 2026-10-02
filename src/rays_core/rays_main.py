@@ -725,7 +725,43 @@ def main():
         action="store_true",
         help="Launch RAYS in OpenCode-style Text User Interface (TUI) mode"
     )
-    
+
+    parser.add_argument(
+        "--voice",
+        action="store_true",
+        help="Launch RAYS in voice mode — say 'Hey RAYS' then your command (cross-platform: Win/macOS/Linux)"
+    )
+
+    parser.add_argument(
+        "--voice-device",
+        type=int,
+        default=None,
+        dest="voice_device",
+        help="Microphone device index for voice mode (use --voice-list-devices to find)"
+    )
+
+    parser.add_argument(
+        "--voice-no-wake",
+        action="store_true",
+        dest="voice_no_wake",
+        help="Voice mode: every utterance is a command (skip 'Hey RAYS' wake phrase)"
+    )
+
+    parser.add_argument(
+        "--voice-tts-voice",
+        type=str,
+        default=None,
+        dest="voice_tts_voice",
+        help="TTS voice for voice mode, e.g. 'en-US-GuyNeural' (Edge TTS) or 'alloy' (OpenAI)"
+    )
+
+    parser.add_argument(
+        "--voice-list-devices",
+        action="store_true",
+        dest="voice_list_devices",
+        help="List available microphone input devices and exit"
+    )
+
     parser.add_argument(
         "--reindex",
         action="store_true",
@@ -821,7 +857,22 @@ def main():
     
     args = parser.parse_args()
 
-    # RAYS Studio Execution Path
+    # ── Voice device listing (early exit, no RAYS session needed) ──────────
+    if getattr(args, "voice_list_devices", False):
+        from rays_core.voice_mode import list_mic_devices
+        devs = list_mic_devices()
+        if devs:
+            print("\n  Available microphone input devices:\n")
+            for d in devs:
+                print(f"    [{d['index']}] {d['name']}  "
+                      f"(ch: {d['channels']}, {d['rate']:.0f} Hz)")
+            print(f"\n  Use: rays --voice --voice-device <index> .\n")
+        else:
+            print("  No input devices found or no mic backend available.")
+            print("  Install PyAudio: pip install pyaudio")
+        sys.exit(0)
+
+
     if args.studio or args.pull or args.pull_sd or args.generate_sd or args.host or args.core or args.start or args.finetune or args.amd_sync:
         try:
             import rays_studio.daemon as daemon
@@ -1069,6 +1120,64 @@ def main():
             except Exception as e:
                 print(f"Error launching TUI: {e}")
                 sys.exit(1)
+
+        # ── Voice mode ──────────────────────────────────────────
+        if args.voice:
+            from .voice_mode import check_voice_deps, voice_loop, speak, list_mic_devices
+            ok, missing = check_voice_deps()
+            if not ok:
+                rays_ui.print_error(
+                    "Voice mode missing packages: " + ", ".join(missing) + "\n"
+                    "  RAYS will attempt auto-install on next run, or install manually:\n"
+                    "  pip install " + " ".join(missing)
+                )
+                sys.exit(1)
+
+            rays_ui.display_banner(model="voice mode", cwd=str(codebase_path))
+            rays_ui.print_step("Initializing RAYS for voice session...")
+
+            # Build RAYS instance (same flow as normal, provider selection skipped
+            # in voice mode — uses whatever is in config.yaml already)
+            with open(config_path, "r") as f:
+                _vcfg = yaml.safe_load(f)
+            _vmodel = _vcfg.get("llm", {}).get("model", "")
+
+            with rays_ui.spinner("Initializing RAYS"):
+                rays = RAYS(
+                    codebase_root=str(codebase_path),
+                    config_path=config_path,
+                    conversation_id=args.conversation_id,
+                )
+
+            if args.auto_approve:
+                rays.set_execution_mode("autonomous")
+
+            rays.skills_orchestrator.discover_skills()
+            rays.mcp_manager.connect_all()
+
+            def _voice_on_command(prompt: str) -> str:
+                """Called by voice_loop for each spoken command."""
+                try:
+                    rays_ui.status_set_agent_running(True)
+                    with rays_ui.orchestration_hud():
+                        rays_ui.hud_set_status("Voice Command", prompt)
+                        result = rays.agent_orchestrator.run(user_prompt=prompt)
+                    return ""   # response already printed to terminal; TTS skips it
+                except Exception as e:
+                    return f"Error: {e}"
+                finally:
+                    rays_ui.status_set_agent_running(False)
+
+            try:
+                voice_loop(
+                    on_command=_voice_on_command,
+                    require_wake=not getattr(args, "voice_no_wake", False),
+                    device_index=getattr(args, "voice_device", None),
+                    tts_voice=getattr(args, "voice_tts_voice", None),
+                )
+            finally:
+                rays.mcp_manager.shutdown()
+            sys.exit(0)
 
         # Show banner with model + MCP info
         try:
@@ -1412,7 +1521,45 @@ def main():
                         status = rays.agent_orchestrator.list_mcp_status()
                         rays_ui.print_box("MCP Status", status, rays_ui.C_VIOLET)
                         continue
-                    
+
+                    elif cmd == '/voice':
+                        # Single-shot voice command inline in the running session
+                        from .voice_mode import check_voice_deps, voice_prompt_once, speak, MicRecorder
+                        _ok, _missing = check_voice_deps()
+                        if not _ok:
+                            rays_ui.print_error(
+                                "Voice mode needs: " + ", ".join(_missing) +
+                                "\n  Auto-install: pip install " + " ".join(_missing)
+                            )
+                            continue
+
+                        if cmd_arg.strip().lower() == "off":
+                            rays_ui.print_step("Voice mode: off")
+                            continue
+
+                        rays_ui.print_step(
+                            "Voice mode: listening… "
+                            "(say 'Hey RAYS <command>')"
+                        )
+                        try:
+                            with MicRecorder() as _rec:
+                                _voice_cmd = voice_prompt_once(_rec, require_wake=True)
+                        except RuntimeError as _ve:
+                            rays_ui.print_error(str(_ve))
+                            continue
+
+                        if _voice_cmd:
+                            rays_ui.print_step(f"Voice command: '{_voice_cmd}'")
+                            speak("On it.")
+                            rays_ui.status_set_agent_running(True)
+                            try:
+                                rays.agent_orchestrator.run(user_prompt=_voice_cmd)
+                            finally:
+                                rays_ui.status_set_agent_running(False)
+                        else:
+                            rays_ui.print_info("No command heard — type or try again.")
+                        continue
+
                     else:
                         rays_ui.print_warning(f"Unknown command: {cmd}. Type /help for available commands.")
                         continue
