@@ -1256,7 +1256,7 @@ print("JSON_START" + json.dumps(res) + "JSON_END")
 
     proc.on("error", (err) => {
       if (closed) return; closed = true; clearTimeout(timer);
-      resolve({ success: false, audioBase64: "", error: \`Python error: \${String(err)}\` });
+      resolve({ success: false, audioBase64: "", error: `Python error: ${String(err)}` });
     });
 
     proc.on("close", () => {

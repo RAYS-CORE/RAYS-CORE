@@ -14,6 +14,11 @@ echo "==> RAYS Studio: bundling Python backend"
 echo "    Studio: $STUDIO_ROOT"
 echo "    Monorepo: $MONOREPO_ROOT"
 
+if [[ "${SKIP_BACKEND_BUNDLE:-0}" == "1" && ( -f "$BACKEND_OUT/rays-gui-bridge" || -f "$BACKEND_OUT/rays-gui-bridge.exe" ) ]]; then
+  echo "==> Reusing existing backend bundle: $BACKEND_OUT"
+  exit 0
+fi
+
 rm -rf "$BACKEND_OUT" "$WORK_DIR"
 mkdir -p "$BACKEND_OUT"
 
