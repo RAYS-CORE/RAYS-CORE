@@ -74,3 +74,7 @@ src_legacy_backup/
 **/.gev-cache/
 .gev-logs/
 **/.gev-logs/
+
+# C2 & Simulation Architectural Workspace (rough assets, specs, plans, and drafts)
+c2_sim_workspace/
+**/c2_sim_workspace/
