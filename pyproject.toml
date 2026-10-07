@@ -33,6 +33,9 @@ dependencies = [
   "huggingface_hub>=0.19",
   "pydantic>=2.0",
   "textual>=0.40",
+  "transformers>=4.40.0",
+  "peft>=0.10.0",
+  "accelerate>=0.29.0",
   "prompt_toolkit>=3.0.0"
 ]
 keywords = ["ai", "codebase", "developer-tools", "cli", "agent"]
@@ -56,6 +59,19 @@ dev = [
   "twine>=6.1,<7",
   "pyinstaller>=6,<7",
 ]
+studio = [
+  "websockets>=12,<18",
+  "onnxruntime>=1.16,<2",
+  "tokenizers>=0.15,<1",
+]
+voice = [
+  "pyaudio>=0.2.14",
+  "SpeechRecognition>=3.10",
+  "edge-tts>=6.0",
+  "faster-whisper>=1.0",
+  "pyttsx3>=2.9",
+]
+
 [project.scripts]
 rays = "rays_core.rays_main:main"
 
