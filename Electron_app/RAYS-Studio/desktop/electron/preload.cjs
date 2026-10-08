@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld("raysDesktop", {
   synthesizeSpeech: (text, provider, voice, speed) =>
     ipcRenderer.invoke("rays:synthesize-speech", { text, provider, voice, speed }),
   listVoices: () => ipcRenderer.invoke("rays:list-voices"),
+  requestMicrophoneAccess: () => ipcRenderer.invoke("rays:request-microphone-access"),
+  getMicrophoneStatus: () => ipcRenderer.invoke("rays:get-microphone-status"),
   onMenuAction: (callback) => {
     const listener = (_event, payload) => callback(payload?.action, payload);
     ipcRenderer.on("rays:menu-action", listener);

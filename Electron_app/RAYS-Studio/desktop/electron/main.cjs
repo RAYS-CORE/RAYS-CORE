@@ -561,6 +561,20 @@ function createWindow(options = {}) {
   }
 
   mainWindow = win;
+
+  win.once("ready-to-show", async () => {
+    if (process.platform === "darwin" && typeof systemPreferences.askForMediaAccess === "function") {
+      try {
+        const status = systemPreferences.getMediaAccessStatus ? systemPreferences.getMediaAccessStatus("microphone") : "unknown";
+        if (status === "not-determined") {
+          await systemPreferences.askForMediaAccess("microphone");
+        }
+      } catch (err) {
+        console.warn("[macOS Mic Permission] ready-to-show check error:", err);
+      }
+    }
+  });
+
   return win;
 }
 
@@ -568,24 +582,33 @@ let proxyServerProcess = null;
 
 app.whenReady().then(async () => {
   // Request microphone permissions on macOS
-  if (process.platform === "darwin" && systemPreferences.askForMediaAccess) {
+  if (process.platform === "darwin" && typeof systemPreferences.askForMediaAccess === "function") {
     try {
-      await systemPreferences.askForMediaAccess("microphone");
+      const status = systemPreferences.getMediaAccessStatus ? systemPreferences.getMediaAccessStatus("microphone") : "unknown";
+      console.log("[macOS Mic Permission] Startup status:", status);
+      if (status === "not-determined") {
+        const granted = await systemPreferences.askForMediaAccess("microphone");
+        console.log("[macOS Mic Permission] Startup askForMediaAccess result:", granted);
+      }
     } catch (err) {
-      console.warn("Could not request microphone access:", err);
+      console.warn("Could not request microphone access on startup:", err);
     }
   }
 
-  // Allow ALL permissions automatically — required for mic access on Linux (Hey RAYS, voice recording)
+  // Allow ALL permissions automatically — required for mic access (Hey RAYS, voice recording)
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     // Grant everything: media, microphone, audioCapture, notifications, midi, etc.
     callback(true);
   });
 
   session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    // Always report permissions as granted so getUserMedia / Web Speech API work on Linux
+    // Always report permissions as granted so getUserMedia / Web Speech API work
     return true;
   });
+
+  if (typeof session.defaultSession.setDevicePermissionHandler === "function") {
+    session.defaultSession.setDevicePermissionHandler(() => true);
+  }
 
   const installEpoch = readBundledInstallEpoch();
   await ensureFreshUserData(installEpoch);
@@ -654,6 +677,32 @@ app.on("window-all-closed", () => {
 });
 
 ipcMain.handle("rays:get-install-epoch", () => ({ epoch: readBundledInstallEpoch() }));
+
+ipcMain.handle("rays:request-microphone-access", async () => {
+  if (process.platform === "darwin" && typeof systemPreferences.askForMediaAccess === "function") {
+    try {
+      const granted = await systemPreferences.askForMediaAccess("microphone");
+      console.log("[macOS Mic Permission] askForMediaAccess result:", granted);
+      return Boolean(granted);
+    } catch (err) {
+      console.warn("[macOS Mic Permission Error]:", err);
+      return false;
+    }
+  }
+  return true;
+});
+
+ipcMain.handle("rays:get-microphone-status", async () => {
+  if (process.platform === "darwin" && typeof systemPreferences.getMediaAccessStatus === "function") {
+    try {
+      return systemPreferences.getMediaAccessStatus("microphone");
+    } catch (err) {
+      console.warn("[macOS Mic Status Error]:", err);
+      return "unknown";
+    }
+  }
+  return "granted";
+});
 
 ipcMain.handle("rays:save-image", async (event, { base64 }) => {
   const result = await dialog.showSaveDialog({

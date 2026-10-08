@@ -557,6 +557,14 @@ export class VoiceEngine {
     this.lastLiveTranscript = "";
 
     try {
+      if (typeof window !== "undefined" && window.raysDesktop?.requestMicrophoneAccess) {
+        try {
+          await window.raysDesktop.requestMicrophoneAccess();
+        } catch (err) {
+          console.warn("[voiceService] desktop requestMicrophoneAccess error:", err);
+        }
+      }
+
       if (!this.mediaStream) {
         this.mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -939,6 +947,14 @@ export class VoiceEngine {
     if (enabled) {
       if (this.isContinuousMode) return;
 
+      if (typeof window !== "undefined" && window.raysDesktop?.requestMicrophoneAccess) {
+        try {
+          await window.raysDesktop.requestMicrophoneAccess();
+        } catch (err) {
+          console.warn("[voiceService] desktop requestMicrophoneAccess error:", err);
+        }
+      }
+
       // Start Web Speech API listener
       this.initRecognition();
       if (this.recognition && !this.recognitionActive) {
@@ -971,6 +987,14 @@ export class VoiceEngine {
     if (this.wakeStream || this.isContinuousMode) return;
 
     try {
+      if (typeof window !== "undefined" && window.raysDesktop?.requestMicrophoneAccess) {
+        try {
+          await window.raysDesktop.requestMicrophoneAccess();
+        } catch (err) {
+          console.warn("[voiceService] desktop requestMicrophoneAccess error:", err);
+        }
+      }
+
       this.wakeStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });

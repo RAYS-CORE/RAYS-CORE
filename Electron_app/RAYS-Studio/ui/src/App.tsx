@@ -30,6 +30,11 @@ const App = () => {
   useEffect(() => {
     void ensureFreshInstallState();
     applyAppearanceSettings(loadAppearanceSettings());
+    if (window.raysDesktop?.requestMicrophoneAccess) {
+      window.raysDesktop.requestMicrophoneAccess().catch((err) => {
+        console.warn("[App] Initial mic access request:", err);
+      });
+    }
   }, []);
 
   return (

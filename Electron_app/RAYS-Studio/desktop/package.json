@@ -67,6 +67,17 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "extendInfo": {
+        "CFBundleDisplayName": "RAYS Studio",
+        "CFBundleExecutable": "RAYS Studio",
+        "CFBundleName": "RAYS Studio",
+        "NSAudioCaptureUsageDescription": "RAYS Studio requires access to the microphone for voice commands ('Hey RAYS') and voice transcription.",
+        "NSMicrophoneUsageDescription": "RAYS Studio requires access to the microphone for voice commands ('Hey RAYS') and voice transcription."
+      },
       "target": [
         "dmg",
         "zip"

@@ -50,6 +50,8 @@ declare global {
         scope: "global" | "project",
         workspaceRoot?: string
       ) => Promise<{ path: string }>;
+      requestMicrophoneAccess?: () => Promise<boolean>;
+      getMicrophoneStatus?: () => Promise<string>;
     };
   }
 }
