@@ -29,6 +29,7 @@ export function GlobalVoiceIsland() {
       setWakePulse(true);
       setTimeout(() => setWakePulse(false), 2000);
       setIsContinuous(true);
+      void voiceEngine.start(true);
     };
 
     const handleFinalUtterance = (prompt: string) => {

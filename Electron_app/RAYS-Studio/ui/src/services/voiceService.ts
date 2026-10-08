@@ -541,6 +541,9 @@ export class VoiceEngine {
     this.playWakeChime();
     this.stopPassiveWakeEngine();
     this.onWakeWord?.();
+    this.wakeWordListeners.forEach((fn) => {
+      try { fn(); } catch (e) { console.error(e); }
+    });
   }
 
   /** Start recording or continuous voice session */
@@ -812,7 +815,7 @@ export class VoiceEngine {
     })();
 
     const timeoutPromise = new Promise<string>((resolve) => {
-      setTimeout(() => resolve(""), 8000);
+      setTimeout(() => resolve(""), 22000);
     });
 
     return Promise.race([fetchPromise, timeoutPromise]);

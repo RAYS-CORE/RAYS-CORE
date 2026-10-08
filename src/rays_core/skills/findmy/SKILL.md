@@ -129,3 +129,8 @@ Analyze each screenshot with vision to extract coordinates, then compile a route
 2. Use `vision_analyze` to read screenshot content — don't try to parse pixels
 3. For ongoing tracking, use a cronjob to periodically capture and log locations
 4. Respect privacy — only track devices/items the user owns
+
+
+## Linux/Windows Alternative
+> [!NOTE]
+> For Linux/Windows, this skill is unsupported as it requires Apple hardware.

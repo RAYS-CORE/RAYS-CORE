@@ -88,3 +88,8 @@ memo notes -ex                    # Export to HTML/Markdown
 1. Prefer Apple Notes when user wants cross-device sync (iPhone/iPad/Mac)
 2. Use the `memory` tool for agent-internal notes that don't need to sync
 3. Use the `obsidian` skill for Markdown-native knowledge management
+
+
+## Linux/Windows Alternative
+> [!NOTE]
+> For Linux/Windows, use Obsidian or standard Markdown notes instead.

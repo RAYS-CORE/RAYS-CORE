@@ -402,8 +402,10 @@ export default defineConfig(({ mode }) => ({
               const { audioBase64, mimeType, provider } = JSON.parse(body || "{}");
               const isWin = process.platform === "win32";
 
-              // Cross-platform Python resolver
+              // Cross-platform Python resolver — venv first (has rays_core, edge-tts, faster-whisper)
+              const repoVenvPy = path.join(cliRoot, ".venv", isWin ? "Scripts/python.exe" : "bin/python");
               const pythonCandidates: string[] = [
+                repoVenvPy,
                 process.env.PYTHON || "",
                 process.env.PYTHON3 || "",
                 ...(isWin ? [
@@ -583,8 +585,10 @@ print("JSON_START" + json.dumps(res) + "JSON_END")
                   : ["/usr/bin", "/usr/local/bin"];
               const envPath = [...extraPaths, process.env.PATH || ""].filter(Boolean).join(isWin ? ";" : ":");
 
+              // Python resolver — venv first (has edge-tts, rays_core, etc.)
+              const repoVenvPyTts = path.join(cliRoot, ".venv", isWin ? "Scripts/python.exe" : "bin/python");
               let selectedPython = isWin ? "python" : "python3";
-              for (const c of [process.env.PYTHON || "", process.env.PYTHON3 || "", ...(isWin ? ["python"] : ["python3", "python"])].filter(Boolean)) {
+              for (const c of [repoVenvPyTts, process.env.PYTHON || "", process.env.PYTHON3 || "", ...(isWin ? ["python"] : ["python3", "python"])].filter(Boolean)) {
                 if (c.includes("/") || c.includes("\\") || c.includes(".exe")) {
                   if (await fs.stat(c).then(() => true).catch(() => false)) { selectedPython = c; break; }
                 } else { selectedPython = c; break; }
@@ -670,7 +674,10 @@ print("JSON_START" + json.dumps(res) + "JSON_END")
           const extraPaths = isWin ? [] : process.platform === "darwin"
             ? ["/opt/homebrew/bin", "/usr/local/bin"] : ["/usr/bin", "/usr/local/bin"];
           const envPath = [...extraPaths, process.env.PATH || ""].filter(Boolean).join(isWin ? ";" : ":");
-          const selectedPython = isWin ? "python" : "python3";
+          // Use repo .venv python first — has edge-tts installed
+          const repoVenvPyVoices = path.join(cliRoot, ".venv", isWin ? "Scripts/python.exe" : "bin/python");
+          const { existsSync: _existsSync } = require("node:fs");
+          const selectedPython = _existsSync(repoVenvPyVoices) ? repoVenvPyVoices : (isWin ? "python" : "python3");
 
           const voiceScript = `
 import sys, json

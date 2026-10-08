@@ -246,8 +246,10 @@ def _try_pyttsx3_tts(text: str, out_wav: str) -> bool:
         engine.setProperty("volume", 1.0)
 
         # Pick the best English voice available
-        voices = engine.getProperty("voices")
-        english_voices = [v for v in voices if "en" in (v.languages[0].decode() if isinstance(v.languages[0], bytes) else v.languages[0]).lower()] if voices else []
+        english_voices = [
+            v for v in (voices or [])
+            if v.languages and len(v.languages) > 0 and "en" in (v.languages[0].decode() if isinstance(v.languages[0], bytes) else str(v.languages[0])).lower()
+        ]
         if english_voices:
             engine.setProperty("voice", english_voices[0].id)
 
