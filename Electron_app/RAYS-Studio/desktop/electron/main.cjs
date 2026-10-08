@@ -10,6 +10,24 @@ const { pathToFileURL } = require("node:url");
 const isDev = !app.isPackaged;
 const STUDIO_DEV_URL = process.env.RAYS_STUDIO_URL || "http://127.0.0.1:8080";
 
+// ── Linux / OS audio + Web Speech API enablement ─────────────────────────────
+// On Linux, Chromium disables Web Speech API and may block mic by default.
+// These flags must be set BEFORE app 'ready' fires.
+if (process.platform === "linux") {
+  // Enable Web Speech API (webkitSpeechRecognition) + PipeWire — needed for "Hey RAYS" + mic capture
+  app.commandLine.appendSwitch("enable-features", "WebSpeechAPI,SpeechRecognition,AudioServiceOutOfProcess,WebRtcPipeWireCapturer");
+  app.commandLine.appendSwitch("enable-webrtc-pipewire-capturer");
+  // Allow mic access without triggering an extra OS permission dialog in Electron
+  app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
+  // Allow getUserMedia on http://127.0.0.1 in dev mode (insecure origin workaround)
+  app.commandLine.appendSwitch("unsafely-treat-insecure-origin-as-secure", "http://127.0.0.1:8080");
+  app.commandLine.appendSwitch("allow-running-insecure-content");
+}
+
+// Allow auto-play of TTS audio without requiring prior user gesture
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+
+
 process.on("uncaughtException", (err) => {
   console.warn("[Electron main uncaughtException]", err);
 });
@@ -513,8 +531,8 @@ function createWindow(options = {}) {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      autoplayPolicy: "no-user-gesture-required",
       webSecurity: false,
+      allowRunningInsecureContent: true,
     },
   });
 
@@ -558,20 +576,15 @@ app.whenReady().then(async () => {
     }
   }
 
-  // Allow audio and media permissions automatically
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
-    if (
-      permission === "media" ||
-      permission === "audioCapture" ||
-      (details && details.mediaTypes && details.mediaTypes.includes("audio"))
-    ) {
-      return callback(true);
-    }
+  // Allow ALL permissions automatically — required for mic access on Linux (Hey RAYS, voice recording)
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    // Grant everything: media, microphone, audioCapture, notifications, midi, etc.
     callback(true);
   });
 
   session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    return permission === "media" || permission === "audioCapture";
+    // Always report permissions as granted so getUserMedia / Web Speech API work on Linux
+    return true;
   });
 
   const installEpoch = readBundledInstallEpoch();
@@ -1118,8 +1131,15 @@ print("JSON_START" + json.dumps(out) + "JSON_END")
 function getPythonRuntime(workspaceRoot = null) {
   const isWin = process.platform === "win32";
 
+  // In dev mode, prioritize the project .venv (where rays_core + voice deps are installed)
+  // __dirname = desktop/electron → ../../.. = RAYS-Studio → ../../../.. = RAYS (repo root)
+  const projectRoot = path.resolve(__dirname, "../../../..");
+  const repoVenvPython = path.join(projectRoot, ".venv", isWin ? "Scripts/python.exe" : "bin/python");
+
   // Cross-platform Python resolver
   const pythonCandidates = [
+    // Dev-mode venv (highest priority — has edge-tts, faster-whisper, etc.)
+    ...(!app.isPackaged ? [repoVenvPython] : []),
     process.env.PYTHON || "",
     process.env.PYTHON3 || "",
     ...(isWin ? [
@@ -1170,7 +1190,6 @@ function getPythonRuntime(workspaceRoot = null) {
     }
   }
 
-  const projectRoot = path.resolve(__dirname, "../../..");
   const srcPath = path.join(projectRoot, "src");
 
   const extraPaths = isWin

@@ -10,8 +10,10 @@ metadata:
     tags: [debugging, troubleshooting, problem-solving, root-cause, investigation]
     related_skills: [test-driven-development, plan, subagent-driven-development]
 ---
-> [!WARNING]
-> **WINDOWS COMPATIBILITY:** You are running on Windows. Linux tools like `jq`, `grep`, `sed`, `head`, `tr`, and `bash` are **NOT available**. If the instructions below suggest using `curl | jq` or pipeline parsing, you MUST NOT do it. Instead, write a short Python script (using `urllib` or `json`) to perform the request and data extraction, and then execute it via `python script.py`.
+> [!NOTE]
+> **CROSS-PLATFORM COMPATIBILITY:**
+> - **Linux/macOS:** You can use native shell tools (`jq`, `grep`, `sed`, `bash`).
+> - **Windows:** Linux shell tools are NOT available. Use Python scripts (`urllib`, `json`) instead of pipeline parsing.
 
 
 # Systematic Debugging

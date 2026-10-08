@@ -180,6 +180,7 @@ export const GeneralConversationView: React.FC<GeneralConversationViewProps> = (
       setWakeActive(true);
       setTimeout(() => setWakeActive(false), 2400);
       setIsContinuousListening(true);
+      void voiceEngine.start(true);
     });
 
     const unTranscript = voiceEngine.addTranscriptListener((transcript, isFinal) => {

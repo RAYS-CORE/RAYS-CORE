@@ -149,6 +149,7 @@ export function AgentChat({
 
     const unWake = voiceEngine.addWakeWordListener(() => {
       setIsContinuousVoice(true);
+      void voiceEngine.start(true);
     });
 
     const unStop = voiceEngine.addStopWordListener(() => {

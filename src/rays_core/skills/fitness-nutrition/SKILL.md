@@ -23,8 +23,10 @@ required_environment_variables:
     help: "Get one free at https://fdc.nal.usda.gov/api-key-signup/ — or skip to use DEMO_KEY with lower rate limits"
     required_for: "higher rate limits on food/nutrition lookups (DEMO_KEY works without signup)"
     optional: true---
-> [!WARNING]
-> **WINDOWS COMPATIBILITY:** You are running on Windows. Linux tools like `jq`, `grep`, `sed`, `head`, `tr`, and `bash` are **NOT available**. If the instructions below suggest using `curl | jq` or pipeline parsing, you MUST NOT do it. Instead, write a short Python script (using `urllib` or `json`) to perform the request and data extraction, and then execute it via `python script.py`.
+> [!NOTE]
+> **CROSS-PLATFORM COMPATIBILITY:**
+> - **Linux/macOS:** You can use native shell tools (`jq`, `grep`, `sed`, `bash`).
+> - **Windows:** Linux shell tools are NOT available. Use Python scripts (`urllib`, `json`) instead of pipeline parsing.
 
 
 # Fitness & Nutrition

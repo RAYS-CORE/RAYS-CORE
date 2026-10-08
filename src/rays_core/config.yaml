@@ -546,7 +546,7 @@ git_status_summarizer_prompts:
     '
 llm:
   api_key: ''
-  model: ornith:35b
+  model: llama3:latest
   num_ctx: 131072
   ollama_endpoint: http://127.0.0.1:11434
   provider: ollama

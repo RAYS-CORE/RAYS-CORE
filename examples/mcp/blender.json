@@ -3,7 +3,7 @@
     {
       "name": "blender",
       "description": "Blender 3D via blender-mcp (stdio → addon socket on port 9876). In Blender: N panel → BlenderMCP → Connect.",
-      "command": "FULL_PATH_TO_UVX",
+      "command": "uvx",
       "args": ["--python", "3.11", "blender-mcp"],
       "env": {
         "BLENDER_HOST": "localhost",

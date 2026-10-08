@@ -128,3 +128,8 @@ Accepted by `--due` and date filters:
 1. When user says "remind me", clarify: Apple Reminders (syncs to phone) vs agent cronjob alert
 2. Always confirm reminder content and due date before creating
 3. Use `--json` for programmatic parsing
+
+
+## Linux/Windows Alternative
+> [!NOTE]
+> For Linux/Windows, use Todoist CLI or a local tasks.md file.
