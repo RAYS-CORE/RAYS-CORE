@@ -618,7 +618,7 @@ export class VoiceEngine {
         resolver?.(fullBlob);
       };
 
-      this.mediaRecorder.start();
+      this.mediaRecorder.start(250);
       this.setState(continuous ? "listening" : "recording");
 
       // Adaptive Dynamic Noise Floor Calibration
@@ -797,6 +797,9 @@ export class VoiceEngine {
           );
           if (res && res.success && res.transcript) {
             return res.transcript.trim();
+          }
+          if (res && !res.success) {
+            console.warn("[voiceService] transcribeAudio failed:", res.error);
           }
         }
 
@@ -1057,7 +1060,7 @@ export class VoiceEngine {
             this.wakeRecorder.ondataavailable = (e) => {
               if (e.data && e.data.size > 0) this.wakeChunks.push(e.data);
             };
-            this.wakeRecorder.start();
+            this.wakeRecorder.start(200);
           } catch (e) {
             this.wakeHeardSpeech = false;
           }

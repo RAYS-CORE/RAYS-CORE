@@ -13,8 +13,10 @@ const STUDIO_DEV_URL = process.env.RAYS_STUDIO_URL || "http://127.0.0.1:8080";
 // ── Linux / OS audio + Web Speech API enablement ─────────────────────────────
 // On Linux, Chromium disables Web Speech API and may block mic by default.
 // These flags must be set BEFORE app 'ready' fires.
+// Enable Web Speech API + Audio Service
+app.commandLine.appendSwitch("enable-features", "WebSpeechAPI,SpeechRecognition,AudioServiceOutOfProcess");
+
 if (process.platform === "linux") {
-  // Enable Web Speech API (webkitSpeechRecognition) + PipeWire — needed for "Hey RAYS" + mic capture
   app.commandLine.appendSwitch("enable-features", "WebSpeechAPI,SpeechRecognition,AudioServiceOutOfProcess,WebRtcPipeWireCapturer");
   app.commandLine.appendSwitch("enable-webrtc-pipewire-capturer");
   // Allow mic access without triggering an extra OS permission dialog in Electron
@@ -819,10 +821,7 @@ try:
 except Exception as e:
     print("Error parsing docx: " + str(e))
 `;
-      const isWin = process.platform === "win32";
-      const pythonPath = app.isPackaged 
-        ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
-        : (isWin ? "python" : "python3");
+      const { pythonPath } = getPythonRuntime();
       const proc = require("node:child_process").spawnSync(pythonPath, ["-c", pythonScript, resolvedPath], { encoding: "utf8" });
       const output = proc.stdout || proc.stderr;
       return { content: output };
@@ -1082,10 +1081,7 @@ print("JSON_START" + json.dumps(out) + "JSON_END")
 
   return await new Promise((resolve) => {
     const launch = resolveBridgeLaunch(workspaceRoot || os.homedir());
-    const isWin = process.platform === "win32";
-    const pythonPath = app.isPackaged
-      ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
-      : (isWin ? "python" : "python3");
+    const { pythonPath } = getPythonRuntime(workspaceRoot);
 
     const env = { ...process.env, ...launch.env };
     const proc = spawn(pythonPath, ["-c", pythonScript, workspaceRoot || os.homedir(), prompt || ""], {
@@ -1146,10 +1142,7 @@ print("JSON_START" + json.dumps(out) + "JSON_END")
 
   return await new Promise((resolve) => {
     const launch = resolveBridgeLaunch(workspaceRoot || os.homedir());
-    const isWin = process.platform === "win32";
-    const pythonPath = app.isPackaged
-      ? path.join(process.resourcesPath, "bundle-venv", isWin ? "Scripts" : "bin", isWin ? "python.exe" : "python")
-      : (isWin ? "python" : "python3");
+    const { pythonPath } = getPythonRuntime(workspaceRoot);
 
     const env = { ...process.env, ...launch.env };
     const proc = spawn(pythonPath, ["-c", pythonScript, workspaceRoot || os.homedir()], {
@@ -1177,56 +1170,29 @@ print("JSON_START" + json.dumps(out) + "JSON_END")
   });
 });
 
-function getPythonRuntime(workspaceRoot = null) {
-  const isWin = process.platform === "win32";
+let _cachedPythonPath = null;
 
-  // In dev mode, prioritize the project .venv (where rays_core + voice deps are installed)
-  // __dirname = desktop/electron → ../../.. = RAYS-Studio → ../../../.. = RAYS (repo root)
-  const projectRoot = path.resolve(__dirname, "../../../..");
-  const repoVenvPython = path.join(projectRoot, ".venv", isWin ? "Scripts/python.exe" : "bin/python");
-
-  // Cross-platform Python resolver
-  const pythonCandidates = [
-    // Dev-mode venv (highest priority — has edge-tts, faster-whisper, etc.)
-    ...(!app.isPackaged ? [repoVenvPython] : []),
-    process.env.PYTHON || "",
-    process.env.PYTHON3 || "",
-    ...(isWin ? [
-      "python.exe",
-      path.join(process.env.LOCALAPPDATA || "", "Programs", "Python", "Python312", "python.exe"),
-      path.join(process.env.LOCALAPPDATA || "", "Programs", "Python", "Python311", "python.exe"),
-      path.join(os.homedir(), "AppData", "Local", "Programs", "Python", "Python312", "python.exe"),
-      "python",
-    ] : []),
-    ...(!isWin && process.platform === "darwin" ? [
-      "/opt/homebrew/bin/python3",
-      "/opt/anaconda3/bin/python3",
-      "/usr/local/bin/python3",
-      "python3",
-    ] : []),
-    ...(!isWin && process.platform === "linux" ? [
-      "/usr/bin/python3",
-      "/usr/local/bin/python3",
-      "/usr/bin/python",
-      "python3",
-    ] : []),
-    "python",
-  ].filter(Boolean);
-
-  let selectedPython = isWin ? "python" : "python3";
-  for (const c of pythonCandidates) {
-    if (!c) continue;
-    if (c.includes("/") || c.includes("\\") || c.includes(".exe")) {
-      if (fs.existsSync(c)) {
-        selectedPython = c;
-        break;
-      }
-    } else {
-      selectedPython = c;
-      break;
-    }
+function resolveBestPythonPath() {
+  if (_cachedPythonPath && (path.isAbsolute(_cachedPythonPath) ? fs.existsSync(_cachedPythonPath) : true)) {
+    return _cachedPythonPath;
   }
 
+  const isWin = process.platform === "win32";
+  const projectRoot = path.resolve(__dirname, "../../../..");
+  const repoVenvPython = path.join(projectRoot, ".venv", isWin ? "Scripts/python.exe" : "bin/python");
+  const home = os.homedir();
+
+  // Explicit env overrides
+  if (process.env.RAYS_PYTHON && fs.existsSync(process.env.RAYS_PYTHON)) {
+    _cachedPythonPath = process.env.RAYS_PYTHON;
+    return _cachedPythonPath;
+  }
+  if (process.env.PYTHON && fs.existsSync(process.env.PYTHON)) {
+    _cachedPythonPath = process.env.PYTHON;
+    return _cachedPythonPath;
+  }
+
+  // Packaged app bundle venv if present
   if (app.isPackaged) {
     const bundleVenv = path.join(
       process.resourcesPath,
@@ -1235,16 +1201,117 @@ function getPythonRuntime(workspaceRoot = null) {
       isWin ? "python.exe" : "python"
     );
     if (fs.existsSync(bundleVenv)) {
-      selectedPython = bundleVenv;
+      _cachedPythonPath = bundleVenv;
+      return _cachedPythonPath;
     }
   }
 
-  const srcPath = path.join(projectRoot, "src");
+  // Active dev repo venv if present
+  if (fs.existsSync(repoVenvPython)) {
+    _cachedPythonPath = repoVenvPython;
+    return _cachedPythonPath;
+  }
+
+  const resolvedSysPy = resolveExecutable(isWin ? "python.exe" : "python3");
+
+  const candidates = [
+    resolvedSysPy,
+    ...(!isWin && process.platform === "darwin" ? [
+      "/opt/anaconda3/bin/python3",
+      path.join(home, "anaconda3/bin/python3"),
+      path.join(home, "miniconda3/bin/python3"),
+      path.join(home, "opt/anaconda3/bin/python3"),
+      "/opt/homebrew/bin/python3",
+      "/usr/local/bin/python3",
+      "/usr/bin/python3",
+    ] : []),
+    ...(!isWin && process.platform === "linux" ? [
+      "/usr/bin/python3",
+      "/usr/local/bin/python3",
+      path.join(home, "miniconda3/bin/python3"),
+      path.join(home, "anaconda3/bin/python3"),
+      "/usr/bin/python",
+    ] : []),
+    ...(isWin ? [
+      path.join(process.env.LOCALAPPDATA || "", "Programs", "Python", "Python312", "python.exe"),
+      path.join(process.env.LOCALAPPDATA || "", "Programs", "Python", "Python311", "python.exe"),
+      path.join(home, "AppData", "Local", "Programs", "Python", "Python312", "python.exe"),
+      path.join(home, "anaconda3", "python.exe"),
+      path.join(home, "miniconda3", "python.exe"),
+      "python.exe",
+    ] : []),
+    "python3",
+    "python",
+  ].filter(Boolean);
+
+  const { spawnSync } = require("node:child_process");
+
+  // First pass: find a python interpreter that has speech_recognition installed
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (candidate.includes("/") || candidate.includes("\\") || candidate.includes(".exe")) {
+      if (!fs.existsSync(candidate)) continue;
+    }
+    try {
+      const probe = spawnSync(candidate, ["-c", "import speech_recognition"], {
+        timeout: 1500,
+        encoding: "utf8",
+        env: { ...process.env, PATH: shellPathEnv() },
+      });
+      if (probe.status === 0) {
+        console.log("[Python Runtime] Selected capable Python (speech_recognition verified):", candidate);
+        _cachedPythonPath = candidate;
+        return _cachedPythonPath;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Second pass: fallback to any working Python interpreter
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (candidate.includes("/") || candidate.includes("\\") || candidate.includes(".exe")) {
+      if (!fs.existsSync(candidate)) continue;
+    }
+    try {
+      const probe = spawnSync(candidate, ["-c", "import sys; print(sys.version)"], {
+        timeout: 1500,
+        encoding: "utf8",
+        env: { ...process.env, PATH: shellPathEnv() },
+      });
+      if (probe.status === 0) {
+        console.log("[Python Runtime] Selected fallback Python:", candidate);
+        _cachedPythonPath = candidate;
+        return _cachedPythonPath;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  _cachedPythonPath = isWin ? "python" : "python3";
+  return _cachedPythonPath;
+}
+
+function getPythonRuntime(workspaceRoot = null) {
+  const isWin = process.platform === "win32";
+  const projectRoot = path.resolve(__dirname, "../../../..");
+
+  let srcPath = path.join(projectRoot, "src");
+  if (app.isPackaged) {
+    const packagedSrc = path.join(process.resourcesPath, "src");
+    if (fs.existsSync(packagedSrc)) {
+      srcPath = packagedSrc;
+    }
+  }
+
+  const selectedPython = resolveBestPythonPath();
 
   const extraPaths = isWin
     ? []
     : process.platform === "darwin"
-      ? ["/opt/homebrew/bin", "/opt/anaconda3/bin", "/usr/local/bin", "/usr/bin"]
+      ? ["/opt/anaconda3/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
       : ["/usr/bin", "/usr/local/bin"];
 
   const envPath = [

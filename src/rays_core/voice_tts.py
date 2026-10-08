@@ -117,7 +117,16 @@ def _try_edge_tts(text: str, out_mp3: str, voice: str = "en-US-AriaNeural", spee
     """
     try:
         import edge_tts  # type: ignore
+    except ImportError:
+        try:
+            _log("edge-tts not found — attempting auto-install via pip...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "edge-tts"], timeout=45, check=True)
+            import edge_tts
+        except Exception as e:
+            _log(f"edge-tts auto-install failed: {e}")
+            return False
 
+    try:
         rate_str = "+0%"
         if speed != 1.0:
             pct = int((speed - 1.0) * 100)

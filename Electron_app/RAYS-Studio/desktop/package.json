@@ -57,6 +57,16 @@
         ]
       },
       {
+        "from": "../../../src",
+        "to": "src",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!**/.DS_Store"
+        ]
+      },
+      {
         "from": "../../../src/rays_core/skills/rayspy",
         "to": "rayspy",
         "filter": [

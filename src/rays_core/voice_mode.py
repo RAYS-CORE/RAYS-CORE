@@ -137,23 +137,60 @@ def _ensure_portaudio_system() -> None:
             break
 
 
+_PYAUDIO_ATTEMPTED = False
+_PYAUDIO_MOD = None
+
 def _try_import_pyaudio():
     """Import pyaudio, auto-installing it (and portaudio) if needed. Returns module or None."""
+    global _PYAUDIO_ATTEMPTED, _PYAUDIO_MOD
+    if _PYAUDIO_ATTEMPTED:
+        return _PYAUDIO_MOD
+
     try:
         import pyaudio  # type: ignore
+        _PYAUDIO_ATTEMPTED = True
+        _PYAUDIO_MOD = pyaudio
         return pyaudio
     except ImportError:
         pass
+
+    if _SYSTEM == "Darwin":
+        # On macOS Apple Silicon, PyAudio requires manual CFLAGS/LDFLAGS compilation against Homebrew
+        _ensure_portaudio_system()
+        brew_prefix = "/opt/homebrew" if os.path.exists("/opt/homebrew") else "/usr/local"
+        env = os.environ.copy()
+        env["CFLAGS"] = f"-I{brew_prefix}/include"
+        env["LDFLAGS"] = f"-L{brew_prefix}/lib"
+        try:
+            res = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet", "pyaudio"],
+                env=env, capture_output=True, timeout=30,
+            )
+            if res.returncode == 0:
+                import pyaudio
+                _PYAUDIO_ATTEMPTED = True
+                _PYAUDIO_MOD = pyaudio
+                return pyaudio
+        except Exception:
+            pass
+        _PYAUDIO_ATTEMPTED = True
+        _PYAUDIO_MOD = None
+        _log("PyAudio not available on macOS — using sounddevice (Core Audio)", "→")
+        return None
 
     _ensure_portaudio_system()
     ok = _pip_install("pyaudio")
     if ok:
         try:
             import pyaudio  # type: ignore
+            _PYAUDIO_ATTEMPTED = True
+            _PYAUDIO_MOD = pyaudio
             return pyaudio
         except ImportError:
             pass
 
+    _PYAUDIO_ATTEMPTED = True
+    _PYAUDIO_MOD = None
     _log("PyAudio not available — trying sounddevice fallback", "⚠")
     return None
 
@@ -342,22 +379,31 @@ class MicRecorder:
         self._sd          = None
 
     def __enter__(self) -> "MicRecorder":
-        pa_mod = _try_import_pyaudio()
-        if pa_mod is not None:
-            with _quiet_alsa():
-                self._pa = pa_mod.PyAudio()
-        else:
+        if _SYSTEM == "Darwin":
+            # On macOS, sounddevice is the most stable and natively supports Core Audio
             sd_mod = _try_import_sounddevice()
             if sd_mod is not None:
                 self._sd = sd_mod
-            else:
-                raise RuntimeError(
-                    "No audio input backend available.\n"
-                    "Install PyAudio: pip install pyaudio\n"
-                    "  Linux:   sudo pacman -S portaudio  (Arch) | sudo apt install portaudio19-dev  (Debian)\n"
-                    "  macOS:   brew install portaudio\n"
-                    "  Windows: pip install pyaudio  (pre-built wheel)"
-                )
+                return self
+            pa_mod = _try_import_pyaudio()
+            if pa_mod is not None:
+                self._pa = pa_mod.PyAudio()
+                return self
+        else:
+            pa_mod = _try_import_pyaudio()
+            if pa_mod is not None:
+                with _quiet_alsa():
+                    self._pa = pa_mod.PyAudio()
+                return self
+            sd_mod = _try_import_sounddevice()
+            if sd_mod is not None:
+                self._sd = sd_mod
+                return self
+
+        raise RuntimeError(
+            "No audio input backend available.\n"
+            "Install sounddevice or PyAudio: pip install sounddevice\n"
+        )
         return self
 
     def record(self) -> Optional[str]:

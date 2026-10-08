@@ -230,6 +230,16 @@ def _try_google_sr(audio_path: str) -> Optional[str]:
     """Attempt transcription via SpeechRecognition (Google STT, free)."""
     try:
         import speech_recognition as sr  # type: ignore
+    except ImportError:
+        try:
+            _log("speech_recognition not found — auto-installing via pip...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "SpeechRecognition"], timeout=45, check=True)
+            import speech_recognition as sr
+        except Exception as e:
+            _log(f"speech_recognition auto-install failed: {e}")
+            return None
+
+    try:
         r = sr.Recognizer()
         r.energy_threshold = 200
         r.dynamic_energy_threshold = True
@@ -249,9 +259,6 @@ def _try_google_sr(audio_path: str) -> Optional[str]:
         except sr.RequestError as e:
             _log(f"Google STT request failed: {e}")
             return None
-    except ImportError:
-        _log("speech_recognition not installed — pip install SpeechRecognition")
-        return None
     except Exception as e:
         _log(f"Google STT error: {e}")
         return None
